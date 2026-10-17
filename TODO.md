@@ -89,6 +89,14 @@ Wenn eine Aufgabe gelesen wird, müssen nicht nur Metadaten, sondern auch Daten 
 - macOS: Der Kommentar oben in `lib/anmeldedaten.dart` beschreibt nur DPAPI und Windows-Konto; für den Mac ist er zu aktualisieren ([0026](docs/adr/0026-schluesselbund-mac.md)).
 - macOS: Ein Release-Bau braucht eine Prüfung, ob der Schlüsselbund ohne Datenschutzgruppe auch dort gilt; der Entwicklerbau hat keine Team-ID ([0026](docs/adr/0026-schluesselbund-mac.md)).
 - macOS: Der Arbeitsordner liegt im Temp-Verzeichnis (`$TMPDIR`), die Spec 0001 nennt dafür einen anderen Ort. Die Abweichung ist zu klären, bevor Sicherungen auf dem Mac entstehen (siehe unten).
+- Codex-Sandbox blockiert den Flutter-Cache: Im Modus `workspace-write` schlägt `flutter analyze` und `flutter build` mit `Operation not permitted` unter `/opt/homebrew/share/flutter/bin/cache` fehl, obwohl der Ordner für `mg` beschreibbar ist (2026-10-17 geprüft). Vorgesehene Abhilfe in `~/.codex/config.toml` (außerhalb des Repos, noch nicht eingetragen, weil die Änderung an der Codex-Konfiguration eine Freigabe braucht):
+  ```toml
+  [sandbox_workspace_write]
+  writable_roots = ["/opt/homebrew/share/flutter/bin/cache"]
+  ```
+  Danach den Codex-Lauf für den Bildschirmfototest wiederholen.
+- `bildschirmfoto` ruft für eine Textseite `modedit.php?update=<cmid>` ab statt der Ansicht (`mod/page/view.php?id=<cmid>`); cmid 1891 liefert HTTP 500, cmid 1892 funktioniert. Das Werkzeug auf die Ansicht umstellen und mit Messung im Testkurs 41 prüfen (A6).
+- `bildschirmfoto` legt das PNG im Temp-Arbeitsordner der App ab (`/private/var/folders/…/moocp_arbeitsordner/`), nicht im Arbeitsordner des Repos, wie `docs/agents/testing.md` es beschreibt. Eine der beiden Angaben angleichen.
 
 ## Widersprüche zwischen Plänen und ADRs
 
