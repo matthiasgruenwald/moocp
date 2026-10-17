@@ -1,6 +1,6 @@
 # CLAUDE.md – moocp
 
-Git: Lokal keine Git-Aktionen durchführen – das macht ausschließlich der Benutzer. In einer Cloud-Sitzung dagegen committen und direkt auf main pushen, ohne Force und ohne eigenen Zweig: `import_from_github.sh` holt nur main herein (E12). Wenn Du während der Arbeit Fehler, Probleme oder sonstige Ungenauigkeiten findest, beseitige Sie entweder sofort oder nimm einen Punkt ins TODO.md auf.
+Git: `git` und `gh` (Branches, Commits, Push, Issues anlegen und schließen) sind im Rahmen der Aufgabe ohne Rückfrage erlaubt, Feature-Zweige zweigen von main ab und werden als eigener Zweig gepushed. Force-Push, History-Rewrite, Branch-Löschen und Pushes auf main nur nach Rückfrage (E12: main auf GitHub wird nie überschrieben). In einer Cloud-Sitzung dagegen committen und direkt auf main pushen, ohne Force und ohne eigenen Zweig: `import_from_github.sh` holt nur main herein (E12). Wenn Du während der Arbeit Fehler, Probleme oder sonstige Ungenauigkeiten findest, beseitige Sie entweder sofort oder nimm einen Punkt ins TODO.md auf.
 
 ## Regeln für die Dokumentation (zuerst lesen, immer einhalten)
 
@@ -42,11 +42,17 @@ Git: Lokal keine Git-Aktionen durchführen – das macht ausschließlich der Ben
    Skills, `skills/<skill>/CLAUDE.md` für Notizen zu einem Skill (nicht im
    Paket). Jede gehört zu dem Ordner, in dem man arbeitet, wenn man sie
    braucht.
-8. **Offene Punkte stehen in [TODO.md](TODO.md)**, nicht in README oder
+8. **Offene Punkte außerhalb von Specs und deren Umsetzungstickets stehen in [TODO.md](TODO.md)**, nicht in README oder
    einer CLAUDE.md: fehlende Funktionen, Fehler und Aufgaben außerhalb des Codes. Was erledigt ist, fliegt dort heraus. „Noch durchzuspielen" kommt dort möglichst gar nicht hinein: Was umgesetzt ist, wird gleich geprüft, von Hand oder mit einem Test. Was dafür zu aufwendig ist (frischer Rechner, Schulnetz, Beobachtung über viele Sitzungen), würde auch später nicht geprüft – das bleibt draußen, bis ein Nutzer ein Problem meldet.
 
 Architektur, Aufbau, Werkzeuge, Bauen und Prüfen: [README.md](README.md),
 Teil 4.
+
+## Agent skills
+
+### Issue tracker
+
+Specs und daraus abgeleitete Umsetzungstickets gehören in die GitHub-Issues dieses Projekts. Vor `/to-spec`, `/to-tickets` oder der Arbeit an diesen Issues [docs/agents/issue-tracker.md](docs/agents/issue-tracker.md) lesen.
 
 ## Anforderungen
 
