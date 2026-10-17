@@ -649,7 +649,7 @@ class _HauptseiteState extends State<Hauptseite> with WindowListener {
           await Anmeldedaten.speichern(benutzer, passwort);
           widget.protokoll.eintrag(
             Art.anmeldung,
-            'Anmeldedaten gespeichert (Passwort verschlüsselt, Windows-DPAPI)',
+            'Anmeldedaten gespeichert (Passwort ${Anmeldedaten.schutz})',
           );
         } catch (e) {
           _meldung =
@@ -841,8 +841,8 @@ class _HauptseiteState extends State<Hauptseite> with WindowListener {
                     'Ohne Haken bleiben Benutzername und Passwort nur im Arbeitsspeicher, solange '
                     'die App läuft -- für die automatische Neuanmeldung, wenn die Sitzung abläuft. '
                     'Mit Haken speichert die App sie nach einer erfolgreichen Anmeldung -- den '
-                    'Benutzernamen in ihren Einstellungen, das Passwort verschlüsselt mit Windows '
-                    '(DPAPI, nur mit Ihrem Windows-Konto lesbar) -- und meldet sich beim Start '
+                    'Benutzernamen in ihren Einstellungen, das Passwort '
+                    '${Anmeldedaten.schutz} (${Anmeldedaten.lesbarFuer}) -- und meldet sich beim Start '
                     'selbst an. Haken weg: beides wird sofort gelöscht. Das Passwort geht nie an '
                     'die KI und in kein Protokoll.',
                     style: klein,

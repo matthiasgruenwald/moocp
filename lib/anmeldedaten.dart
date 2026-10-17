@@ -17,6 +17,8 @@
 // Tippfehler festsetzt. Nimmt die Lehrkraft den Haken weg, werden
 // Benutzername und Passwort sofort entfernt.
 
+import 'dart:io';
+
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -24,6 +26,17 @@ class Anmeldedaten {
   static const _merken = 'anmeldung.merken';
   static const _benutzer = 'anmeldung.benutzer';
   static const _passwort = 'moodle.passwort';
+
+  /// Wo das Passwort verschlüsselt liegt, für Protokoll und Hinweise. Auf dem
+  /// Mac ist es der Schlüsselbund, unter Windows DPAPI.
+  static String get schutz => Platform.isMacOS
+      ? 'verschlüsselt im macOS-Schlüsselbund'
+      : 'verschlüsselt mit Windows-DPAPI';
+
+  /// Wer das Passwort wieder lesen kann.
+  static String get lesbarFuer => Platform.isMacOS
+      ? 'nur mit Ihrem Benutzerkonto lesbar'
+      : 'nur mit Ihrem Windows-Konto lesbar';
 
   // Ohne Rückgriff auf die Windows-Anmeldeinformationsverwaltung älterer
   // Paketversionen: nur die DPAPI-verschlüsselte Datei. Auf dem Mac der alte

@@ -79,7 +79,6 @@ Wenn eine Aufgabe gelesen wird, müssen nicht nur Metadaten, sondern auch Daten 
   Modul `qbank_bulkmove/bulk_move` lädt nicht); nach einem Leeren der Caches
   durch die Administration erneut prüfen, dann wäre der Weg zu messen.
 - macOS: Bildschirmfotos suchen Edge und Chrome nur unter Windows-Programmpfaden (`lib/moodle/bildschirmfoto.dart`); auf dem Mac findet das Werkzeug den Browser nicht.
-- macOS: Der Hinweis im Anmeldebereich nennt DPAPI und das Windows-Konto (`lib/main.dart`); auf dem Mac gilt der Schlüsselbund, der Text müsste je Plattform stimmen.
 - macOS: Die Release-Entitlements (`macos/Runner/Release.entitlements`) haben keine Netzwerkrechte; ohne sie scheitern Moodle und der MCP-Server im Release. Vor einem Release-Bau für den Mac nachziehen und die Sandbox dort bewusst entscheiden (im Entwicklungsbau ist sie aus).
 - macOS: Ohne `HOME` lösen `ClaudeCode`, `CodexCli` und `LmStudio` ihre Ordner relativ zum Arbeitsverzeichnis auf (`?? ''` in `lib/einrichtung.dart`); dort ist der Pfad leer, statt zu scheitern. Abfangen oder den Start verweigern.
 - macOS: LM Studio mit Bionic fehlt auf dem Mac. Ihre Brücke `moocp-bruecke.exe` ist ein Windows-Programm, eine Mac-Brücke bräuchte eine eigene Umsetzung.
