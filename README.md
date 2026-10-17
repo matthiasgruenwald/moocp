@@ -199,6 +199,7 @@ In allen dreien arbeiten Sie gleich, siehe [Arbeiten](#arbeiten); die Skills nim
 
 - **Claude Code**: in der Claude-Desktop-App im Reiter „Code" eine neue Sitzung beginnen. `/mcp` zeigt die Verbindung; `/moodle`, `/moodle-fragen` oder `/lernsituation` ruft einen Skill gezielt auf.
 - **Codex CLI**: in einer Eingabeaufforderung `codex` starten. `/mcp` zeigt die Verbindung; `$moodle`, `$moodle-fragen` oder `$lernsituation` in der Anfrage wählt einen Skill gezielt.
+  **Achtung:** Codex kann selbst einen Browser öffnen und steuern, etwa über seine eigenen Werkzeuge. Das läuft nicht über die App, und die Anmeldung bei Moodle in einem solchen Browser sieht die App nicht. Die App verlangt keine Änderung an Codex; wer das ausschließen will, schaltet die Browser- und Computerwerkzeuge in Codex selbst ab. Die Bildschirmfotos der App sind davon nicht betroffen.
 - **LM Studio**: Bionic starten, nicht das klassische LM Studio, und ein Modell wählen, das Werkzeuge benutzen kann. moocp muss nicht vorher laufen, es startet bei Bedarf von selbst. Bionic fragt in jedem Chat nach Zugriff auf den Arbeitsordner.
 
 ### Arbeiten
