@@ -82,3 +82,17 @@ Wenn eine Aufgabe gelesen wird, müssen nicht nur Metadaten, sondern auch Daten 
 - macOS: Die Release-Entitlements (`macos/Runner/Release.entitlements`) haben keine Netzwerkrechte; ohne sie scheitern Moodle und der MCP-Server im Release. Vor einem Release-Bau für den Mac nachziehen und die Sandbox dort bewusst entscheiden (im Entwicklungsbau ist sie aus).
 - macOS: Ohne `HOME` lösen `ClaudeCode`, `CodexCli` und `LmStudio` ihre Ordner relativ zum Arbeitsverzeichnis auf (`?? ''` in `lib/einrichtung.dart`); dort ist der Pfad leer, statt zu scheitern. Abfangen oder den Start verweigern.
 - macOS: LM Studio mit Bionic fehlt auf dem Mac. Ihre Brücke `moocp-bruecke.exe` ist ein Windows-Programm, eine Mac-Brücke bräuchte eine eigene Umsetzung.
+- macOS: Die Werkzeuge Claude Code und Codex sind auf dem Mac nicht ausgeführt geprüft. Ob sie die Pfade `~/.local/bin`, `/opt/homebrew/bin`, `/usr/local/bin` und die Skill-Ordner `~/.claude/skills`, `~/.codex/skills` tatsächlich lesen, ist offen ([0024](docs/adr/0024-plattformen.md), [0013](docs/adr/0013-ki-werkzeuge-einrichten.md)).
+- macOS: Ein Entfernen der KI-Werkzeug-Einträge gibt es auf dem Mac nicht, weil die Deinstallation (NSIS) dort fehlt. Entweder ein Befehl in der App oder ein Hinweis, wie man die Einträge von Hand löscht ([0013](docs/adr/0013-ki-werkzeuge-einrichten.md)).
+- macOS: Der Kommentar oben in `lib/anmeldedaten.dart` beschreibt nur DPAPI und Windows-Konto; für den Mac ist er zu aktualisieren ([0026](docs/adr/0026-schluesselbund-mac.md)).
+- macOS: Ein Release-Bau braucht eine Prüfung, ob der Schlüsselbund ohne Datenschutzgruppe auch dort gilt; der Entwicklerbau hat keine Team-ID ([0026](docs/adr/0026-schluesselbund-mac.md)).
+- macOS: Der Arbeitsordner liegt im Temp-Verzeichnis (`$TMPDIR`), die Spec 0001 nennt dafür einen anderen Ort. Die Abweichung ist zu klären, bevor Sicherungen auf dem Mac entstehen (siehe unten).
+
+## Widersprüche zwischen Plänen und ADRs
+
+Offen benannt, nicht still aufgelöst. Entscheidung jeweils durch die Lehrkraft beziehungsweise die Projektleitung.
+
+- **Arbeitsordner gegen dauerhafte Sicherungen:** [E5](docs/adr/0005-ergebnisse-als-dateien.md) und A3 verlangen Dateien nur im Arbeitsordner, der geleert wird. Spec 0001, `docs/plans/moodle-sicherung-grilling.md` (Q4) und `docs/plans/moodle-sicherung-formulare.md` verlangen Sicherungen dagegen in einem gewählten dauerhaften Ordner außerhalb davon. Eine Ausnahme für Sicherungen braucht eine eigene ADR, sonst bleibt es beim Arbeitsordner.
+- **Freigabestufe „keine“:** [E20](docs/adr/0020-freigabestufen.md) sagt „vor nichts fragen“. `docs/plans/moodle-sicherung-technik.md` lässt Nachfragen bei unklarem Auftrag unabhängig von der Stufe gelten. Entscheiden, ob das eine Frage der Stufe bleibt oder außerhalb liegt.
+- **Datenschutz und Sicherungsdatei:** [A1](CLAUDE.md) verbietet, personenbezogene Daten zu lesen. Eine Sicherung eines Kurses kann Abgaben und Teilnehmendenlisten enthalten, auch wenn die App sie nur als binäre Datei kopiert. Spec 0001 sagt „keine Änderung der Datenschutzregeln“; das ist mit A1 nur vereinbar, wenn die Datei nie gelesen wird. Das ist zu klären, bevor #11 gebaut wird.
+- **Abnahme von #11 gegen die Schnittstelle:** Die Abnahme in Spec 0001 verlangt „ohne Verzweigung im Kern“; die Schnittstelle zwischen Kern und Plattform ist noch nicht entschieden.

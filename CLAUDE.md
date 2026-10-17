@@ -143,8 +143,11 @@ Begründung, Messungen und Verworfenes stehen je Entscheidung in `docs/adr/`; vo
 | E21 | Drei KI-Werkzeuge (Claude Code, Codex, LM Studio/Bionic über Brücke) | [0021](docs/adr/0021-drei-ki-werkzeuge.md) |
 | E22 | Interaktive Elemente nur als Datei im abgeschotteten Rahmen | [0022](docs/adr/0022-interaktive-elemente.md) |
 | E23 | Kein Moodle-Plugin, kein Web-Service-Token; Formulare mit der Sitzung der Lehrkraft | [0023](docs/adr/0023-kein-moodle-plugin.md) |
-| E24 | Windows wird ausgeliefert, macOS läuft aus dem Entwicklungsbau (Umfang: Spec 0001) | [0024](docs/adr/0024-plattformen.md) |
+| E24 | Windows wird ausgeliefert, macOS läuft aus dem Entwicklungsbau; Lösungen für den Mac stehen in der ADR | [0024](docs/adr/0024-plattformen.md) |
 | E25 | Flutter-Desktop-App, ein Code für beide Plattformen, keine nachgeladene Logik | [0025](docs/adr/0025-flutter-desktop.md) |
+| E26 | Auf dem Mac Passwort im Schlüsselbund ohne Datenschutzgruppe (Entwicklerbau ohne Team-ID) | [0026](docs/adr/0026-schluesselbund-mac.md) |
+| E27 | Einzelstart auf dem Mac über einen Unix-Socket im Einstellungsordner | [0027](docs/adr/0027-einzelstart-mac.md) |
+| E28 | Bildschirmfotos nur über den Browser der App, nie über einen Browser des KI-Werkzeugs | [0028](docs/adr/0028-bildschirmfoto-app-browser.md) |
 
 ## Arbeitsregeln für die KI
 
