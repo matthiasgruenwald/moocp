@@ -1,0 +1,11 @@
+# E18 Bildschirmfotos nur vom Inhalt, mit Grund und Freigabe je Bild
+
+Seit 0.9.0 (2026-10-02). Status: gilt. Die Kurzfassung steht in [CLAUDE.md](../../CLAUDE.md).
+
+## Entscheidung
+
+`bildschirmfoto` zeigt, wie eine Textseite, ein Buchkapitel, eine Wikiseite oder eine Frage in der Vorschau im Browser aussieht, auf Wunsch wie gedruckt. So prüft Claude, was es geschrieben hat (Formeln, Druck, Vorschau), statt die Lehrkraft nachsehen zu lassen. Gerendert wird mit Edge, sonst Chrome, ohne Fenster über das DevTools-Protokoll. Der Schutz liegt im Code (A1), nicht erst in der Freigabe: Jede Anfrage des Browsers hält die App an; Anfragen an Moodle stellt sie selbst (Sperrliste, eigene Liste `lib/moodle/browserliste.dart`, Protokoll), der Browser bekommt nie das Sitzungscookie und lädt als Seite nur die eine, die aufgenommen wird, als Rahmen darin auch ihre interaktiven Elemente (E22); nur MathJax lädt er selbst, von der Adresse, die die Seite einstellt. Aufgenommen wird nur der Inhalt selbst, also was auch die Textwerkzeuge liefern, und ein Wiki nur, wenn sie es lesen dürfen. Darüber kommt die Freigabe: Jeder Aufruf nennt einen Grund, und die Lehrkraft sieht ihn mit jedem Bild, bevor es an Claude geht. Freigegebene Bilder gehen nur als PNG-Dateien in den Arbeitsordner (E5), die Antwort nennt die Pfade, und Claude öffnet sie selbst; wer später wieder hinsehen will, nimmt ein neues Bild auf, denn Moodle ist maßgeblich (E17). Verbietet eine Richtlinie die Fernsteuerung des Browsers, gibt es keine Bildschirmfotos; die App umgeht das nicht.
+
+## Verworfen
+
+Das Bild in der Antwort selbst, als Bildinhalt oder eingebettete Ressource (beides Base64 im JSON, also nicht billiger als die Datei; Bionic gibt keines davon ans Modell weiter, E21), auch zusätzlich zur Datei (das Modell sähe dasselbe Bild zweimal); eine Webview in der App (`webview_flutter` kann kein Windows; WebView2-Pakete bringen nativen Code und einen bleibenden Profilordner); das Werkzeug nur in einem Entwicklermodus (der Nutzen ist bei der Lehrkraft derselbe, und die Schutzgrenze liegt ohnehin im Werkzeug); Bilder der ganzen Seite oder des ganzen Inhaltsbereichs (Kopf, Blöcke, Auswahllisten und Kommentare können Namen zeigen).
