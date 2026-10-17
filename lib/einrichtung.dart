@@ -514,6 +514,14 @@ String tomlBlockEntfernen(String text, String name) => _zeilenweise(text, (zeile
 ///   Sekunden; erlaubt ist jede positive ganze Zahl bis 2³¹−1. Danach bricht
 ///   Bionic den Werkzeugaufruf ab, auch während eine Freigabe offen ist --
 ///   darum trägt die App [bionicZeitlimit] ein.
+/// - Bilder aus Werkzeugergebnissen gibt Bionic nicht ans Modell weiter,
+///   weder als Bildinhalt noch als eingebettete Ressource (darum legt
+///   `bildschirmfoto` Dateien ab).
+/// - Bionic verlangt in jeder Sitzung eine Erlaubnis für den Arbeitsordner;
+///   sie lässt sich nicht vorab eintragen.
+/// - Die Skills liegen in `~/.lmstudio/skills`, wie bei den anderen Werkzeugen
+///   im eigenen Ordner: Claude Code liest keinen gemeinsamen, und nur so
+///   bleibt das Deinstallieren eindeutig.
 ///
 /// Also schreibt die App selbst hinein, ohne dass Bionic beendet werden muss.
 /// Weil die Datei intern und nicht dokumentiert ist, so vorsichtig wie
