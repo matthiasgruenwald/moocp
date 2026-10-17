@@ -149,6 +149,7 @@ Begründung, Messungen und Verworfenes stehen je Entscheidung in `docs/adr/`; vo
 | E27 | Einzelstart auf dem Mac über einen Unix-Socket im Einstellungsordner | [0027](docs/adr/0027-einzelstart-mac.md) |
 | E28 | Bildschirmfotos nur über den Browser der App, nie über einen Browser des KI-Werkzeugs | [0028](docs/adr/0028-bildschirmfoto-app-browser.md) |
 | E29 | Sicherungen außerhalb des Arbeitsordners; Rückfragen unabhängig von der Freigabestufe; Plattformverzweigung am Rand | [0029](docs/adr/0029-sicherungen-und-verzweigung.md) |
+| E30 | Skills in einer Quelle `~/.agents/skills`, Claude per Verlinkung statt Kopien je Werkzeug | [0030](docs/adr/0030-skills-eine-quelle.md) |
 
 ## Arbeitsregeln für die KI
 
