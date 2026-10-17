@@ -26,9 +26,13 @@ class Anmeldedaten {
   static const _passwort = 'moodle.passwort';
 
   // Ohne Rückgriff auf die Windows-Anmeldeinformationsverwaltung älterer
-  // Paketversionen: nur die DPAPI-verschlüsselte Datei.
-  static const _sicher =
-      FlutterSecureStorage(wOptions: WindowsOptions(useBackwardCompatibility: false));
+  // Paketversionen: nur die DPAPI-verschlüsselte Datei. Auf dem Mac der alte
+  // Schlüsselbund statt der Datenschutz-Schlüsselbundgruppe: Die verlangt eine
+  // Team-ID zum Signieren, die ein Entwicklerbau ohne Konto nicht hat.
+  static const _sicher = FlutterSecureStorage(
+    wOptions: WindowsOptions(useBackwardCompatibility: false),
+    mOptions: MacOsOptions(usesDataProtectionKeychain: false),
+  );
 
   final bool merken;
   final String? benutzer;

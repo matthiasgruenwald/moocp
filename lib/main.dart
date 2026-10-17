@@ -23,6 +23,7 @@ import 'einrichtung_dialog.dart';
 import 'einstellungen.dart';
 import 'einstellungen_dialog.dart';
 import 'einstellungen_ort.dart';
+import 'einzelstart.dart';
 import 'freigabe.dart';
 import 'log.dart';
 import 'mcp/mcp_dienst.dart';
@@ -52,6 +53,12 @@ Future<void> main(List<String> argumente) async {
   mcpLogsUmleiten();
   WidgetsFlutterBinding.ensureInitialized();
   await windowManager.ensureInitialized();
+  // Vor allem, was Einstellungen und Arbeitsordner anfasst: Eine zweite App
+  // holt hier nur die laufende nach vorn (einzelstart.dart). Unter Windows
+  // hat windows/runner/main.cpp das schon geprüft und gibt immer eine Sperre
+  // zurück.
+  final einzel = await Einzelstart.sichern(einstellungenOrdner);
+  if (einzel == null) exit(0);
   final einstellungen = await Einstellungen.laden();
   final protokoll = Protokoll(
     datei: File(p.join(einstellungenOrdner, 'protokoll.log')),
@@ -100,6 +107,7 @@ Future<void> main(List<String> argumente) async {
       freigaben,
       arbeitsordner,
       updatefaehig: updateMoeglich(argumente, Platform.environment),
+      fokus: einzel.fokus,
     ),
   );
 }
@@ -181,6 +189,7 @@ class MoocpApp extends StatelessWidget {
     this.arbeitsordner, {
     this.einrichtungsstand,
     this.updatefaehig = false,
+    this.fokus,
     super.key,
   });
   final Einstellungen einstellungen;
@@ -198,6 +207,9 @@ class MoocpApp extends StatelessWidget {
   /// (tool/bilder_test.dart): Die echte Prüfung sähe auf dem Rechner nach,
   /// und ihr Dialog zeigte den echten Pfad zur claude.exe im Bild.
   final Future<Einrichtungsstand> Function()? einrichtungsstand;
+
+  /// Wenn eine zweite Anmeldung das Fenster verlangt (einzelstart.dart).
+  final Stream<void>? fokus;
 
   @override
   Widget build(BuildContext context) {
@@ -221,6 +233,7 @@ class MoocpApp extends StatelessWidget {
         arbeitsordner,
         einrichtungsstand: einrichtungsstand,
         updatefaehig: updatefaehig,
+        fokus: fokus,
       ),
     );
   }
@@ -236,6 +249,7 @@ class Hauptseite extends StatefulWidget {
     this.arbeitsordner, {
     this.einrichtungsstand,
     this.updatefaehig = false,
+    this.fokus,
     super.key,
   });
   final Einstellungen einstellungen;
@@ -246,6 +260,7 @@ class Hauptseite extends StatefulWidget {
   final Arbeitsordner arbeitsordner;
   final Future<Einrichtungsstand> Function()? einrichtungsstand;
   final bool updatefaehig;
+  final Stream<void>? fokus;
 
   @override
   State<Hauptseite> createState() => _HauptseiteState();
@@ -284,12 +299,27 @@ class _HauptseiteState extends State<Hauptseite> with WindowListener {
     if (mounted) setState(() {});
   }
 
+  StreamSubscription<void>? _fokusAbo;
+
   @override
   void initState() {
     super.initState();
     windowManager.addListener(this);
     widget.protokoll.addListener(_aktualisieren);
+    _fokusAbo = widget.fokus?.listen((_) => _fensterZeigen());
     WidgetsBinding.instance.addPostFrameCallback((_) => _starten());
+  }
+
+  /// Eine zweite Anmeldung hat die App gestartet: Das Fenster kommt aus dem
+  /// Hintergrund, auch aus der Minimierung. Anders als _nachVorn bleibt es
+  /// nicht oben, sondern verhält sich wie jedes andere Fenster.
+  Future<void> _fensterZeigen() async {
+    try {
+      await windowManager.show();
+      await windowManager.focus();
+    } catch (_) {
+      // Ohne Fensterzugriff bleibt das Fenster, wie es ist.
+    }
   }
 
   /// Der Start in fester Reihenfolge: Updates, KI-Werkzeuge einrichten,
@@ -594,6 +624,7 @@ class _HauptseiteState extends State<Hauptseite> with WindowListener {
   void dispose() {
     windowManager.removeListener(this);
     widget.protokoll.removeListener(_aktualisieren);
+    _fokusAbo?.cancel();
     _adresse.dispose();
     _benutzer.dispose();
     _passwort.dispose();

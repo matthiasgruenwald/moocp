@@ -85,6 +85,9 @@ class NeueVersion {
 
 /// Ob diese App sich selbst aktualisieren kann; siehe Kopf dieser Datei.
 bool updateMoeglich(List<String> argumente, Map<String, String> umgebung) {
+  // Der Installer (NSIS) gibt es nur unter Windows; ein Mac-Bau kennt keinen
+  // Ort, an dem er sich selbst ersetzen könnte.
+  if (!Platform.isWindows) return false;
   if (argumente.contains(keinUpdateSchalter)) return false;
   final lokal = umgebung['LOCALAPPDATA'];
   if (lokal == null || lokal.isEmpty) return false;

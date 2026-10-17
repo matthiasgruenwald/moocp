@@ -50,9 +50,21 @@ String? _v(Map<String, String> umgebung, String name) {
   return w == null || w.trim().isEmpty ? null : w;
 }
 
-/// Die Verzeichnisse aus PATH, in der Reihenfolge, in der Windows sucht.
-List<String> _pfad(Map<String, String> umgebung) =>
-    [for (final d in (_v(umgebung, 'PATH') ?? '').split(';')) if (d.trim().isNotEmpty) d.trim()];
+/// Die Verzeichnisse aus PATH, in der Reihenfolge, in der das Betriebssystem sucht.
+List<String> _pfad(Map<String, String> umgebung) => [
+      for (final d in (_v(umgebung, 'PATH') ?? '').split(Platform.isWindows ? ';' : ':'))
+        if (d.trim().isNotEmpty) d.trim(),
+    ];
+
+/// Das Benutzerverzeichnis: USERPROFILE unter Windows, sonst HOME.
+String? _heimOrdner(Map<String, String> umgebung) => _v(umgebung, Platform.isWindows ? 'USERPROFILE' : 'HOME');
+
+/// Der Dateiname eines Programms: unter Windows mit .exe, auf dem Mac nackt.
+String _programm(String name) => Platform.isWindows ? '$name.exe' : name;
+
+/// Wo Homebrew und ein Installer unter macOS Programme ablegen, die nicht im
+/// PATH einer App liegen (eine Finder-gestartete App erbt den PATH der Shell nicht).
+const _macVerzeichnisse = ['/opt/homebrew/bin', '/usr/local/bin'];
 
 // ---------------------------------------------------------------------------
 // Die Verbindung: der MCP-Eintrag „moodle"
@@ -146,14 +158,15 @@ const _claudeDesktopPaket = 'Claude_pzs8sxrjxfjjc';
 String? claudeFinden(Map<String, String> umgebung) {
   final lokal = _v(umgebung, 'LOCALAPPDATA');
   final roaming = _v(umgebung, 'APPDATA');
-  final heim = _v(umgebung, 'USERPROFILE');
+  final heim = _heimOrdner(umgebung);
   final kandidaten = <String?>[
-    if (lokal != null)
+    if (Platform.isWindows && lokal != null)
       _neuesteVersion(p.join(lokal, 'Packages', _claudeDesktopPaket, 'LocalCache', 'Roaming', 'Claude', 'claude-code')),
-    if (roaming != null) _neuesteVersion(p.join(roaming, 'Claude', 'claude-code')),
-    for (final d in _pfad(umgebung)) p.join(d, 'claude.exe'),
-    if (heim != null) p.join(heim, '.local', 'bin', 'claude.exe'),
-    if (heim != null) _vsCode(p.join(heim, '.vscode', 'extensions')),
+    if (Platform.isWindows && roaming != null) _neuesteVersion(p.join(roaming, 'Claude', 'claude-code')),
+    for (final d in _pfad(umgebung)) p.join(d, _programm('claude')),
+    if (heim != null) p.join(heim, '.local', 'bin', _programm('claude')),
+    if (!Platform.isWindows) for (final d in _macVerzeichnisse) p.join(d, 'claude'),
+    if (Platform.isWindows && heim != null) _vsCode(p.join(heim, '.vscode', 'extensions')),
   ];
   for (final k in kandidaten) {
     if (k != null && File(k).existsSync()) return k;
@@ -217,7 +230,7 @@ String? _vsCode(String erweiterungen) {
 class ClaudeCode extends KiWerkzeug {
   ClaudeCode(super.umgebung)
       : _eigen = umgebung['CLAUDE_CONFIG_DIR'],
-        _heim = umgebung['USERPROFILE'] ?? '';
+        _heim = _heimOrdner(umgebung) ?? '';
 
   final String? _eigen;
   final String _heim;
@@ -334,7 +347,7 @@ class CodexCli extends KiWerkzeug {
   String get datenziel => 'Inhalte gehen an das eingestellte Modell, in der Regel bei OpenAI';
 
   /// CODEX_HOME verlegt Konfiguration und Skills; sonst `~/.codex`.
-  Directory get heim => Directory(_v(umgebung, 'CODEX_HOME') ?? p.join(umgebung['USERPROFILE'] ?? '', '.codex'));
+  Directory get heim => Directory(_v(umgebung, 'CODEX_HOME') ?? p.join(_heimOrdner(umgebung) ?? '', '.codex'));
 
   File get konfiguration => File(p.join(heim.path, 'config.toml'));
 
@@ -345,8 +358,14 @@ class CodexCli extends KiWerkzeug {
   /// selbst), wohl aber einen Hinweis darauf, dass Codex benutzt wird. Über
   /// npm installiert, liegt nur ein .cmd im Suchpfad.
   String? get exe {
-    for (final d in [..._pfad(umgebung), if (_v(umgebung, 'APPDATA') != null) p.join(umgebung['APPDATA']!, 'npm')]) {
-      for (final n in const ['codex.exe', 'codex.cmd', 'codex.bat']) {
+    final dirs = [
+      ..._pfad(umgebung),
+      if (Platform.isWindows && _v(umgebung, 'APPDATA') != null) p.join(umgebung['APPDATA']!, 'npm'),
+      if (!Platform.isWindows) ..._macVerzeichnisse,
+    ];
+    final namen = Platform.isWindows ? const ['codex.exe', 'codex.cmd', 'codex.bat'] : const ['codex'];
+    for (final d in dirs) {
+      for (final n in namen) {
         if (File(p.join(d, n)).existsSync()) return p.join(d, n);
       }
     }
@@ -545,7 +564,7 @@ class LmStudio extends KiWerkzeug {
   @override
   String get datenziel => 'Inhalte gehen an das eingestellte Modell, lokal oder in der Cloud';
 
-  Directory get heim => Directory(p.join(umgebung['USERPROFILE'] ?? '', '.lmstudio'));
+  Directory get heim => Directory(p.join(_heimOrdner(umgebung) ?? '', '.lmstudio'));
 
   /// Bionics Liste der MCP-Server.
   File get liste => File(p.join(heim.path, 'apps', 'bionic', '.internal', 'ng-mcp.json'));
@@ -555,8 +574,10 @@ class LmStudio extends KiWerkzeug {
 
   /// Gefunden ist LM Studio, sobald Bionic einmal gelaufen ist: Erst dann
   /// gibt es seine Liste, und erst Bionic arbeitet mit Werkzeugen und Skills.
+  /// Bionic gibt es nur unter Windows; auf dem Mac wird es nicht angeboten,
+  /// denn die Brücke ist eine .exe.
   @override
-  bool get gefunden => Directory(p.join(heim.path, 'apps', 'bionic')).existsSync();
+  bool get gefunden => Platform.isWindows && Directory(p.join(heim.path, 'apps', 'bionic')).existsSync();
 
   @override
   bool get bedienbar => true;
