@@ -1,6 +1,13 @@
 // Offline prüfbar: die Einrichtung der KI-Werkzeuge an einem nachgebauten
 // Ordnerbaum -- Werkzeuge finden, die MCP-Einträge von Claude Code, Codex
 // und LM Studio prüfen und schreiben, Skills vergleichen und installieren.
+//
+// Nur unter Windows: Die Fälle sind mit Windows-Pfaden (C:\…, .exe, „;" im
+// PATH) geschrieben, und p.join baut auf dem Mac POSIX-Pfade. Der macOS-Zweig
+// steht in test/macos_test.dart.
+@TestOn('windows')
+library;
+
 import 'dart:convert';
 import 'dart:io';
 

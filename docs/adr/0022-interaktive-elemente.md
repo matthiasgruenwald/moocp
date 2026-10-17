@@ -1,0 +1,17 @@
+# E22 Interaktive Elemente nur als Datei im abgeschotteten Rahmen
+
+Seit 0.9.18 (2026-10-09). Status: gilt. Die Kurzfassung steht in [CLAUDE.md](../../CLAUDE.md).
+
+## Entscheidung
+
+Kleine HTML-Anwendungen zum Ausprobieren und Üben, ohne Bewertung und ohne Gedächtnis, als Ersatz für H5P. Ein Element ist eine eigene HTML-Datei im Dateibereich des Editorfelds, eingebunden mit `<iframe sandbox="allow-scripts" src="@@PLUGINFILE@@/….html">`; den Anfang ihres Kopfs setzt die App (`lib/moodle/elemente.dart`).
+
+Der Schutz liegt im Browser, nicht in einer Prüfung am Text: Ohne `allow-same-origin` kommt das Element nicht an Seite, Sitzung, Cookies und Speicher (gemessen), und verschleierter Code ändert daran nichts. Die Prüfung am Text meldet nur früh, was ohnehin gesperrt wäre.
+
+Neuen Code direkt im Text, neue Rahmen ohne diese Abschottung und neue HTML-, SVG- oder XML-Dateien mit Code, die kein Element sind, weist die App beim Schreiben ab; was schon in Moodle steht, bleibt und erscheint als Befund (E17). Elemente gibt es in Kursinhalten, nicht in Fragen und Wikis.
+
+Die KI schlägt sie vor, wo sie an einer Stelle mehr bringen als Text und Bild. Der Skill beschreibt die Möglichkeit offen, ohne Katalog von Arten, im Gleichanteil `einsatz.md`, den `moodle` und `lernsituation` ohnehin laden; das Wissen zum Bauen steht in `references/elemente.md`. Messungen, Policy und ihre Grenzen: Kopfkommentar von `elemente.dart`.
+
+## Verworfen
+
+Skripte direkt im Text (liefen in der Sitzung jedes Betrachters, auch der Lehrkraft, an der Sperrliste vorbei); `<iframe srcdoc>` (der Moodle-Editor löscht `srcdoc` beim nächsten Speichern, und ein Filter vor manchen Instanzen weist Formulare mit `srcdoc` oder `<script>` ab, auf der Testinstanz bei Abschnitt und Buchkapitel); diesen Filter mit `data:`-Adressen oder einer Kodierung zu umgehen (nie – er ist eine Schutzmaßnahme des Betreibers, das Hochladen einer Datei dagegen eine gewöhnliche Moodle-Funktion); Elemente in Fragen (die bewertet werden, und für Interaktives dort gibt es STACK mit JSXGraph); ein eigener Skill (lädt nur, wenn jemand nach ihm fragt, und wer die Möglichkeit nicht kennt, fragt nicht); eine Höhe, die sich dem Inhalt anpasst (bräuchte ein Skript auf der Seite selbst).

@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.9.23
+- macOS: Die App startet als Entwicklerversion auf dem Mac; ein zweiter Start holt das laufende Fenster nach vorn, ohne den Arbeitsordner zu berühren.
+
 ## 0.9.22
 - Freigaben: Warten weitere Anfragen hinter der offenen, zeigt der Dialog, wie viele, und das Protokoll nennt jede, die sich einreiht.
 - Freigaben: Ein abgelaufener Dialog bleibt nicht mehr stehen, wenn schon die nächste Anfrage wartet, und die 30 Minuten zählen ab der Anfrage, auch während sie wartet.

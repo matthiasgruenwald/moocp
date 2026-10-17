@@ -79,3 +79,23 @@ Wenn eine Aufgabe gelesen wird, müssen nicht nur Metadaten, sondern auch Daten 
 - Fragen zwischen Kategorien verschieben scheitert auf der Testinstanz (das
   Modul `qbank_bulkmove/bulk_move` lädt nicht); nach einem Leeren der Caches
   durch die Administration erneut prüfen, dann wäre der Weg zu messen.
+- macOS: Bildschirmfotos suchen Edge und Chrome nur unter Windows-Programmpfaden (`lib/moodle/bildschirmfoto.dart`); auf dem Mac findet das Werkzeug den Browser nicht.
+- macOS: Die Release-Entitlements (`macos/Runner/Release.entitlements`) haben keine Netzwerkrechte; ohne sie scheitern Moodle und der MCP-Server im Release. Vor einem Release-Bau für den Mac nachziehen und die Sandbox dort bewusst entscheiden (im Entwicklungsbau ist sie aus).
+- macOS: Ohne `HOME` lösen `ClaudeCode`, `CodexCli` und `LmStudio` ihre Ordner relativ zum Arbeitsverzeichnis auf (`?? ''` in `lib/einrichtung.dart`); dort ist der Pfad leer, statt zu scheitern. Abfangen oder den Start verweigern.
+- macOS: LM Studio mit Bionic fehlt auf dem Mac. Ihre Brücke `moocp-bruecke.exe` ist ein Windows-Programm, eine Mac-Brücke bräuchte eine eigene Umsetzung.
+- macOS: Die Werkzeuge Claude Code und Codex sind auf dem Mac nicht ausgeführt geprüft. Ob sie die Pfade `~/.local/bin`, `/opt/homebrew/bin`, `/usr/local/bin` tatsächlich lesen, ist offen ([0024](docs/adr/0024-plattformen.md), [0013](docs/adr/0013-ki-werkzeuge-einrichten.md)).
+- Skills (#3a, [E30](docs/adr/0030-skills-eine-quelle.md)): Codex hat in einer frischen Sitzung (`codex exec`) einen Testskill unter `~/.agents/skills/zz-ladetest/` gefunden und gelesen (2026-10-17). Offen: ob das über den Skill-Mechanismus lief oder über eine Dateisuche; Codex hat den Ordner nicht per Skill-Aufruf geladen, nur die Datei gelesen. Die Prüfung mit einem Skill, der im Gespräch genutzt wird, steht noch aus. Dann die App umstellen: Quelle `~/.agents/skills`, Claude per Verlinkung, unter Windows Kopie als Rückfall.
+- macOS: Ein Entfernen der KI-Werkzeug-Einträge gibt es auf dem Mac nicht, weil die Deinstallation (NSIS) dort fehlt. Entweder ein Befehl in der App oder ein Hinweis, wie man die Einträge von Hand löscht ([0013](docs/adr/0013-ki-werkzeuge-einrichten.md)).
+- macOS: Der Kommentar oben in `lib/anmeldedaten.dart` beschreibt nur DPAPI und Windows-Konto; für den Mac ist er zu aktualisieren ([0026](docs/adr/0026-schluesselbund-mac.md)).
+- macOS: Ein Release-Bau braucht eine Prüfung, ob der Schlüsselbund ohne Datenschutzgruppe auch dort gilt; der Entwicklerbau hat keine Team-ID ([0026](docs/adr/0026-schluesselbund-mac.md)).
+- macOS: Der Arbeitsordner liegt im Temp-Verzeichnis (`$TMPDIR`), die Spec 0001 nennt dafür einen anderen Ort. Die Abweichung ist zu klären, bevor Sicherungen auf dem Mac entstehen (siehe unten).
+
+## Widersprüche zwischen Plänen und ADRs
+
+Offen benannt, nicht still aufgelöst. Entscheidung jeweils durch die Lehrkraft beziehungsweise die Projektleitung.
+
+- ~~**Arbeitsordner gegen dauerhafte Sicherungen:**~~ Entschieden in [E29](docs/adr/0029-sicherungen-und-verzweigung.md): Sicherungen liegen außerhalb des Arbeitsordners.
+- ~~**Freigabestufe „keine“:**~~ Entschieden in [E29](docs/adr/0029-sicherungen-und-verzweigung.md): Rückfragen bei unklarem Auftrag gelten unabhängig von der Stufe; E20 bleibt unverändert.
+- ~~**Datenschutz und Sicherungsdatei:**~~ Entschieden in [E29](docs/adr/0029-sicherungen-und-verzweigung.md): A1 bleibt unverändert. Selbst erzeugte Sicherungen gehen direkt; bei fremden Dateien fragt die App deutlich, dass Nutzerdaten enthalten sein können, ohne sie zu lesen. Die Lehrkraft entscheidet.
+- ~~**Abnahme von #11 gegen die Schnittstelle:**~~ Entschieden in [E29](docs/adr/0029-sicherungen-und-verzweigung.md): Verzweigung am Rand, nicht im Moodle-Kern. Die Schnittstelle wird vor #11 festgelegt.
+- **Codex und Browser:** Codex kann über `mcp__cua_repl` selbst einen Browser öffnen und steuern. Die Lehrkraft hat das Risiko bewusst akzeptiert; in der Dokumentation für Lehrkräfte nennen ([E29](docs/adr/0029-sicherungen-und-verzweigung.md)).

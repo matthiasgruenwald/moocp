@@ -199,6 +199,7 @@ In allen dreien arbeiten Sie gleich, siehe [Arbeiten](#arbeiten); die Skills nim
 
 - **Claude Code**: in der Claude-Desktop-App im Reiter „Code" eine neue Sitzung beginnen. `/mcp` zeigt die Verbindung; `/moodle`, `/moodle-fragen` oder `/lernsituation` ruft einen Skill gezielt auf.
 - **Codex CLI**: in einer Eingabeaufforderung `codex` starten. `/mcp` zeigt die Verbindung; `$moodle`, `$moodle-fragen` oder `$lernsituation` in der Anfrage wählt einen Skill gezielt.
+  **Achtung:** Codex kann selbst einen Browser öffnen und steuern, etwa über seine eigenen Werkzeuge. Das läuft nicht über die App, und die Anmeldung bei Moodle in einem solchen Browser sieht die App nicht. Die App verlangt keine Änderung an Codex; wer das ausschließen will, schaltet die Browser- und Computerwerkzeuge in Codex selbst ab. Die Bildschirmfotos der App sind davon nicht betroffen.
 - **LM Studio**: Bionic starten, nicht das klassische LM Studio, und ein Modell wählen, das Werkzeuge benutzen kann. moocp muss nicht vorher laufen, es startet bei Bedarf von selbst. Bionic fragt in jedem Chat nach Zugriff auf den Arbeitsordner.
 
 ### Arbeiten
@@ -565,6 +566,22 @@ Schalter von `moocp.exe`; die Auskünfte schreiben nach stdout, und weil `moocp.
 | `--version` | gibt die Version aus und endet |
 | `--werkzeugliste` | gibt als eine Zeile JSON aus, was der MCP-Server auf `initialize` und `tools/list` antwortet, und endet; daraus antwortet die Brücke |
 | `--claude-entfernen` | entfernt die Einrichtung in allen KI-Werkzeugen und endet; ruft die Deinstallation auf (der Name stammt aus der Zeit, als es nur Claude Code gab, und bleibt, damit auch ältere Deinstallationen wirken) |
+
+### Auf dem Mac bauen (nur Entwicklerversion)
+
+Voraussetzung: Flutter und Xcode (aus dem App Store, einmal gestartet). Eine Veröffentlichung für den Mac gibt es nicht; die App läuft aus dem Entwicklungsbau.
+
+```sh
+flutter analyze
+flutter test
+flutter run -d macos
+```
+
+Die Einstellungen liegen unter `~/Library/Application Support/moocp`, dort auch der Socket für die Einzelstart-Sperre (`moocp.sock`). Die Zugangsdaten stehen im Schlüsselbund des Benutzers, im alten Schlüsselbund statt der Datenschutz-Schlüsselbundgruppe, weil ein Entwicklerbau ohne Team-ID dort nicht schreiben darf.
+
+Das KI-Werkzeug LM Studio mit Bionic wird auf dem Mac nicht angeboten: Seine Brücke ist ein Windows-Programm. Claude Code und Codex CLI findet die App im `PATH` sowie unter `~/.local/bin`, `/opt/homebrew/bin` und `/usr/local/bin`.
+
+Bildschirmfotos finden auf dem Mac Edge und Chrome bisher nicht; das Werkzeug meldet dann den fehlenden Browser, statt ihn zu raten. Offen in [TODO.md](TODO.md).
 
 ### Bildschirmfotos
 

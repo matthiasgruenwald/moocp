@@ -154,6 +154,8 @@ class Bruecke {
     required this.ausgabe,
     required this.listeHolen,
     required this.appStarten,
+    // Kürzer als Bionics Zeitlimit (einrichtung.dart): Die KI soll den Hinweis
+    // „moocp ist noch nicht bereit" bekommen, nicht nur eine Zeitüberschreitung.
     this.aufAppWarten = const Duration(minutes: 5),
     HttpClient? client,
   }) : _client = client ?? (HttpClient()..connectionTimeout = const Duration(milliseconds: 500));

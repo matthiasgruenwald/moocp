@@ -1,0 +1,11 @@
+# E20 Wie viele Freigaben, stellt die Lehrkraft ein, nicht Claude
+
+Seit 0.9.6 (2026-10-07). Status: gilt. Die Kurzfassung steht in [CLAUDE.md](../../CLAUDE.md).
+
+## Entscheidung
+
+Drei Stufen in einem Feld der Titelzeile (`Bestaetigungen` in `lib/freigabe.dart`): „mittel" wie E4, „alle" zusätzlich vor jedem Vorgang, der in Moodle etwas erzeugt (verborgen Anlegen, Duplizieren, Kategorie anlegen, Fragen importieren) und vor dem Füllen und Ändern dessen, was die App seit der Anmeldung selbst verborgen angelegt hat, solange es verborgen ist, „keine" vor nichts. Gerade Angelegtes ist noch nichts Bestehendes, es zu füllen gehört zum Anlegen (`fuellenAb` in `lib/moodle/kurs.dart`); sonst kostete eine Lernsituation mit Board, Fortschrittsliste und Test bei „mittel" je einen Dialog für etwas, das niemand außer der KI gesehen hat. Kopien zählen nicht dazu – bei ihnen ist der Zeilenvergleich zum Original der Sinn der Freigabe –, und Verschieben, Sichtbarkeit und Löschen fragen immer. Entschieden wird an einer Stelle, `Freigaben.anfragen`: Jede Anfrage nennt mit `ab`, ab welcher Stufe sie kommt, und liegt die eingestellte darunter, gilt sie als erteilt. So kann kein Werkzeug die Einstellung übersehen, und eine neue Freigabe ist von selbst dabei. Die Stufe steht in den Einstellungen und gilt über einen Neustart hinweg – eine, die sich von selbst zurückstellte, überraschte; dass sie Rückfragen abschaltet, zeigt das Feld rot und das Protokoll bei jedem Start. Die Freigabe je Bildschirmfoto hängt nicht daran (`ab: keine`, also immer): Sie entscheidet nicht über eine Änderung, sondern darüber, welches Bild aus dem Kurs an Claude geht (A1, E18). Claude erfährt die Stufe über `status` und nach einer ausgelassenen Freigabe in der Antwort des Werkzeugs – damit die Skills keine Rückfrage ankündigen, die nicht kommt –, kann sie nicht ändern und soll nie vorschlagen, sie zu senken. Gebündelt wird nur, was ein Werkzeugaufruf zusammen erledigt (`aendern_mehrere`, `links_setzen`, `fragen_importieren`): Über mehrere Aufrufe hinweg bräuchte es eine Planungsebene im Code, und die ist mit E4 verworfen.
+
+## Verworfen
+
+„keine" beim Start auf „mittel" zurückfallen zu lassen (das rote Feld und der Protokolleintrag sind die Sichtbarkeit, die es braucht), und die Stufe über MCP erreichbar zu machen.
