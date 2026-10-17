@@ -9,9 +9,7 @@ Seit 0.9.23 (2026-10-17). Status: gilt. Ergänzt [E5](0005-ergebnisse-als-dateie
 3. **Die Plattformverzweigung liegt am Rand, nicht im Kern.** Pfade, Schlüsselbund, Einzelstart, Browsersuche, Installer und Aktualisierung unterscheiden die Plattformen. Die Moodle-Logik unter `lib/moodle/` kennt keine Plattformprüfung. Die Schnittstelle zwischen Kern und Plattform wird vor #11 festgelegt.
 4. **Browser des KI-Werkzeugs.** E28 gilt für den Browser der App. Ein Werkzeug kann aber einen eigenen Browser öffnen und steuern. Bei Codex (`mcp__cua_repl`, Stand der Prüfung am 2026-10-17) ist das so. Das Risiko wird bewusst getragen und in der Dokumentation für Lehrkräfte genannt. Die App verlangt keine Änderung an der Codex-Konfiguration.
 
-## Offen
-
-- Umgang mit Sicherungsdateien, die die App nicht selbst erzeugt hat. A1 bleibt unverändert. Die Datei nicht zu lesen ist mit einer Prüfung auf Nutzerdaten nicht vereinbar. Lösung noch nicht entschieden ([TODO.md](../../TODO.md)).
+5. **Fremde Sicherungsdateien:** A1 bleibt unverändert, die App liest die Datei nicht. Bei einer Datei, die die App nicht selbst erzeugt hat, fragt sie deutlich, dass Nutzerdaten enthalten sein können. Die Lehrkraft entscheidet, ob sie weitermacht. Keine harte Sperre im Programm.
 
 ## Verworfen
 
