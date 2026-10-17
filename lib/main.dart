@@ -649,7 +649,11 @@ class _HauptseiteState extends State<Hauptseite> with WindowListener {
           await Anmeldedaten.speichern(benutzer, passwort);
           widget.protokoll.eintrag(
             Art.anmeldung,
-            'Anmeldedaten gespeichert (Passwort ${Anmeldedaten.schutz})',
+            Anmeldedaten.testzugangAktiv
+                // Testzugang aus einer Datei: das Passwort liegt nirgends
+                // gespeichert, der Eintrag soll nicht den Schlüsselbund nennen.
+                ? 'Anmeldedaten gespeichert (Testzugang aus Datei, nicht im Schlüsselbund)'
+                : 'Anmeldedaten gespeichert (Passwort ${Anmeldedaten.schutz})',
           );
         } catch (e) {
           _meldung =

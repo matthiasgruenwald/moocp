@@ -19,6 +19,7 @@
 
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -53,10 +54,47 @@ class Anmeldedaten {
 
   const Anmeldedaten(this.merken, this.benutzer, this.passwort);
 
+  /// Nur Entwicklerbau: Zugangsdaten aus einer Datei im Format `SCHLUESSEL=WERT`,
+  /// deren Ort die Umgebungsvariable `MOOCP_TESTZUGANG` nennt. Die Datei liegt
+  /// außerhalb des Repos (E2E-Zugang der Spike-Instanz, `TEACHER_USERNAME` und
+  /// `TEACHER_PASSWORD`). Dann kein Schlüsselbund und keine Abfrage des
+  /// Mac-Passworts; im Release-Bau gibt es das nicht.
+  static String? get _testdatei {
+    if (!kDebugMode) return null;
+    final v = Platform.environment['MOOCP_TESTZUGANG'];
+    return (v == null || v.isEmpty) ? null : v;
+  }
+
+  /// Ob der Testzugang aus einer Datei gilt; dann liegt nichts im Schlüsselbund.
+  static bool get testzugangAktiv => _testdatei != null;
+
+  static Future<(String, String)?> _testzugang() async {
+    final pfad = _testdatei;
+    if (pfad == null) return null;
+    // Nur die Namen stehen in Fehlermeldungen, nie die Werte.
+    final werte = <String, String>{};
+    for (final zeile in await File(pfad).readAsLines()) {
+      final t = zeile.trim();
+      if (t.isEmpty || t.startsWith('#')) continue;
+      final gleich = t.indexOf('=');
+      if (gleich < 0) continue;
+      final wert = t.substring(gleich + 1).trim();
+      werte[t.substring(0, gleich).trim()] = wert.replaceAll(RegExp(r'''^["']|["']$'''), '');
+    }
+    final benutzer = werte['TEACHER_USERNAME'];
+    final passwort = werte['TEACHER_PASSWORD'];
+    if (benutzer == null || passwort == null) {
+      throw StateError('Testzugang: TEACHER_USERNAME oder TEACHER_PASSWORD fehlt in $pfad');
+    }
+    return (benutzer, passwort);
+  }
+
   static Future<Anmeldedaten> laden() async {
     final prefs = await SharedPreferences.getInstance();
     final merken = prefs.getBool(_merken) ?? false;
     if (!merken) return const Anmeldedaten(false, null, null);
+    final test = await _testzugang();
+    if (test != null) return Anmeldedaten(true, test.$1, test.$2);
     String? passwort;
     try {
       passwort = await _sicher.read(key: _passwort);
@@ -78,7 +116,7 @@ class Anmeldedaten {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_merken, true);
     await prefs.setString(_benutzer, benutzer);
-    await _sicher.write(key: _passwort, value: passwort);
+    if (_testdatei == null) await _sicher.write(key: _passwort, value: passwort);
   }
 
   /// Entfernt Benutzername und Passwort ausdrücklich -- shared_preferences
@@ -87,6 +125,6 @@ class Anmeldedaten {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_merken, false);
     await prefs.remove(_benutzer);
-    await _sicher.delete(key: _passwort);
+    if (_testdatei == null) await _sicher.delete(key: _passwort);
   }
 }

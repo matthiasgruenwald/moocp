@@ -225,16 +225,28 @@ Future<bool> _fernsteuerungVerboten(String richtlinie) async {
   return false;
 }
 
-/// Name und Pfad des Browsers: Edge, sonst Chrome.
+/// Programmdatei eines Browsers unter macOS: im Bündel in /Applications oder
+/// im Benutzerordner. Die Registry gibt es dort nicht.
+String? _macFinden(String app, String programm) {
+  final home = Platform.environment['HOME'] ?? '';
+  for (final ordner in ['/Applications', p.join(home, 'Applications')]) {
+    final pfad = p.join(ordner, '$app.app', 'Contents', 'MacOS', programm);
+    if (File(pfad).existsSync()) return pfad;
+  }
+  return null;
+}
+
+/// Name und Pfad des Browsers: Edge, sonst Chrome. Unter macOS gibt es keine
+/// Richtlinie in der Registry; sie wird dort nicht geprüft.
 Future<(String, String)> _browser() async {
   final verboten = <String>[];
-  for (final (name, exe, ordner, richtlinie) in [
-    ('Microsoft Edge', 'msedge.exe', ['Microsoft', 'Edge', 'Application'], r'SOFTWARE\Policies\Microsoft\Edge'),
-    ('Google Chrome', 'chrome.exe', ['Google', 'Chrome', 'Application'], r'SOFTWARE\Policies\Google\Chrome'),
+  for (final (name, exe, ordner, richtlinie, app) in [
+    ('Microsoft Edge', 'msedge.exe', ['Microsoft', 'Edge', 'Application'], r'SOFTWARE\Policies\Microsoft\Edge', 'Microsoft Edge'),
+    ('Google Chrome', 'chrome.exe', ['Google', 'Chrome', 'Application'], r'SOFTWARE\Policies\Google\Chrome', 'Google Chrome'),
   ]) {
-    final pfad = await _finden(exe, ordner);
+    final pfad = Platform.isMacOS ? _macFinden(app, app) : await _finden(exe, ordner);
     if (pfad == null) continue;
-    if (await _fernsteuerungVerboten(richtlinie)) {
+    if (!Platform.isMacOS && await _fernsteuerungVerboten(richtlinie)) {
       verboten.add(name);
       continue;
     }
@@ -658,6 +670,7 @@ Future<_Aufnahme> _aufnehmen(
 /// neuen weiter, dessen Elternprozess es nicht mehr gibt (gemessen);
 /// taskkill /T über die gestartete Nummer trifft dann nichts.
 Future<int> _profilProzesseBeenden(Directory profil, String exe) async {
+  if (Platform.isMacOS) return _macProzesseBeenden(profil);
   String ps(String s) => s.replaceAll("'", "''");
   try {
     final r = await Process.run('powershell', [
@@ -669,6 +682,26 @@ Future<int> _profilProzesseBeenden(Directory profil, String exe) async {
           r"$p | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }; $p.Count",
     ]);
     return int.tryParse('${r.stdout}'.trim()) ?? -1;
+  } on ProcessException {
+    return -1;
+  }
+}
+
+/// macOS-Gegenstück zu [_profilProzesseBeenden]: `ps` nennt die Prozesse mit
+/// ihrem Aufruf, und die mit dem Profil im Aufruf bekommen ein `kill -9`.
+Future<int> _macProzesseBeenden(Directory profil) async {
+  try {
+    final r = await Process.run('ps', ['-axww', '-o', 'pid=,command=']);
+    final pids = <String>[];
+    for (final zeile in '${r.stdout}'.split('\n')) {
+      final m = RegExp(r'^\s*(\d+)\s(.*)$').firstMatch(zeile);
+      if (m == null || !m.group(2)!.contains(profil.path)) continue;
+      pids.add(m.group(1)!);
+    }
+    for (final pid in pids) {
+      await Process.run('kill', ['-9', pid]);
+    }
+    return pids.length;
   } on ProcessException {
     return -1;
   }
