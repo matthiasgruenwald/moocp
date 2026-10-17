@@ -15,7 +15,8 @@ Git: `git` und `gh` (Branches, Commits, Push, Issues anlegen und schließen) sin
 
 ### Coding Standards
 
-Vor Codeänderungen und Reviews `CODING_STANDARDS.md` lesen: Vereinsstandards
+Vor Codeänderungen und Reviews die Coding Standards lesen, verlinkt im Repo
+`Moodle-in-Niedersachsene-V/security-checks` (`coding-standards/CODING_STANDARDS.md`, privat): Vereinsstandards
 für neue und geänderte Stellen, ohne Gesamtumbau oder Übernahme der Security Checks.
 
 ### Issue tracker
