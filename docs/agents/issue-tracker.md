@@ -22,6 +22,4 @@ Verbindliche Ablage für Specs und daraus abgeleitete Umsetzungstickets sind die
 - Ist die Veröffentlichung blockiert, den konkreten Fehler melden und den Entwurf bis zur Klärung erhalten. Einen lokalen Entwurf nicht als veröffentlicht oder als eingerichteten lokalen Tracker ausgeben.
 - Deaktivierte Issues oder fehlende Berechtigungen rechtfertigen keinen stillen Wechsel zu einem anderen Tracker.
 
-## Labels
-
-`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix` (1:1-Vokabular wie in den Schwesterprojekten). Erledigte Issues mit `gh issue close <nr> --comment "..."` schließen.
+Labels und Triage: [triage-labels.md](triage-labels.md).
