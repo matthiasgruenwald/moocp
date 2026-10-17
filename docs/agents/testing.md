@@ -15,3 +15,4 @@ Die Anforderung A10 (Testkurs, Präfix `ZZ`, `flutter analyze` und `flutter test
   (Eintrag „MCP-Server läuft auf …" in `%APPDATA%\moocp\protokoll.log`; er
   startet nach der Anmeldung), nicht um Bescheid bitten. Dasselbe beim Warten auf eine Freigabe. Geduldig:
   bis 30 Minuten, im Hintergrund, nicht nach wenigen Minuten aufgeben.
+- **Bauen nur auf Auftrag, dann mit Test.** `flutter build` (auch Debug, auch macOS) darf die KI ausführen, wenn die Lehrkraft den Bau ausdrücklich verlangt oder ein Issue einen Bau vorsieht, der getestet wird. Der Bau gilt als Teil dieses Auftrags, nicht als Freibrief: Danach wird gestartet und geprüft (A10), und der Befund wird gemeldet. Ohne solchen Auftrag fragt die KI vorher. Nicht eingeschlossen sind Release-Bau und Installer (`create_installer.bat`); die brauchen einen eigenen, ausdrücklichen Auftrag. Die Berechtigung kommt aus diesem Absatz, nicht aus einer Freigabe im Einzelfall.

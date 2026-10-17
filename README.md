@@ -566,6 +566,20 @@ Schalter von `moocp.exe`; die Auskünfte schreiben nach stdout, und weil `moocp.
 | `--werkzeugliste` | gibt als eine Zeile JSON aus, was der MCP-Server auf `initialize` und `tools/list` antwortet, und endet; daraus antwortet die Brücke |
 | `--claude-entfernen` | entfernt die Einrichtung in allen KI-Werkzeugen und endet; ruft die Deinstallation auf (der Name stammt aus der Zeit, als es nur Claude Code gab, und bleibt, damit auch ältere Deinstallationen wirken) |
 
+### Auf dem Mac bauen (nur Entwicklerversion)
+
+Voraussetzung: Flutter und Xcode (aus dem App Store, einmal gestartet). Eine Veröffentlichung für den Mac gibt es nicht; die App läuft aus dem Entwicklungsbau.
+
+```sh
+flutter analyze
+flutter test
+flutter run -d macos
+```
+
+Die Einstellungen liegen unter `~/Library/Application Support/moocp`, dort auch der Socket für die Einzelstart-Sperre (`moocp.sock`). Die Zugangsdaten stehen im Schlüsselbund des Benutzers, im alten Schlüsselbund statt der Datenschutz-Schlüsselbundgruppe, weil ein Entwicklerbau ohne Team-ID dort nicht schreiben darf.
+
+Das KI-Werkzeug LM Studio mit Bionic wird auf dem Mac nicht angeboten: Seine Brücke ist ein Windows-Programm. Claude Code und Codex CLI findet die App im `PATH` sowie unter `~/.local/bin`, `/opt/homebrew/bin` und `/usr/local/bin`.
+
 ### Bildschirmfotos
 
 `bildschirmfoto` rendert mit Microsoft Edge, sonst Google Chrome, ohne Fenster und steuert ihn über das DevTools-Protokoll; ein Paket braucht es dafür nicht. Jede Anfrage des Browsers hält die App an, und zwar auf der Ebene des Browsers, nicht der Seite: Abgeschottete Rahmen wie die Zeichnungen in STACK-Fragen laufen als eigene Ziele, deren Anfragen sonst direkt ins Netz gingen. Sie stellt sie selbst – geprüft gegen Sperrliste und eine eigene, enge Liste (`lib/moodle/browserliste.dart`) und mit Eintrag im Protokoll; der Browser bekommt das Sitzungscookie nie und lädt als Seite nur die eine, die aufgenommen wird, auch nicht in einem eingebetteten Rahmen. Nur MathJax lädt er selbst, von der Adresse, die die Seite dafür einstellt. Interaktive Elemente lädt er als Rahmen, ebenfalls über die App; Fehler in ihrem Skript meldet ihr Kopf per `postMessage` an die Seite, wo die App sie einsammelt und in der Antwort nennt. Aufgenommen wird nur der Inhalt selbst, also was auch die Textwerkzeuge liefern; ein Wiki nur, wenn es gemeinsam ist und nicht im Gruppenmodus steht. Mit `druck: true` wird jede Seite der Druckaufbereitung ein Bild, ohne sie der Inhalt mit den Druck-Stylesheets. Jeder Aufruf braucht einen Grund (`grund`), der im Freigabedialog über dem Bild steht. Das Ansehen hat dieselben Nebenwirkungen wie im Browser: Moodle protokolliert den Aufruf unter dem eigenen Konto, und die Fragenvorschau legt einen Vorschauversuch an. Freigegebene Bilder legt die App als PNG in den Arbeitsordner; die Antwort nennt die Pfade. Beim Entwickeln ersetzt das Werkzeug Bildschirmfotos von Hand: Claude sieht sich Messungen im Testkurs selbst an.
