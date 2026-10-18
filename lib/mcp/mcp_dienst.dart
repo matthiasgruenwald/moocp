@@ -39,6 +39,7 @@ import '../moodle/moodle_zugang.dart';
 import '../moodle/sicherung.dart';
 import '../moodle/stack.dart';
 import '../moodle/test.dart';
+import '../moodle/wiederherstellung.dart';
 import '../moodle/wiki.dart';
 import '../protokoll.dart';
 
@@ -700,6 +701,46 @@ class McpDienst {
               sicherungStatus(moodle, vorgaenge, id: a['id'] as String?),
               const Duration(minutes: 1),
               () => 'Die Sicherung läuft noch. Bitte später erneut prüfen.',
+            ));
+
+    // ---- Wiederherstellen einer Sicherungsdatei in einen bestehenden Kurs (E29, moodle/wiederherstellung.dart)
+    _werkzeug(server, 'wiederherstellen_datei',
+        titel: 'Datei in Kurs wiederherstellen',
+        beschreibung: 'Stellt eine Sicherungsdatei (.mbz) aus dem Sicherungsordner in einen bestehenden Kurs wieder '
+            'her, verschmelzend: Inhalte kommen dazu, nichts im Kurs wird gelöscht. Die Datei wird vor dem Hochladen '
+            'geprüft (gepacktes Tar, keine Nutzerdaten, keine Pfade nach außen, höchstens 200 MB). Der Kursname muss '
+            'zu der Nummer passen. Vor dem Start fragt die App nach einer Freigabe, die Kurs, Datei, Modus und die '
+            'neuen Aktivitäten zeigt; neue Aktivitäten werden verborgen angelegt. Verborgen ist kein Schutz. Dauert '
+            'es länger als eine Minute, läuft es weiter: dann wiederherstellung_status mit der Nummer aufrufen. '
+            'Nach dem Start wird nie neu gesendet.',
+        parameter: {
+          'datei': JsonSchema.string(
+              description: 'Dateiname der .mbz relativ zum Sicherungsordner, wie sichern_aktivitaet ihn nennt.'),
+          'kurs': _kurs,
+          'name': _name,
+        },
+        pflicht: ['datei', 'kurs', 'name'],
+        ausfuehren: (a) => _zeitlimit(
+              wiederherstellen(moodle, freigaben, vorgaenge,
+                  datei: _text(a, 'datei'),
+                  kurs: _zahl(a, 'kurs'),
+                  name: _text(a, 'name'),
+                  instanz: profil.name),
+              const Duration(minutes: 1),
+              () => 'Die Wiederherstellung läuft weiter. Mit wiederherstellung_status und der Nummer später prüfen.',
+            ));
+
+    _werkzeug(server, 'wiederherstellung_status',
+        titel: 'Wiederherstellung prüfen',
+        beschreibung: 'Zeigt den Stand einer Wiederherstellung (anstehend, hochgeladen, laufend, fertig, '
+            'fehlgeschlagen, unklar) und fragt eine laufende bei Moodle nach. Startet nie neu. Ein Vorgang, der nie bei '
+            'Moodle begonnen hat, wird als fehlgeschlagen vermerkt.',
+        parameter: {'id': JsonSchema.string(description: 'Nummer der Wiederherstellung, wie wiederherstellen_datei sie nennt')},
+        pflicht: ['id'],
+        ausfuehren: (a) => _zeitlimit(
+              wiederherstellungStatus(moodle, vorgaenge, id: _text(a, 'id')),
+              const Duration(minutes: 1),
+              () => 'Die Wiederherstellung läuft noch. Bitte später erneut prüfen.',
             ));
 
     _werkzeug(server, 'sichern_auswahl',

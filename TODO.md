@@ -138,6 +138,24 @@ Umgesetzt (`sichern_auswahl`, `auswahlSichern` in `lib/moodle/sicherung.dart`), 
 - Positivliste und Sperrliste sind unverändert: der Kursweg `/backup/backup.php?id=<kurs>` ohne `cm` und die Schritte 1, 2 und 4 sind über die bestehenden Einträge erlaubt (Tests in `test/sicherung_regeln_test.dart`). Ob Moodle den Kursweg wie den Aktivitätsweg beantwortet, ist ungemessen.
 - Änderung im Kurs zwischen Schritt 2 und Schritt 4: die Prüfung vergleicht nur die Seite von Schritt 4 mit der Bestellung, nicht mit dem Stand von Schritt 2. Ob das bei gleichzeitigem Bearbeiten reicht, ist ungemessen.
 
+## Wiederherstellen in bestehenden Kurs (Issue #8): UNGEMESSEN
+
+Umgesetzt (`wiederherstellen_datei`, `wiederherstellung_status`, `lib/moodle/wiederherstellung.dart`, `lib/moodle/wiederherstellung_regeln.dart`), nicht auf einer Instanz durchgespielt. Die Prüfung der Datei (Größe, Pfade, Nutzerdaten, Bewertungen, Format) ist offline getestet (`test/wiederherstellung_regeln_test.dart`); der Ablauf gegen Moodle ist es nicht. Im Testkurs (Quelle 41, Ziel 42, Präfix `ZZ`) zu messen, bevor die Wiederherstellung als geprüft gilt.
+
+- Sichtbarkeit der wiederhergestellten Aktivitäten: Ob Moodle sie beim Verschmelzen verborgen anlegt, ist nicht gemessen. Gegenlesen meldet „geprüft" nur, wenn neue Aktivitäten da sind und alle verborgen sind; sonst bleibt der Befund ungeprüft.
+- Fortschritt: `core_backup_get_async_backup_progress` mit `operation=restore` und dem Schlüssel `backupids` = Laufzeitkennung ist nicht gemessen; ob Moodle die Wiederherstellung unter dieser Kennung führt, ist offen.
+- Zielwahl: `target=4` (Verschmelzen) und `targetid` = Kurs-ID sind nicht gemessen; ebenso, wie der Kurs bei der Suche im Schritt 2 erscheint.
+- Kurskontext: Die Kontext-ID des Kurses wird aus `/course/view.php?id=<kurs>` gelesen (`Seitenangaben.aus`); ungemessen, ob diese Seite die Kontext-ID immer trägt.
+- Upload-Schaltfläche und Feldname: `repository_ajax.php?action=upload` mit Feld `repo_upload_file` und Feld `itemid` ist aus dem Upload-Pfad übernommen; die Schaltfläche des Wiederherstellen-Formulars und das Feld `backupfile` in `restorefile.php` sind ungemessen.
+- Namenlose Absendeknöpfe: Die Schritte 2, 4, 8 und 16 senden nur die Felder des Formulars selbst (inklusive `restore`-Feld), ohne Absendeknopf-Namen. Ob Moodle das bei allen Schritten annimmt, ist ungemessen.
+- Formularnamen: `_qf__restore_target_form`, `_qf__restore_settings_form`, `_qf__restore_schema_form`, `_qf__restore_review_form`, `_qf__course_restore_form` sind aus dem Moodle-Aufbau übernommen, nicht gemessen.
+- MIME-Typ der .mbz im Upload (`application/octet-stream` oder `application/vnd.moodle.backup`) ist ungemessen.
+- Größenobergrenze: 200 MB (`archivGrenzeStandard`). Die Obergrenze des Upload-Formulars (`maxbytes`) wird noch nicht gelesen; `hochladeGrenze` ist definiert, aber nirgends verdrahtet.
+- Archiv-Grenzen (`entpacktGrenzeStandard` 1 GB, `eintragGrenzeStandard` 20000, Verhältnis 200) sind Schätzwerte, nicht gemessen. Die Prüfung liest das Archiv vollständig in den Speicher, bevor sie entpackt; ein Strom-Lesen wäre bei großen Dateien besser.
+- Nur .tar.gz (.mbz) wird unterstützt; ZIP-Archive lehnt die Prüfung ab.
+- Abbruch oder verlorene Antwort nach dem Absenden von Schritt 16: Die App liest den Stand nach und wiederholt nie blind. Ob Moodle den Lauf nach einem Abbruch der Sitzung tatsächlich weiterführt, ist ungemessen.
+- Freigabe-Test „Die Stufe steht in den Einstellungen …" schlug einmal im Gesamtlauf fehl und lief beim Wiederholen durch (Flake, nicht durch diese Änderung verursacht). Beobachten.
+
 ## Instanzprofile (Issue #4): offene Teile
 
 - Oberfläche für ein zweites Profil fehlt: Anmeldung, Titelzeile und Dialoge zeigen nur das Hauptprofil (erstes Profil). Weitere Profile kommen über die Einstellungsdatei, ein Anmeldefeld je Profil fehlt.

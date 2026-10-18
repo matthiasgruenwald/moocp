@@ -66,7 +66,8 @@ void main() {
     expect(post('https://m.example/course/editsection.php',
         const [MapEntry('id', '812'), MapEntry('_qf__editsection_form', '1')]), isTrue);
     expect(post('https://m.example/course/editsection.php', const [MapEntry('id', '812')]), isFalse);
-    expect(post('https://m.example/repository/repository_ajax.php?action=upload'), isTrue);
+    // Upload nur mit Datei: ein Aufruf ohne Anhang ist kein Upload mehr.
+    expect(post('https://m.example/repository/repository_ajax.php?action=upload'), isFalse);
     expect(post('https://m.example/repository/repository_ajax.php?action=delete'), isFalse);
     // Verbergen, Löschen, Verschieben laufen über die Kursstruktur-Aktionen,
     // nicht über course/mod.php.

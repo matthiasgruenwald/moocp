@@ -24,6 +24,7 @@ Moodle-Instanz hat einen eigenen Server mit eigenem Präfix (etwa
 | Ändern | `aendern`, `aendern_mehrere`, `links_setzen`, `claude_schreiben`, `fortschrittsliste_aendern`, `board_aendern`, `kanban_aendern`, `bewertungsschema_setzen`, `buch_ordnen`, `buchkapitel_verschieben` |
 | Kursrahmen | `sichtbarkeit_setzen`, `verschieben`, `duplizieren`, `loeschen`, `buchkapitel_loeschen`, `wikiseite_loeschen` |
 | Sichern | `sichern_aktivitaet`, `sichern_auswahl`, `sicherung_status` |
+| Wiederherstellen | `wiederherstellen_datei`, `wiederherstellung_status` |
 | Ansehen | `bildschirmfoto` |
 | Tests und Fragen | im Skill `moodle-fragen` |
 
@@ -44,6 +45,16 @@ Das sag ihr auch selbst, bevor sie zustimmt. Eine Aktivität kommt nur mit, wenn
 ihr Abschnitt mitgeht; dieser Abschnitt ist dann ein Rahmen, und die Freigabe
 nennt ihn. Ob Moodle den Rahmen ohne seine übrigen Aktivitäten hält und wie
 Moodle den Kurs bei einer Auswahl benennt, prüft die Lehrkraft vor dem Einsatz.
+
+Eine Sicherungsdatei zurückspielen kann `wiederherstellen_datei`: Sie fügt die
+Aktivitäten einer Datei aus dem Sicherungsordner in einen bestehenden Kurs ein
+(Modus „verschmelzen"), ersetzt aber nichts. Nenne der Lehrkraft Kurs, Nummer
+und Datei genau. Die Freigabe zeigt, was neu entsteht; das kommt verborgen an,
+und Verbergen schützt nicht vor Änderungen durch andere. Die Datei wird vor dem
+Hochladen geprüft; eine Datei mit Nutzerdaten wird abgelehnt. Läuft die
+Wiederherstellung länger, rufe `wiederherstellung_status` mit der Nummer auf.
+Startet es nie neu: Steht „fehlgeschlagen" da, sag das so, und frag die
+Lehrkraft, bevor du etwas erneut versuchst.
 
 **Fehlen die Werkzeuge**, oder meldet `status` „nicht angemeldet", dann bitte
 die Lehrkraft, die App zu starten bzw. sich darin anzumelden, und warte. Weich

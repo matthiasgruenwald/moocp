@@ -31,6 +31,7 @@ import 'formular_schreiben.dart';
 import 'kurs.dart';
 import 'moodle_zugang.dart';
 import 'sicherung_regeln.dart';
+import 'wiederherstellung_regeln.dart';
 
 /// Vorgänge, die gerade laufen (Freigabe oder Abfrage) in dieser Sitzung der App.
 final Set<String> _laufend = {};
@@ -53,6 +54,9 @@ class Vorgang {
     this.bytes,
     this.verified = false,
     this.auswahl,
+    this.wiederherstellung,
+    this.wiederherstellungDatei,
+    this.vorherCmids,
   }) : aktualisiert = aktualisiert ?? begonnen;
 
   final String id;
@@ -80,6 +84,13 @@ class Vorgang {
   /// Bei einer Auswahl aus dem Kurs (sichern_auswahl) statt der einen cmid: Art und Zahlen.
   String? auswahl;
 
+  /// Nur bei einer Wiederherstellung (wiederherstellung.dart): ihr Stand, die
+  /// Laufzeitkennung von Moodle und die Nummern der Aktivitäten im Zielkurs vor
+  /// dem Start. Die Sicherung nutzt diese Felder nicht.
+  WiederherstellungStand? wiederherstellung;
+  String? wiederherstellungDatei;
+  List<int>? vorherCmids;
+
   Map<String, Object?> zuJson() => {
         'id': id,
         'kurs': kurs,
@@ -95,6 +106,9 @@ class Vorgang {
         'bytes': bytes,
         'verified': verified,
         'auswahl': auswahl,
+        'wiederherstellung_status': wiederherstellung?.name,
+        'wiederherstellung_laufzeit': wiederherstellungDatei,
+        'vorher_cmids': vorherCmids,
       };
 
   static Vorgang? ausJson(Object? o) {
@@ -117,6 +131,9 @@ class Vorgang {
       bytes: o['bytes'] as int?,
       verified: o['verified'] == true,
       auswahl: o['auswahl'] as String?,
+      wiederherstellung: WiederherstellungStand.aus(o['wiederherstellung_status'] as String?),
+      wiederherstellungDatei: o['wiederherstellung_laufzeit'] as String?,
+      vorherCmids: (o['vorher_cmids'] as List?)?.whereType<int>().toList(),
     );
   }
 }
@@ -176,6 +193,15 @@ class Vorgaenge {
     return v;
   }
 
+  /// Ein Vorgang für die Wiederherstellung. Die Datei liegt relativ zum
+  /// Sicherungsordner; der Kurs ist der Zielkurs.
+  Future<Vorgang> neuWiederherstellung({required int kurs, required String datei}) async {
+    final v = await neu(kurs: kurs, cmid: 0, datei: datei);
+    v.wiederherstellung = WiederherstellungStand.anstehend;
+    await _speichern();
+    return v;
+  }
+
   Future<void> aktualisieren(
     Vorgang v, {
     SicherungStand? stand,
@@ -185,7 +211,13 @@ class Vorgaenge {
     String? dateiname,
     int? bytes,
     bool? verified,
+    WiederherstellungStand? wiederherstellung,
+    String? wiederherstellungDatei,
+    List<int>? vorherCmids,
   }) async {
+    if (wiederherstellung != null) v.wiederherstellung = wiederherstellung;
+    if (wiederherstellungDatei != null) v.wiederherstellungDatei = wiederherstellungDatei;
+    if (vorherCmids != null) v.vorherCmids = vorherCmids;
     if (stand != null) v.stand = stand;
     if (text != null) v.text = text;
     if (backupid != null) v.backupid = backupid;
@@ -219,7 +251,7 @@ Future<String> freierName(String ordner, String basis) async {
 }
 
 /// Die Antwortseite einer Sicherung: Ziel, Felder, Seitenangaben.
-({String aktion, Felder felder, Seitenangaben seite}) _seite(Antwort r) {
+({String aktion, Felder felder, Seitenangaben seite}) seiteVon(Antwort r) {
   final dom.Element? form = hauptformular(html_parser.parse(r.text));
   if (form == null) {
     throw MoodleFehler('Moodle liefert kein Sicherungsformular. Ist die Aktivität für diese Sitzung sicherbar?');
@@ -260,7 +292,7 @@ Future<String> aktivitaetSichern(
     throw MoodleFehler('Die Sicherung beginnt nicht auf Schritt 1. Nichts gestartet.');
   }
   final r2 = await moodle.senden(f1.aktion, [...nutzerdatenAus(f1.felder), const MapEntry('submitbutton', 'Weiter')]);
-  final s2 = _seite(r2);
+  final s2 = seiteVon(r2);
   if (schrittVon(s2.felder) != '2') {
     throw MoodleFehler('Die Auswahlseite der Sicherung kommt nicht wie gemessen. Nichts gestartet.');
   }
@@ -271,7 +303,7 @@ Future<String> aktivitaetSichern(
     throw MoodleFehler('Die Aktivität cmid $cmid fehlt auf der Auswahlseite der Sicherung. Nichts gestartet.');
   }
   final r4 = await moodle.senden(s2.aktion, [...auswahl, const MapEntry('submitbutton', 'Weiter')]);
-  final s4 = _seite(r4);
+  final s4 = seiteVon(r4);
 
   // Bestätigungsseite gegen die Bestellung prüfen, bevor etwas ausgeführt wird.
   final fehler = bestaetigungFehler(s4.felder, cmid: cmid);
@@ -404,7 +436,7 @@ Future<String> auswahlSichern(
     throw MoodleFehler('Die Sicherung beginnt nicht auf Schritt 1. Nichts gestartet.');
   }
   final r2 = await moodle.senden(f1.aktion, [...nutzerdatenAus(f1.felder), const MapEntry('submitbutton', 'Weiter')]);
-  final s2 = _seite(r2);
+  final s2 = seiteVon(r2);
   if (schrittVon(s2.felder) != '2') {
     throw MoodleFehler('Die Auswahlseite der Sicherung kommt nicht wie gemessen. Nichts gestartet.');
   }
@@ -430,7 +462,7 @@ Future<String> auswahlSichern(
     throw MoodleFehler('Ein gewählter Teil fehlt auf der Auswahlseite der Sicherung. Nichts gestartet.');
   }
   final r4 = await moodle.senden(s2.aktion, [...schema, const MapEntry('submitbutton', 'Weiter')]);
-  final s4 = _seite(r4);
+  final s4 = seiteVon(r4);
 
   // Bestätigungsseite gegen die Bestellung prüfen, bevor etwas ausgeführt wird.
   final fehler = bestaetigungWahlFehler(s4.felder, cmids: wahlCmids, abschnitte: wahlAbschnitte);
@@ -570,6 +602,9 @@ Future<String> sicherungStatus(MoodleZugang moodle, Vorgaenge vorgaenge, {String
   if (_laufend.contains(v.id)) {
     return 'Läuft noch (Nummer ${v.id}). Bitte später erneut prüfen.\n${_zeile(v)}';
   }
+  if (v.wiederherstellung != null) {
+    return 'Das ist eine Wiederherstellung (wiederherstellung_status, Nummer ${v.id}).';
+  }
   if (v.stand == SicherungStand.anstehend) {
     await vorgaenge.aktualisieren(v,
         stand: SicherungStand.fehlgeschlagen,
@@ -589,6 +624,11 @@ Future<String> sicherungStatus(MoodleZugang moodle, Vorgaenge vorgaenge, {String
 }
 
 String _zeile(Vorgang v) {
+  if (v.wiederherstellung != null) {
+    final verified = v.wiederherstellung == WiederherstellungStand.fertig ? ' · verified: ${v.verified}' : '';
+    final hinweis = v.text.isEmpty ? '' : '\n${v.text}';
+    return '${v.id} · Wiederherstellung in Kurs ${v.kurs} · ${v.wiederherstellung!.text} · ${v.datei}$verified$hinweis';
+  }
   final verified = v.stand == SicherungStand.fertig ? ' · verified: ${v.verified}' : '';
   final hinweis = v.text.isEmpty ? '' : '\n${v.text}';
   final wer = v.auswahl ?? 'cmid ${v.cmid}';
