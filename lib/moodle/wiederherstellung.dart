@@ -28,6 +28,7 @@ import 'package:html/parser.dart' as html_parser;
 import '../freigabe.dart';
 import 'formular.dart';
 import 'formular_lesen.dart';
+import 'wiederherstellung_fragen.dart';
 import 'formular_schreiben.dart';
 import 'kurs.dart';
 import 'kurs_aendern.dart';
@@ -169,6 +170,10 @@ Future<String> wiederherstellen(
       if (zielweg.loescht && zielweg.brauchtKurs)
         'Im Kurs „$kursName" werden vorhandene Inhalte gelöscht, bevor die Datei wieder hineinkommt.',
       if (aktivitaeten.isNotEmpty) 'Angelegt werden: ${aktivitaeten.join(', ')}',
+      // Fragenherkunft (Issue #20): Die verwendeten Fragen im Archiv werden noch nicht
+      // gelesen (UNGEMESSEN, TODO.md); die Freigabe nennt das ausdrücklich.
+      if (befund.aktivitaeten.any((a) => a.modul == 'quiz'))
+        herkunftPruefen(verwendet: null, eigeneSachnummern: const {}, eigeneAnzahl: 0).text,
       'Moodle stellt die neuen Aktivitäten sichtbar wieder her; die App verbirgt sie danach. Sie können '
           'kurzzeitig für Lernende sichtbar sein. Verborgen ist kein Schutz: Wer im Kurs Rechte hat, sieht sie und kann sie sichtbar machen.',
       'Nutzerdaten sind im Archiv nicht enthalten (geprüft). Rechte und Einschreibungen bleiben unverändert.',
