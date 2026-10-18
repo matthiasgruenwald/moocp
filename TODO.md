@@ -275,6 +275,8 @@ Nicht Teil dieses Umbaus (eigene Aufgabe):
 - Lehrkraft-Beobachtungen, nicht reproduziert und nicht gemessen: Verweise gehen beim Kopieren verloren; einmal die Warnung `Undefined array key "p1"`.
 - Quiz-Wiederherstellung (`get_questions_category()` mit `false`, MDL-89981): nicht geprüft, nicht Teil von #23.
 
+- Doppelstart, Befund 5 (Review): Die Logik ist im Code geprüft: Meldet Moodle einen Fehler im Fortschritt, wird der Vorgang „unklar" und bleibt gesperrt; „fehlgeschlagen" mit Freigabe des Kurses setzt nur der Abbruch vor dem Start (`vorUpload`). Ein Ende-zu-Ende-Test mit Fortschritts-Doppel fehlt (UNGEMESSEN gegen Moodle).
+
 ## Aufräumen (Befunde aus dem Review, nicht behoben)
 
 - Doppelt: `seiteVon` (`lib/moodle/sicherung.dart`) und `restoreSeite` (`lib/moodle/wiederherstellung.dart`) lesen dieselben Formularseiten. Zusammenlegen, sobald beide Abläufe gemessen und gegen die Tests geprüft sind.
