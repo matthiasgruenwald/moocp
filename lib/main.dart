@@ -174,6 +174,18 @@ class Instanz {
   final McpDienst dienst;
 }
 
+/// Eingaben einer Anmeldung, festgehalten bevor sie asynchron beginnt.
+class AnmeldeAuftrag {
+  const AnmeldeAuftrag({required this.instanz, required this.profil, required this.adresse,
+    required this.benutzer, required this.passwort, required this.merken});
+  final Instanz instanz;
+  final Profil profil;
+  final String adresse;
+  final String benutzer;
+  final String passwort;
+  final bool merken;
+}
+
 /// Aufruf durch die Deinstallation (installer/moocp.nsi): die
 /// Einrichtung in den KI-Werkzeugen entfernen und mit dem Code aus [Entfernt]
 /// enden. Ohne Fenster: Es erscheint erst mit dem ersten Bild
@@ -844,14 +856,16 @@ class _HauptseiteState extends State<Hauptseite> with WindowListener {
 
   Future<void> _anmelden() async {
     if (_beschaeftigt) return;
-    final moodle = _moodle;
-    final dienst = _dienst;
-    final freigaben = _freigaben;
-    final profil = _profil;
-    final adresse = _adresse.text.trim();
-    final merken = _merken;
-    final benutzer = _benutzer.text.trim();
-    final passwort = _passwort.text;
+    final auftrag = AnmeldeAuftrag(instanz: _aktiv, profil: _profil, adresse: _adresse.text.trim(),
+        benutzer: _benutzer.text.trim(), passwort: _passwort.text, merken: _merken);
+    final moodle = auftrag.instanz.moodle;
+    final dienst = auftrag.instanz.dienst;
+    final freigaben = auftrag.instanz.freigaben;
+    final profil = auftrag.profil;
+    final adresse = auftrag.adresse;
+    final benutzer = auftrag.benutzer;
+    final passwort = auftrag.passwort;
+    final merken = auftrag.merken;
     freigaben.testmodus = Anmeldedaten.testzugangAktivFuer(profil.copyWith(adresse: adresse));
     setState(() {
       _beschaeftigt = true;
