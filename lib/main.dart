@@ -186,6 +186,19 @@ class AnmeldeAuftrag {
   final bool merken;
 }
 
+/// Gibt gespeicherte Zugangsdaten nur zurück, wenn das Profil nach dem Laden
+/// noch ausgewählt ist.
+Future<Anmeldedaten?> gespeicherteAnmeldedatenVerwenden({
+  required Future<Anmeldedaten> Function() laden,
+  required bool Function() zielIstAktiv,
+  required void Function(Anmeldedaten) anwenden,
+}) async {
+  final daten = await laden();
+  if (!zielIstAktiv()) return null;
+  anwenden(daten);
+  return daten;
+}
+
 /// Aufruf durch die Deinstallation (installer/moocp.nsi): die
 /// Einrichtung in den KI-Werkzeugen entfernen und mit dem Code aus [Entfernt]
 /// enden. Ohne Fenster: Es erscheint erst mit dem ersten Bild
@@ -515,9 +528,23 @@ class _HauptseiteState extends State<Hauptseite> with WindowListener {
   /// Gespeichert heißt: gleich anmelden. Wer den Haken setzt, will sich
   /// nicht bei jedem Start erneut anmelden.
   Future<void> _gespeichertAnmelden() async {
+    final instanz = _aktiv;
+    final profil = _profil;
+    bool zielIstAktiv() =>
+        mounted && identical(_aktiv, instanz) && identical(_profil, profil);
     final Anmeldedaten d;
     try {
-      d = await Anmeldedaten.laden(kennung: _profil.kennung, adresse: _profil.adresse);
+      final geladen = await gespeicherteAnmeldedatenVerwenden(
+        laden: () => Anmeldedaten.laden(kennung: profil.kennung, adresse: profil.adresse),
+        zielIstAktiv: zielIstAktiv,
+        anwenden: (daten) => setState(() {
+          _merken = daten.merken;
+          if (daten.benutzer != null) _benutzer.text = daten.benutzer!;
+          if (daten.passwort != null) _passwort.text = daten.passwort!;
+        }),
+      );
+      if (geladen == null) return;
+      d = geladen;
     } catch (e) {
       widget.protokoll.eintrag(
         Art.fehler,
@@ -525,13 +552,7 @@ class _HauptseiteState extends State<Hauptseite> with WindowListener {
       );
       return;
     }
-    if (!mounted) return;
-    setState(() {
-      _merken = d.merken;
-      if (d.benutzer != null) _benutzer.text = d.benutzer!;
-      if (d.passwort != null) _passwort.text = d.passwort!;
-    });
-    if (!d.merken || d.benutzer == null || _moodle.angemeldet) return;
+    if (!d.merken || d.benutzer == null || instanz.moodle.angemeldet) return;
     if (d.passwort == null) {
       // Etwa unter einem anderen Windows-Konto: DPAPI entschlüsselt nicht.
       // Ohne Eintrag bliebe die App still abgemeldet.
@@ -736,10 +757,25 @@ class _HauptseiteState extends State<Hauptseite> with WindowListener {
       _meldung = null;
       _merken = false;
     });
+    final instanz = _aktiv;
+    final profil = _profil;
+    bool zielIstAktiv() => mounted && index == _profilIndex &&
+        identical(_aktiv, instanz) && identical(_profil, profil);
     if (!await _einrichtungPruefen()) return;
+    if (!zielIstAktiv()) return;
     final Anmeldedaten d;
     try {
-      d = await Anmeldedaten.laden(kennung: _profil.kennung, adresse: _profil.adresse);
+      final geladen = await gespeicherteAnmeldedatenVerwenden(
+        laden: () => Anmeldedaten.laden(kennung: profil.kennung, adresse: profil.adresse),
+        zielIstAktiv: zielIstAktiv,
+        anwenden: (daten) => setState(() {
+          _merken = daten.merken;
+          _benutzer.text = daten.benutzer ?? '';
+          _passwort.text = daten.passwort ?? '';
+        }),
+      );
+      if (geladen == null) return;
+      d = geladen;
     } catch (e) {
       if (mounted) {
         widget.protokoll.eintrag(
@@ -749,16 +785,10 @@ class _HauptseiteState extends State<Hauptseite> with WindowListener {
       }
       return;
     }
-    if (!mounted || index != _profilIndex) return;
-    setState(() {
-      _merken = d.merken;
-      _benutzer.text = d.benutzer ?? '';
-      _passwort.text = d.passwort ?? '';
-    });
     if (d.merken &&
         d.benutzer != null &&
         d.passwort != null &&
-        !_moodle.angemeldet) {
+        !instanz.moodle.angemeldet) {
       await _anmelden();
     }
   }

@@ -87,9 +87,12 @@ try:
     else:
         r = d['result']
         if not isinstance(r, dict): raise ValueError('result shape')
-        print('isError:', r.get('isError', False))
+        is_error = r.get('isError', False) is True
+        print('isError:', is_error)
         for c in r.get('content', []):
             print(sauber(c.get('text', '')))
+        if is_error:
+            sys.exit(4)
 except (UnicodeDecodeError, json.JSONDecodeError):
     print('MCP-Antwort enthält ungültiges JSON.', file=sys.stderr)
     sys.exit(5)

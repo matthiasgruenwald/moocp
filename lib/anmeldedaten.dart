@@ -79,7 +79,7 @@ class Anmeldedaten {
           throw const FormatException('MOOCP_TESTZUGANG_PROFILE enthält einen ungültigen Eintrag.');
         }
         final uri = Uri.tryParse(wert['address'] as String);
-        if (uri == null || !{'http', 'https'}.contains(uri.scheme) || uri.host.isEmpty) {
+        if (uri == null || _adresseSchluessel(uri) == null) {
           throw const FormatException('MOOCP_TESTZUGANG_PROFILE enthält eine ungültige Moodle-Adresse.');
         }
         result[entry.key as String] = (datei: wert['file'] as String, adresse: uri.toString());
@@ -93,11 +93,19 @@ class Anmeldedaten {
     return result;
   }
 
-  static String _adresseSchluessel(String adresse) {
-    final uri = Uri.tryParse(adresse.trim());
-    if (uri == null) return '';
+  static String? _adresseSchluessel(Uri uri) {
+    if (!{'http', 'https'}.contains(uri.scheme.toLowerCase()) || uri.host.isEmpty ||
+        uri.userInfo.isNotEmpty || uri.query.isNotEmpty || uri.fragment.isNotEmpty ||
+        (uri.path.isNotEmpty && uri.path != '/')) {
+      return null;
+    }
     return uri.replace(scheme: uri.scheme.toLowerCase(), host: uri.host.toLowerCase(),
         path: uri.path.replaceFirst(RegExp(r'/+$'), '')).toString();
+  }
+
+  static String? _adresseSchluesselFuer(String adresse) {
+    final uri = Uri.tryParse(adresse.trim());
+    return uri == null ? null : _adresseSchluessel(uri);
   }
 
   static bool testzugangZuordnungPasst(Profil profil, Map<String, ({String datei, String adresse})> testprofile) =>
@@ -105,7 +113,10 @@ class Anmeldedaten {
 
   static bool _testprofilPasst(String kennung, String adresse, Map<String, ({String datei, String adresse})> testprofile) {
     final test = testprofile[kennung];
-    return test != null && _adresseSchluessel(test.adresse) == _adresseSchluessel(adresse);
+    if (test == null) return false;
+    final testAdresse = _adresseSchluesselFuer(test.adresse);
+    final profilAdresse = _adresseSchluesselFuer(adresse);
+    return testAdresse != null && profilAdresse != null && testAdresse == profilAdresse;
   }
 
   static bool testzugangAktivFuer(Profil profil) => testzugangZuordnungPasst(profil, _testprofile);
@@ -116,7 +127,11 @@ class Anmeldedaten {
   /// Der Testzugang gehört zum ersten Profil ([Profil.standardKennung]).
   static Future<(String, String)?> _testzugang(String kennung, String? adresse) async {
     final test = _testprofile[kennung];
-    if (test == null || adresse == null || _adresseSchluessel(test.adresse) != _adresseSchluessel(adresse)) return null;
+    if (test == null ||
+        adresse == null ||
+        !_testprofilPasst(kennung, adresse, _testprofile)) {
+      return null;
+    }
     final pfad = test.datei;
     // Nur die Namen stehen in Fehlermeldungen, nie die Werte.
     final werte = <String, String>{};

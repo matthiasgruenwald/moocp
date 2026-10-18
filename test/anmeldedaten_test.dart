@@ -25,6 +25,12 @@ void main() {
       final anderesMoodleUnterverzeichnis = testprofil.copyWith(
         adresse: 'https://moodle.schule.example/Moodle',
       );
+      final testpfad = testprofil.copyWith(
+        adresse: 'https://moodle.schule.example/test',
+      );
+      final query = testprofil.copyWith(
+        adresse: 'https://moodle.schule.example/?next=/test',
+      );
       final anderesProfil = Profil(
         kennung: 'anderes-profil',
         name: 'Anderes Profil',
@@ -45,6 +51,23 @@ void main() {
         Anmeldedaten.testzugangZuordnungPasst(
           anderesMoodleUnterverzeichnis,
           zuordnung,
+        ),
+        isFalse,
+      );
+      expect(
+        Anmeldedaten.testzugangZuordnungPasst(testpfad, zuordnung),
+        isFalse,
+      );
+      expect(Anmeldedaten.testzugangZuordnungPasst(query, zuordnung), isFalse);
+      expect(
+        Anmeldedaten.testzugangZuordnungPasst(
+          testprofil.copyWith(adresse: 'https://moodle.schule.example/test'),
+          const {
+            'testprofil': (
+              datei: 'testzugang.env',
+              adresse: 'https://moodle.schule.example/test',
+            ),
+          },
         ),
         isFalse,
       );

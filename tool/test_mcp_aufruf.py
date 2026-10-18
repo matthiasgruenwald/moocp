@@ -175,6 +175,22 @@ class McpAufrufTest(unittest.TestCase):
         self.assertIn("ungültiges JSON", result.stderr)
         self.assert_no_secret_leak(result)
 
+    def test_tool_result_error_returns_nonzero(self):
+        FakeMcp.tool_response = {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "result": {
+                "isError": True,
+                "content": [{"type": "text", "text": f"Fehler {SECRET}"}],
+            },
+        }
+        result = self.call()
+
+        self.assertEqual(result.returncode, 4)
+        self.assertIn("isError: True", result.stdout)
+        self.assertIn("[geschwärzt]", result.stdout)
+        self.assert_no_secret_leak(result)
+
     def test_transport_failure_returns_nonzero_without_secret(self):
         server = self.servers.pop(0)
         server.shutdown()

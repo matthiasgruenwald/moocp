@@ -1,15 +1,44 @@
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:moocp/anmeldedaten.dart';
 import 'package:moocp/einstellungen.dart';
 import 'package:moocp/freigabe.dart';
-import 'package:moocp/main.dart' show AnmeldeAuftrag, Instanz;
+import 'package:moocp/main.dart'
+    show AnmeldeAuftrag, Instanz, gespeicherteAnmeldedatenVerwenden;
 import 'package:moocp/mcp/mcp_dienst.dart';
 import 'package:moocp/moodle/moodle_zugang.dart';
 import 'package:moocp/profil.dart';
 import 'package:moocp/protokoll.dart';
 
 void main() {
+  test(
+    'verwendet gespeicherte Zugangsdaten nach Profilwechsel nicht weiter',
+    () async {
+      final begonnen = Completer<void>();
+      final fortsetzen = Completer<void>();
+      var aktivesProfil = 'profil-a';
+      final felderVonB = <String>['lehrkraft-b:passwort-b'];
+
+      final laden = gespeicherteAnmeldedatenVerwenden(
+        laden: () async {
+          begonnen.complete();
+          await fortsetzen.future;
+          return const Anmeldedaten(true, 'lehrkraft-a', 'passwort-a');
+        },
+        zielIstAktiv: () => aktivesProfil == 'profil-a',
+        anwenden: (daten) =>
+            felderVonB.add('${daten.benutzer}:${daten.passwort}'),
+      );
+      await begonnen.future;
+      aktivesProfil = 'profil-b';
+      fortsetzen.complete();
+      await laden;
+
+      expect(felderVonB, ['lehrkraft-b:passwort-b']);
+    },
+  );
+
   test(
     'behält Profil und Formulareingaben während einer verzögerten Anmeldung',
     () async {
