@@ -196,10 +196,10 @@ Future<String> wiederherstellen(
       }
       final alt = await vorgaenge.finde(kopf!);
       if (alt == null) {
-        throw MoodleFehler('Der Altvorgang $kopf hat keine sichere Profilbindung. '
+        throw MoodleFehler('Der Altvorgang $kopf hat keine sichere Profilbindung oder Instanzbindung. '
             'Den Kurs in Moodle prüfen; keine Wiederholung über die App gestartet.');
       }
-      wiederholungsBefund = await _wiederholungsStand(moodle, alt);
+      wiederholungsBefund = await _wiederholungsStand(moodle, vorgaenge, alt);
     }
 
     // 5. Freigabe in der App, vor jedem Schreiben (beim neuen Kurs vor dem Platzhalter).
@@ -278,7 +278,8 @@ Future<String> wiederherstellen(
 
 /// Frischer Stand vor einer bewussten Wiederholung. Keine Rückleseprobe und kein
 /// Verbergen: Die Prüfung vor der Freigabe darf selbst nichts in Moodle schreiben.
-Future<String> _wiederholungsStand(MoodleZugang moodle, Vorgang v) async {
+Future<String> _wiederholungsStand(MoodleZugang moodle, Vorgaenge vorgaenge, Vorgang v) async {
+  vorgaenge.pruefeBindung(v);
   if (v.backupid == null || v.kontext == null) {
     return 'Gespeicherter Stand: ${v.wiederherstellung?.text}. Kein abfragbarer Hintergrundauftrag; '
         'der tatsächliche Kurszustand ist unklar. ${v.text}';
@@ -553,6 +554,7 @@ Future<String> _warten(
   var erster = true;
   try {
     while (true) {
+      vorgaenge.pruefeBindung(vg);
       // Operation „restore" und die Restore-ID als backupids: ungemessen, siehe TODO.md.
       final antwort = await moodle.dienst('core_backup_get_async_backup_progress', {
         'backupids': [restoreid],
@@ -678,6 +680,7 @@ Future<String> _gegenlesen(
   bool herkunftEigen = false,
 }) async {
   // Erneut aufrufbar (nach „unklar"): Verborgenes wird nicht noch einmal angefasst.
+  vorgaenge.pruefeBindung(vg);
   final vorVerbergen = await kursLesen(moodle, kurs);
   final zugeordnet = importierteCmidsEindeutig(
     erwartet: erwartet,
@@ -687,9 +690,11 @@ Future<String> _gegenlesen(
   final sichtbareNeue = zugeordnet == null ? const <int>[] :
       [for (final cmid in zugeordnet) if (vorVerbergen.nachCmid[cmid]!.sichtbar) cmid];
   if (sichtbareNeue.isNotEmpty) {
+    vorgaenge.pruefeBindung(vg);
     await kursAktion(moodle, kurs, 'cm_hide', sichtbareNeue);
   }
 
+  vorgaenge.pruefeBindung(vg);
   final jetzt = await kursLesen(moodle, kurs);
   final neue = [
     for (final a in jetzt.nachCmid.values)
@@ -708,6 +713,7 @@ Future<String> _gegenlesen(
   // Ticket #21: Anhänge und Bilder der eindeutig zugeordneten Aktivitäten zurücklesen.
   // Nur bei eindeutiger Zuordnung; sonst bleibt die Prüfung aus (keine Raterei).
   final bestaetigt = zuordnungUnveraendert ? abschliessendZugeordnet : null;
+  vorgaenge.pruefeBindung(vg);
   final anhang = bestaetigt == null
       ? null
       : await anhaengePruefen(moodle, vorgaenge, vg, [

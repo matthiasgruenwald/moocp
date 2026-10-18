@@ -467,7 +467,8 @@ class McpDienst {
       server.server.oninitialized = () => protokoll.eintrag(Art.info, 'KI-Werkzeug verbunden: ${_client(server)}');
     }
     final ao = arbeitsordner;
-    final vorgaenge = Vorgaenge(sicherungsordner ?? sicherungenOrdner, profilKennung: profil.kennung);
+    final vorgaenge = Vorgaenge(sicherungsordner ?? sicherungenOrdner, profilKennung: profil.kennung,
+        instanzBasis: () => moodle.angemeldet ? moodle.basis : null);
 
     _werkzeug(server, 'status',
         titel: 'Status',
@@ -845,7 +846,8 @@ class McpDienst {
         beschreibung: 'Zeigt den Stand einer Sicherung (anstehend, laufend, fertig, fehlgeschlagen, unklar) und '
             'fragt laufende bei Moodle nach. Ohne Nummer: die letzten Sicherungen. Nur lesen, außer wenn eine '
             'Sicherung noch bei Moodle läuft. Nur Vorgänge dieses Profils; ungebundene Altvorgänge '
-            'werden nicht bei Moodle fortgesetzt.',
+            'werden nicht bei Moodle fortgesetzt. Die tatsächliche Moodle-Adresse einschließlich Installationspfad '
+            'muss mit der gespeicherten Instanzbindung übereinstimmen.',
         parameter: {'id': JsonSchema.string(description: 'Nummer der Sicherung, wie sichern_aktivitaet sie nennt')},
         nurLesen: true,
         ausfuehren: (a) => _zeitlimit(
@@ -868,6 +870,7 @@ class McpDienst {
             'zu der Nummer passen. Vor dem Start fragt die App nach einer Freigabe, die Kurs, Datei, Modus und die '
             'neuen Aktivitäten zeigt; bei löschenden Wegen steht dort, dass vorhandene Inhalte gelöscht werden. '
             'Neue Aktivitäten werden danach verborgen (kurzzeitig können sie sichtbar sein). Verborgen ist kein Schutz. '
+            'Ein nach dem Start ausgetauschtes Quellarchiv oder fehlender Inhalts-Hash bleibt bei der Anhangprüfung eine Prüflücke. '
             'Dauert es länger als eine Minute, läuft es weiter: dann wiederherstellung_status mit der Nummer aufrufen. '
             'Nach dem Start wird nie neu gesendet. Dieselbe Datei für denselben Zielweg wird nicht ein zweites Mal '
             'gestartet, solange ein Vorgang offen ist (auch nach dem Zeitlimit oder einem Neustart); die Antwort nennt '
@@ -926,7 +929,8 @@ class McpDienst {
         beschreibung: 'Zeigt den Stand einer Wiederherstellung (anstehend, hochgeladen, laufend, fertig, '
             'fehlgeschlagen, unklar) und fragt eine laufende bei Moodle nach. Startet nie neu. Ein Vorgang, der nie bei '
             'Moodle begonnen hat, wird als fehlgeschlagen vermerkt. Nur Vorgänge dieses Profils; ungebundene Altvorgänge '
-            'werden nicht bei Moodle fortgesetzt.',
+            'werden nicht bei Moodle fortgesetzt. Die tatsächliche Moodle-Adresse einschließlich Installationspfad '
+            'muss mit der gespeicherten Instanzbindung übereinstimmen.',
         parameter: {'id': JsonSchema.string(description: 'Nummer der Wiederherstellung, wie wiederherstellen_datei sie nennt')},
         pflicht: ['id'],
         ausfuehren: (a) => _zeitlimit(

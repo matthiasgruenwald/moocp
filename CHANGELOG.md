@@ -8,9 +8,9 @@
 - Moodle-Profile: Mehrere Instanzen lassen sich in einem Fenster verwalten; Anmeldung, Freigabestufe und KI-Werkzeug-Einrichtung gelten je Profil.
 - Moodle-Profile: Freigaben bleiben dem richtigen Profil zugeordnet; eine aktive Moodle-Adresse lässt sich erst nach der Abmeldung ändern.
 - Testmodus: Automatische Freigaben gelten nur für ausdrücklich zugeordnete Testprofile und deren Moodle-Adresse.
-- Wiederherstellung: Bilder und Anhänge der neuen Aktivitäten werden nach dem Wiederherstellen gegen die Sicherung geprüft; ein Unterschied oder eine fehlende Datei steht im Bericht als „nicht vollständig verifiziert", nichts wird stillschweigend repariert.
+- Wiederherstellung: Bilder und Anhänge werden gegen die ursprüngliche Sicherung geprüft; ein zwischenzeitlich ausgetauschtes Archiv, fehlende Dateien oder Unterschiede bleiben ausdrücklich unverifiziert.
 - Wiederherstellung: Nur eindeutig zugeordnete Aktivitäten aus der Sicherung werden verborgen; parallele oder mehrdeutige Neuanlagen bleiben unberührt und werden zur Prüfung gemeldet.
-- Sicherung und Wiederherstellung: Vorgänge bleiben bei mehreren KI-Sitzungen erhalten und gehören zum richtigen Profil; Umbenennen umgeht keine Wiederholungssperre, und vor einer bewussten Wiederholung zeigt die Freigabe den aktuellen Stand und das Dublettenrisiko.
+- Sicherung und Wiederherstellung: Vorgänge bleiben bei mehreren KI-Sitzungen erhalten und bleiben an Profil und tatsächliche Moodle-Adresse gebunden; Umbenennen umgeht keine Wiederholungssperre, und vor einer bewussten Wiederholung zeigt die Freigabe den aktuellen Stand und das Dublettenrisiko.
 - MCP-Aufrufe: Ungültige Antworten und Transportfehler melden einen Fehlerstatus statt Erfolg.
 - macOS: Bildschirmfotos finden Edge, Chrome oder Chromium im Programmordner; eine Richtlinie, die die Fernsteuerung abschaltet, nennt die App.
 - macOS: Die App darf Verbindungen aufbauen (Netzwerkrechte im Entwicklungsbau). Fehlt der Benutzerordner, bricht die App mit einem Fehler ab, statt einen falschen Ort zu nehmen.

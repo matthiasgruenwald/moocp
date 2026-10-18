@@ -18,6 +18,7 @@ import 'package:path/path.dart' as p;
 
 class _Moodle {
   late HttpServer server;
+  int requests = 0;
   int starts = 0;
   int backupStarts = 0;
   String modul = 'page';
@@ -40,6 +41,7 @@ class _Moodle {
   Future<void> start() async {
     server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     server.listen((r) async {
+      requests++;
       final path = r.uri.path;
       final body = await const Utf8Decoder(allowMalformed: true).bind(r).join();
       String answer;
@@ -272,15 +274,17 @@ void main() {
     await client.initialize();
   }
 
-  void writeArchive({bool quiz = false}) {
+  void writeArchive({bool quiz = false, bool image = false}) {
     external.modul = quiz ? 'quiz' : 'page';
     external.title = quiz ? 'ZZ Quiz' : 'ZZ Blatt';
     final archive = Archive();
     for (final e in <String, String>{
       'moodle_backup.xml':
           '<moodle_backup><information><format>moodle2</format><type>activity</type></information><activities><activity><modulename>${external.modul}</modulename><title>${external.title}</title><directory>activities/${external.modul}_7</directory></activity></activities></moodle_backup>',
-      'activities/${external.modul}_7/inforef.xml': '<inforef/>',
-      'files.xml': '<files/>',
+      'activities/${external.modul}_7/inforef.xml': image ? '<inforef><file><id>1</id></file></inforef>' : '<inforef/>',
+      'files.xml': image
+          ? '<files><file><id>1</id><component>mod_page</component><filename>bild.png</filename><contenthash>0000000000000000000000000000000000000000</contenthash></file></files>'
+          : '<files/>',
       if (quiz) 'activities/quiz_7/quiz.xml': '<quiz><question_instance><question_reference><questionbankentryid>1</questionbankentryid><version>1</version></question_reference></question_instance></quiz>',
       if (quiz) 'questions.xml': '<question_bank_entry id="1"><idnumber>ZZ-1</idnumber><question_version><version>1</version><question><name>ZZ Frage</name></question></question_version></question_bank_entry>',
     }.entries) {
@@ -549,7 +553,7 @@ void main() {
   });
 
   test('Sicherung: fremde und ungebundene Altvorgänge bleiben ohne Moodle-Zugriff', () async {
-    for (final owner in ['fremd', null]) {
+    for (final owner in ['fremd', null, profile.kennung]) {
       final store = Vorgaenge(folder.path, profilKennung: owner);
       final old = await store.neu(kurs: 12, cmid: 1, datei: 'old.mbz');
       await store.aktualisieren(old, stand: SicherungStand.laufend, backupid: _Moodle.restore, kontext: 55);
@@ -566,7 +570,7 @@ void main() {
     final now = DateTime(2026, 10, 19, 10);
     jetzt = () => now;
     addTearDown(() => jetzt = DateTime.now);
-    final store = Vorgaenge(folder.path, profilKennung: profile.kennung);
+    final store = Vorgaenge(folder.path, profilKennung: profile.kennung, instanzBasis: () => external.basis);
     final backup = await store.neu(kurs: 12, cmid: 1, datei: 'old.mbz');
     final restore = await store.neuWiederherstellung(kurs: 12, datei: 'test.mbz');
     await store.aktualisieren(
@@ -618,5 +622,86 @@ void main() {
     final duplicate = await client.tool('wiederherstellen_datei', arguments);
     expect(duplicate, contains(number));
     expect(external.starts, 1);
+  });
+  for (final otherInstallationPath in [false, true]) {
+    test(
+      'gleiche Profilkennung schützt alte Vorgänge nach Wechsel ${otherInstallationPath ? 'des Installationspfads' : 'der Moodle-Instanz'}',
+      () async {
+        external.progress = {'unexpected': true};
+        final restored = await client.tool('wiederherstellen_datei', arguments);
+        final restoreId = RegExp(r'Nummer ([a-z0-9]+)').firstMatch(restored)!.group(1)!;
+        final backed = await client.tool('sichern_auswahl', {
+          'kurs': 12,
+          'name_des_kurses': 'ZZ Kurs',
+          'ganzer_kurs': true,
+        });
+        final backupId = RegExp(r'Nummer ([a-z0-9]+)').firstMatch(backed)!.group(1)!;
+        await service.stoppen();
+        client.http.close(force: true);
+        final target = otherInstallationPath ? external : _Moodle();
+        if (!otherInstallationPath) {
+          await target.start();
+          addTearDown(() => target.server.close(force: true));
+        }
+        final newAddress = target.basis.replace(path: otherInstallationPath ? '/anderes-moodle' : '');
+        profile = profile.copyWith(adresse: newAddress.toString());
+        moodle = await MoodleZugang.fuerTest(Protokoll(), newAddress, benutzer: 'e.mustermann', passwort: 'test');
+        await startService();
+        target.progress = {'progress': 1, 'status': 1000};
+        target.completed = true;
+        final requests = target.requests;
+        expect(await client.tool('wiederherstellung_status', {'id': restoreId}), contains('Keine Wiederherstellung'));
+        expect(await client.tool('sicherung_status', {'id': backupId}), contains('Keine Sicherung'));
+        expect(await client.tool('sicherung_status', {}), 'Noch keine Sicherung.');
+        expect(target.requests, requests, reason: 'Die lokale Instanzbindung muss vor jeder Moodle-Anfrage greifen.');
+      },
+    );
+  }
+  for (final restart in [false, true]) {
+    test(
+      'ausgetauschtes Quellarchiv wird ${restart ? 'nach Neustart' : 'während des Hintergrundlaufs'} nie verifiziert',
+      () async {
+        writeArchive(image: true);
+        external.progress = {'unexpected': true};
+        if (!restart) external.hold = Completer<void>();
+        final started = await client.tool('wiederherstellen_datei', arguments);
+        final number = RegExp(r'Nummer ([a-z0-9]+)').firstMatch(started)!.group(1)!;
+        writeArchive();
+        external.completed = true;
+        external.progress = {'progress': 1, 'status': 1000};
+        if (restart) {
+          await service.stoppen();
+          client.http.close(force: true);
+          await startService();
+        } else {
+          external.hold!.complete();
+          external.hold = null;
+        }
+        final status = await client.waitStatus('wiederherstellung_status', number, (text) => text.contains('fertig'));
+        expect(status, contains('Prüflücke'));
+        expect(status, contains('Quellaufnahme'));
+        final overview = await client.tool('sicherung_status', {});
+        expect(overview, contains('verified: false'));
+        expect(external.starts, 1);
+      },
+    );
+  }
+  test('fehlender Start-Inhalts-Hash bleibt bei Anhangprüfung eine ausdrückliche Prüflücke', () async {
+    final store = Vorgaenge(folder.path, profilKennung: profile.kennung, instanzBasis: () => external.basis);
+    final old = await store.neuWiederherstellung(kurs: 12, datei: 'test.mbz');
+    await store.aktualisieren(
+      old,
+      wiederherstellung: WiederherstellungStand.laufend,
+      backupid: _Moodle.restore,
+      kontext: 55,
+      vorherCmids: [],
+      wiederherstellungAktivitaeten: [(modul: 'page', titel: 'ZZ Blatt')],
+    );
+    external.completed = true;
+    external.progress = {'progress': 1, 'status': 1000};
+    final result = await client.tool('wiederherstellung_status', {'id': old.id});
+    expect(result, contains('Inhalts-Hash fehlt'));
+    expect(result, contains('Prüflücke'));
+    expect(await client.tool('sicherung_status', {}), contains('verified: false'));
   });
 }

@@ -69,6 +69,7 @@ class Vorgang {
     this.fingerabdruck,
     this.wiederholungVon,
     this.profilKennung,
+    this.instanzAdresse,
     this.quizQuelle,
   }) : aktualisiert = aktualisiert ?? begonnen;
 
@@ -118,6 +119,9 @@ class Vorgang {
   /// Stabile Zielidentität; null bei Altvorgängen mit Anzeigenamen im Fingerabdruck.
   String? profilKennung;
 
+  /// Normalisierte tatsächliche Moodle-Basisadresse einschließlich Installationspfad.
+  String? instanzAdresse;
+
   /// Quellfragen bleiben auch ohne laufende Sitzung für den Vergleich verfügbar.
   List<QuizFrage>? quizQuelle;
 
@@ -145,6 +149,7 @@ class Vorgang {
         'fingerabdruck': fingerabdruck,
         'wiederholung_von': wiederholungVon,
         'profil_kennung': profilKennung,
+        'instanz_adresse': instanzAdresse,
         'quiz_quelle': quizQuelle?.map((f) => {'name': f.name, 'sachnummer': f.sachnummer, 'zufall': f.zufall}).toList(),
       };
 
@@ -181,6 +186,7 @@ class Vorgang {
       fingerabdruck: o['fingerabdruck'] as String?,
       wiederholungVon: o['wiederholung_von'] as String?,
       profilKennung: o['profil_kennung'] as String?,
+      instanzAdresse: o['instanz_adresse'] as String?,
       quizQuelle: (o['quiz_quelle'] as List?)?.whereType<Map>()
           .where((f) => f['name'] is String && f['zufall'] is bool)
           .map((f) => (name: f['name'] as String, sachnummer: f['sachnummer'] as String?, zufall: f['zufall'] as bool)).toList(),
@@ -192,10 +198,32 @@ class Vorgang {
 /// eine Datei .tmp, die dann umbenannt wird; ein Absturz hinterlässt also
 /// entweder den alten oder den neuen Stand.
 class Vorgaenge {
-  Vorgaenge(this.ordner, {this.profilKennung});
+  Vorgaenge(this.ordner, {this.profilKennung, this.instanzBasis});
 
   final String ordner;
   final String? profilKennung;
+
+  /// Der angemeldete Zugang kann nach Abmelden eine andere Basis haben. Darum
+  /// wird vor dem Fortsetzen stets die aktuelle Basis gelesen.
+  final Uri? Function()? instanzBasis;
+
+  String? get instanzAdresse {
+    final basis = instanzBasis?.call();
+    if (basis == null || basis.host.isEmpty || !{'https', 'http'}.contains(basis.scheme)) return null;
+    final pfad = basis.normalizePath().path.replaceFirst(RegExp(r'/+$'), '');
+    return Uri(scheme: basis.scheme, host: basis.host, port: basis.hasPort ? basis.port : null, path: pfad).toString();
+  }
+
+  bool _passt(Vorgang v) =>
+      (profilKennung == null || v.profilKennung == profilKennung) &&
+      (instanzBasis == null || (instanzAdresse != null && v.instanzAdresse == instanzAdresse));
+
+  /// Prüft erneut, bevor ein Hintergrundvorgang Moodle anfragt oder verändert.
+  void pruefeBindung(Vorgang v) {
+    if (!_passt(v)) {
+      throw MoodleFehler('Der Vorgang gehört nicht zur aktuell angemeldeten Moodle-Instanz. Nichts weiter ausgeführt.');
+    }
+  }
 
   // Alle MCP-Sitzungen und Profile teilen dieselbe Datei. Eine Änderung liest
   // unter dieser Sperre frisch und ersetzt nur ihren eigenen Vorgang, damit
@@ -233,14 +261,15 @@ class Vorgaenge {
 
   Future<List<Vorgang>> alle() async => [
     for (final v in await _alle())
-      if (profilKennung == null || v.profilKennung == profilKennung) v,
+      if (_passt(v)) v,
   ];
 
   /// Alte Vorgänge ohne Profilbindung dürfen sperren, aber keine Statusabfrage
   /// auf einer möglicherweise falschen Instanz auslösen.
   Future<List<Vorgang>> alleFuerDoppelstart() async => [
     for (final v in await _alle())
-      if (profilKennung == null || v.profilKennung == null || v.profilKennung == profilKennung) v,
+      if ((profilKennung == null || v.profilKennung == null || v.profilKennung == profilKennung) &&
+          (instanzBasis == null || v.instanzAdresse == null || v.instanzAdresse == instanzAdresse)) v,
   ];
 
   Future<Vorgang?> finde(String id) async {
@@ -261,6 +290,7 @@ class Vorgaenge {
       begonnen: DateTime.now(),
       auswahl: auswahl,
       profilKennung: profilKennung,
+      instanzAdresse: instanzAdresse,
     );
     await _speichern(v);
     return v;
@@ -653,6 +683,7 @@ Future<String> _warten(
   var erster = true;
   try {
     while (true) {
+      vorgaenge.pruefeBindung(vg);
       final antwort = await moodle.dienst('core_backup_get_async_backup_progress', {
         'backupids': [id],
         'contextid': vg.kontext,
@@ -700,6 +731,7 @@ Future<String> _warten(
       return 'Unklar (Nummer ${vg.id}): Der Dateiname fehlt im Vorgang.';
     }
     // Den Link holt die Seite „Wiederherstellen" (siehe sicherungsLinks).
+    vorgaenge.pruefeBindung(vg);
     final seite = await moodle.lesen('/backup/restorefile.php?contextid=${vg.kontext}');
     final pfade = sicherungsLinks(seite.text, dateiname);
     if (pfade.length != 1) {
@@ -711,6 +743,7 @@ Future<String> _warten(
     }
     final pfad = pfade.single;
     final ziel = File(p.join(vorgaenge.ordner, vg.datei));
+    vorgaenge.pruefeBindung(vg);
     final bytes = await moodle.herunterladen(pfad, ziel);
 
     // Lesen zurück: Die Datei auf der Platte muss die gemeldete Größe haben.

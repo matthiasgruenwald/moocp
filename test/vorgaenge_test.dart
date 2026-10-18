@@ -34,4 +34,16 @@ void main() {
     ]);
     expect((await Vorgaenge(folder.path).alle()).map((v) => v.id).toSet(), created.map((v) => v.id).toSet());
   });
+  test('Instanzbindung folgt der aktuellen normalisierten Basis und behält den Installationspfad', () async {
+    var basis = Uri.parse('https://MOODLE.schule.example/installation/./');
+    final store = Vorgaenge(folder.path, profilKennung: 'a', instanzBasis: () => basis);
+    final old = await store.neu(kurs: 12, cmid: 7, datei: 'a.mbz');
+    basis = Uri.parse('https://moodle.schule.example/installation');
+    expect(await store.finde(old.id), isNotNull);
+    basis = Uri.parse('https://moodle.schule.example/andere-installation');
+    expect(await store.finde(old.id), isNull);
+    expect(() => store.pruefeBindung(old), throwsA(isA<Exception>()));
+    basis = Uri.parse('https://moodle.schule.example/installation/');
+    expect(await store.finde(old.id), isNotNull);
+  });
 }
