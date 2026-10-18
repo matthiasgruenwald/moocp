@@ -80,4 +80,27 @@ class Protokoll extends ChangeNotifier {
     _eintraege.clear();
     notifyListeners();
   }
+
+  /// Eine Sicht auf dieses Protokoll für ein Instanzprofil (Issue #4): Jeder
+  /// Eintrag bekommt den Profilnamen voran, damit man ihn Moodle zuordnen kann.
+  /// Die Einträge landen im selben Protokoll und in derselben Datei.
+  Protokoll fuer(String profil) => _ProfilProtokoll(this, profil);
+}
+
+/// Die Sicht aus [Protokoll.fuer]. Sie hat keinen eigenen Speicher; Zuhörer
+/// hängen am Protokoll selbst.
+class _ProfilProtokoll extends Protokoll {
+  _ProfilProtokoll(this._wurzel, this._profil);
+
+  final Protokoll _wurzel;
+  final String _profil;
+
+  @override
+  void eintrag(Art art, String text) => _wurzel.eintrag(art, '[$_profil] $text');
+
+  @override
+  List<Eintrag> get eintraege => _wurzel.eintraege;
+
+  @override
+  void leeren() => _wurzel.leeren();
 }

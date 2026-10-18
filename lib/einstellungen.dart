@@ -22,7 +22,6 @@ class Einstellungen {
   Einstellungen({
     String moodleAdresse = '',
     List<Profil>? profile,
-    required this.port,
     required this.schluessel,
     this.bestaetigungen = Bestaetigungen.vorgabe,
     this.wahlSkills,
@@ -30,12 +29,54 @@ class Einstellungen {
     this.updatePruefen,
     this.updateZuletzt,
     this.updateErwartet,
-  }) : profile = profile ?? (moodleAdresse.isEmpty ? [] : [Profil.migriert(moodleAdresse)]);
+  }) : profile = _verteilt(profile ?? (moodleAdresse.isEmpty ? [] : [Profil.migriert(moodleAdresse)]));
 
   /// Die Moodle-Instanzen, mit denen die App angemeldet sein kann. Das erste
   /// Profil hat die Kennung `standard` (profil.dart), wenn es aus dem
   /// Altbestand stammt oder als erstes angelegt wurde.
   List<Profil> profile;
+
+  /// Port des MCP-Servers des ersten Profils, also des Altbestands (E31). Die
+  /// weiteren Profile haben ihren Port in [profile].
+  int get port => profile.isEmpty ? standardPort : profile.first.port;
+
+  /// Vergibt fehlende Ports und Servernamen und macht beide eindeutig. Das
+  /// erste Profil behält seinen Port; jedes weitere bekommt den nächsten freien
+  /// Port ab [standardPort]. Doppelte Servernamen bekommen eine Zählnummer.
+  /// Vollständige, eindeutige Profile bleiben unverändert.
+  static List<Profil> _verteilt(List<Profil> liste) {
+    final vergeben = <int>{for (final p in liste) if (p.port > 0) p.port};
+    final namen = <String>{};
+    int freierPort() {
+      var n = standardPort;
+      while (vergeben.contains(n)) {
+        n++;
+      }
+      vergeben.add(n);
+      return n;
+    }
+
+    final ergebnis = <Profil>[];
+    for (final p in liste) {
+      final port = p.port > 0 && !ergebnis.any((q) => q.port == p.port) ? p.port : freierPort();
+      var mcp = p.mcpName;
+      var zaehler = 2;
+      final basis = mcp;
+      while (namen.contains(mcp)) {
+        mcp = '$basis-${zaehler++}';
+      }
+      namen.add(mcp);
+      ergebnis.add(Profil(
+        kennung: p.kennung,
+        name: p.name,
+        adresse: p.adresse,
+        port: port,
+        mcpName: mcp,
+        rolle: p.rolle,
+      ));
+    }
+    return ergebnis;
+  }
 
   /// Die Adresse des ersten Profils. Der Dialog und die Titelzeile arbeiten
   /// noch mit einer Adresse; ein zweites Profil kommt über [profile].
@@ -49,7 +90,6 @@ class Einstellungen {
     profile[0] = profile[0].copyWith(adresse: a);
   }
 
-  int port;
   String schluessel;
 
   /// Wie viele Bestätigungen die Lehrkraft vor Änderungen in Moodle will
@@ -94,7 +134,6 @@ class Einstellungen {
   static Future<Einstellungen> laden() async {
     final standard = Einstellungen(
       moodleAdresse: '',
-      port: standardPort,
       schluessel: neuerSchluessel(),
     );
     try {
@@ -110,15 +149,17 @@ class Einstellungen {
   }
 
   /// Liest den Inhalt der Datei. Ohne `profile` (Stand bis Issue #4) wird die
-  /// Adresse `moodleAdresse` zum ersten Profil; beim nächsten Speichern kommt
-  /// `profile` dazu, `moodleAdresse` bleibt für ältere Versionen stehen.
+  /// Adresse `moodleAdresse` mit dem alten Port `port` zum ersten Profil; beim
+  /// nächsten Speichern kommt `profile` dazu, `moodleAdresse` und `port`
+  /// bleiben für ältere Versionen stehen.
   static Einstellungen aus(Map<String, dynamic> j, Einstellungen standard) {
     final liste = (j['profile'] as List?)?.map(Profil.ausJson).whereType<Profil>().toList();
     final altAdresse = j['moodleAdresse'] as String? ?? standard.moodleAdresse;
+    final altPort = j['port'] as int?;
     return Einstellungen(
       moodleAdresse: altAdresse,
-      profile: liste ?? (altAdresse.isEmpty ? [] : [Profil.migriert(altAdresse)]),
-      port: j['port'] as int? ?? standard.port,
+      profile: liste ??
+          (altAdresse.isEmpty ? [] : [Profil.migriert(altAdresse, port: altPort ?? standardPort)]),
       schluessel: j['schluessel'] as String? ?? standard.schluessel,
       bestaetigungen: Bestaetigungen.ausText(j['bestaetigungen'] as String?),
       wahlSkills: (j['wahlSkills'] as List?)?.whereType<String>().toSet(),

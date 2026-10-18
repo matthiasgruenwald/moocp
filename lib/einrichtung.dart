@@ -118,15 +118,15 @@ abstract class KiWerkzeug {
   /// Was fehlt, wenn [bedienbar] false ist; sonst null.
   String? get hindernis;
 
-  /// Der Stand des MCP-Eintrags „moodle" in diesem Werkzeug.
-  Verbindung verbindung(int port, String schluessel);
+  /// Der Stand des MCP-Eintrags [name] (E31: je Instanzprofil einer) in diesem Werkzeug.
+  Verbindung verbindung(int port, String schluessel, {String name = mcpName});
 
   /// Trägt die App ein. null bei Erfolg, sonst eine Beschreibung -- nie mit
   /// der Ausgabe eines Programms, denn die kann den Schlüssel enthalten.
-  Future<String?> eintragen(int port, String schluessel);
+  Future<String?> eintragen(int port, String schluessel, {String name = mcpName});
 
-  /// Entfernt den Eintrag „moodle" wieder. null bei Erfolg.
-  Future<String?> austragen();
+  /// Entfernt den Eintrag [name] wieder. null bei Erfolg.
+  Future<String?> austragen({String name = mcpName});
 
 
   /// Der Stand der Verbindung in Worten für den Dialog.
@@ -267,12 +267,12 @@ class ClaudeCode extends KiWerkzeug {
           '„Code" öffnen, danach „Nochmal prüfen".';
 
   @override
-  Verbindung verbindung(int port, String schluessel) {
+  Verbindung verbindung(int port, String schluessel, {String name = mcpName}) {
     if (!konfiguration.existsSync()) return Verbindung.fehlt;
     try {
       final d = jsonDecode(konfiguration.readAsStringSync());
       final server = (d is Map) ? d['mcpServers'] : null;
-      final e = (server is Map) ? server[mcpName] : null;
+      final e = (server is Map) ? server[name] : null;
       if (e is! Map) return Verbindung.fehlt;
       final kopf = e['headers'] is Map ? (e['headers'] as Map)['Authorization'] : null;
       final passt = e['type'] == 'http' && e['url'] == mcpAdresse(port) && kopf == mcpKopf(schluessel);
@@ -285,25 +285,25 @@ class ClaudeCode extends KiWerkzeug {
 
   /// Die Argumente für `claude mcp add`. Der Schlüssel steht darin -- sie
   /// gehen an die claude.exe, nie in Protokoll oder Anzeige.
-  List<String> addArgumente(int port, String schluessel) => [
-        'mcp', 'add', '--scope', 'user', '--transport', 'http', mcpName, mcpAdresse(port), //
+  List<String> addArgumente(int port, String schluessel, [String name = mcpName]) => [
+        'mcp', 'add', '--scope', 'user', '--transport', 'http', name, mcpAdresse(port), //
         '--header', 'Authorization: ${mcpKopf(schluessel)}',
       ];
 
   @override
-  Future<String?> eintragen(int port, String schluessel) async {
+  Future<String?> eintragen(int port, String schluessel, {String name = mcpName}) async {
     if (exe == null) return 'claude.exe nicht gefunden';
     // Fehlt der Eintrag, endet remove mit Fehler; das ist hier der Normalfall.
-    await ausfuehren(exe!, ['mcp', 'remove', mcpName, '--scope', 'user']);
-    final code = await ausfuehren(exe!, addArgumente(port, schluessel));
+    await ausfuehren(exe!, ['mcp', 'remove', name, '--scope', 'user']);
+    final code = await ausfuehren(exe!, addArgumente(port, schluessel, name));
     return code == 0 ? null : 'claude mcp add endete mit Code $code';
   }
 
   @override
-  Future<String?> austragen() async {
-    if (verbindung(0, '') == Verbindung.fehlt) return null;
+  Future<String?> austragen({String name = mcpName}) async {
+    if (verbindung(0, '', name: name) == Verbindung.fehlt) return null;
     if (exe == null) return 'claude.exe nicht gefunden';
-    final code = await ausfuehren(exe!, ['mcp', 'remove', mcpName, '--scope', 'user']);
+    final code = await ausfuehren(exe!, ['mcp', 'remove', name, '--scope', 'user']);
     return code == 0 ? null : 'claude mcp remove endete mit Code $code';
   }
 
@@ -381,7 +381,7 @@ class CodexCli extends KiWerkzeug {
   String? get hindernis => null;
 
   @override
-  Verbindung verbindung(int port, String schluessel) {
+  Verbindung verbindung(int port, String schluessel, {String name = mcpName}) {
     if (!konfiguration.existsSync()) return Verbindung.fehlt;
     final String text;
     try {
@@ -389,7 +389,7 @@ class CodexCli extends KiWerkzeug {
     } catch (_) {
       return Verbindung.unlesbar;
     }
-    final block = tomlBlock(text, mcpName);
+    final block = tomlBlock(text, name);
     if (block == null) return Verbindung.fehlt;
     final url = _tomlWert(block, 'url');
     final kopf = _tomlWert(block, 'Authorization');
@@ -398,10 +398,10 @@ class CodexCli extends KiWerkzeug {
   }
 
   @override
-  Future<String?> eintragen(int port, String schluessel) async {
+  Future<String?> eintragen(int port, String schluessel, {String name = mcpName}) async {
     try {
       final alt = konfiguration.existsSync() ? konfiguration.readAsStringSync() : '';
-      final neu = tomlBlockSetzen(alt, mcpName, mcpAdresse(port), mcpKopf(schluessel));
+      final neu = tomlBlockSetzen(alt, name, mcpAdresse(port), mcpKopf(schluessel));
       konfiguration.parent.createSync(recursive: true);
       konfiguration.writeAsStringSync(neu, flush: true);
       return null;
@@ -411,12 +411,12 @@ class CodexCli extends KiWerkzeug {
   }
 
   @override
-  Future<String?> austragen() async {
+  Future<String?> austragen({String name = mcpName}) async {
     if (!konfiguration.existsSync()) return null;
     try {
       final alt = konfiguration.readAsStringSync();
-      if (tomlBlock(alt, mcpName) == null) return null;
-      konfiguration.writeAsStringSync(tomlBlockEntfernen(alt, mcpName), flush: true);
+      if (tomlBlock(alt, name) == null) return null;
+      konfiguration.writeAsStringSync(tomlBlockEntfernen(alt, name), flush: true);
       return null;
     } catch (x) {
       return 'config.toml nicht geschrieben (${x.runtimeType})';
@@ -640,7 +640,9 @@ class LmStudio extends KiWerkzeug {
   }
 
   @override
-  Verbindung verbindung(int port, String schluessel) {
+  Verbindung verbindung(int port, String schluessel, {String name = mcpName}) {
+    // Die Brücke kennt nur den Namen moodle (TODO.md, Instanzprofile).
+    if (name != mcpName) return Verbindung.fehlt;
     try {
       final e = [for (final x in _lesen()['servers'] as List) if (_unser(x)) x as Map];
       if (e.isEmpty) return Verbindung.fehlt;
@@ -654,7 +656,10 @@ class LmStudio extends KiWerkzeug {
   /// remove` und `add` es bei Claude Code tun. Die id eines vorhandenen
   /// bleibt, damit Bionic, was es daran hängt, nicht verliert.
   @override
-  Future<String?> eintragen(int port, String schluessel) async {
+  Future<String?> eintragen(int port, String schluessel, {String name = mcpName}) async {
+    if (name != mcpName) {
+      return 'Die Brücke für Bionic kennt nur den Servernamen moodle; weitere Profile sind offen (TODO.md).';
+    }
     if (!File(bruecke).existsSync()) return '$brueckeExe fehlt neben moocp.exe: moocp neu installieren.';
     try {
       final d = _lesen();
@@ -685,7 +690,8 @@ class LmStudio extends KiWerkzeug {
   }
 
   @override
-  Future<String?> austragen() async {
+  Future<String?> austragen({String name = mcpName}) async {
+    if (name != mcpName) return null;
     try {
       final d = _lesen();
       final server = d['servers'] as List;
@@ -1058,6 +1064,7 @@ Future<Einrichtungsstand> einrichtungPruefen({
   required Map<String, String> umgebung,
   required int port,
   required String schluessel,
+  String name = mcpName,
   required List<SkillPaket> skills,
   Set<String> abgewaehlt = const {},
   Set<String> gewaehlt = const {},
@@ -1077,7 +1084,7 @@ Future<Einrichtungsstand> einrichtungPruefen({
         Werkzeugstand(
           werkzeug: w,
           gewaehlt: gewaehlteWerkzeuge.contains(w.id),
-          verbindung: w.verbindung(port, schluessel),
+          verbindung: w.verbindung(port, schluessel, name: name),
           skills: gewaehlteWerkzeuge.contains(w.id) ? gewollt : const [],
           stand: {for (final s in skills) s.name: skillVergleichen(s, Directory(p.join(w.skillOrdner.path, s.name)))},
           entfernen: {

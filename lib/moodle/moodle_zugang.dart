@@ -28,6 +28,7 @@ import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:html/dom.dart' as dom;
 import 'package:html/parser.dart' as html_parser;
 
@@ -539,6 +540,36 @@ class MoodleZugang {
   bool _angemeldet = false;
   Completer<void>? _anmeldungLaeuft;
 
+  /// Nur gesetzt von [fuerTest]: Die Instanz ist eine lokale Testadresse mit
+  /// http. Sonst gilt überall https.
+  bool _testInstanz = false;
+
+  /// Ein Zugang gegen eine lokale Testinstanz (Test-Doppel auf 127.0.0.1), mit
+  /// derselben Anmeldung wie [anmelden], aber ohne die https-Pflicht. Der
+  /// einzige Weg, http zu erlauben; die Positivliste lässt http nur für genau
+  /// diese Adresse und diesen Port zu ([_schemeErlaubt]).
+  ///
+  /// Im Release-Bau wirft die Methode, bevor etwas geschieht.
+  @visibleForTesting
+  static Future<MoodleZugang> fuerTest(
+    Protokoll protokoll,
+    Uri basis, {
+    required String benutzer,
+    required String passwort,
+  }) async {
+    if (!kDebugMode) throw StateError('Testzugang nur im Testbau verfügbar.');
+    if (basis.scheme != 'http' || basis.host != '127.0.0.1') {
+      throw ArgumentError('Testzugang nur über http://127.0.0.1.');
+    }
+    final z = MoodleZugang(protokoll);
+    z._testInstanz = true;
+    z._basis = basis;
+    z._benutzer = benutzer;
+    z._passwort = passwort;
+    await z._anmelden();
+    return z;
+  }
+
   /// Der sesskey der Sitzung, mitgelesen aus jeder HTML-Antwort (M.cfg).
   String? _sesskey;
 
@@ -868,8 +899,14 @@ class MoodleZugang {
   // Eine einzelne Anfrage -- hier sitzt die Positivliste
   // ---------------------------------------------------------------------
 
+  /// https ist Pflicht. Ausnahme nur die Testinstanz ([fuerTest]) auf ihrer
+  /// eigenen Adresse und ihrem eigenen Port.
+  bool _schemeErlaubt(Uri uri) =>
+      uri.scheme == 'https' ||
+      (_testInstanz && _basis!.scheme == 'http' && uri.scheme == 'http' && uri.port == _basis!.port);
+
   void _pruefePositivliste(String methode, Uri uri, Felder? formular, String? rumpf) {
-    if (_basis == null || uri.host != _basis!.host || uri.scheme != 'https') {
+    if (_basis == null || uri.host != _basis!.host || !_schemeErlaubt(uri)) {
       throw MoodleFehler('Gesperrt: fremder Rechner oder kein https (${uri.host}).');
     }
     final regel = sperrregel(uri);

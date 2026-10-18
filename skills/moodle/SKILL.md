@@ -12,7 +12,9 @@ dich, keinen Browser-Umweg und keinen Webservice-Token — und du fragst nie
 danach.
 
 Dein KI-Werkzeug setzt vor die Namen ein Präfix (in Claude Code
-`mcp__moodle__<name>`, in anderen ähnlich); hier steht nur der Name.
+`mcp__moodle__<name>`, in anderen ähnlich); hier steht nur der Name. Jede
+Moodle-Instanz hat einen eigenen Server mit eigenem Präfix (etwa
+`mcp__moodle-test__<name>`). `status` nennt, zu welchem Profil der Server gehört.
 
 | Wofür | Werkzeuge |
 |---|---|

@@ -110,8 +110,10 @@ Offen benannt, nicht still aufgelöst. Entscheidung jeweils durch die Lehrkraft 
 
 ## Instanzprofile (Issue #4): offene Teile
 
-- Konflikt mit E31 offen: Issue #4 verlangt den Parameter `instanz` an allen Moodle-Werkzeugen, E31 verwirft genau das („Ein Server mit der Instanz als Werkzeugparameter wird nicht gebaut"). Entscheidung der Lehrkraft, bevor der MCP-Teil gebaut wird; danach E31 oder Issue anpassen.
-- MCP-Teil nicht umgesetzt: `instanz` in `mcp_dienst.dart` (rund 60 Werkzeuge), `status` und `meine_kurse` mit Profilliste, Arbeitsordner-Dateinamen mit Kennung bei mehreren Profilen, Protokoll mit Profilname. Die Auflösung liegt fertig in `lib/profil.dart` (`profilAufloesen`).
-- Oberfläche für ein zweites Profil fehlt (Titelzeile und Dialog kennen nur die eine Adresse).
-- Zwei-Instanz-Test mit lokalen Gegenstellen fehlt. Die Positivliste verlangt https, daher braucht der Test entweder ein Testzertifikat für `127.0.0.1` oder einen Seam für die Gegenstelle. Entscheidung offen; die Produktivprüfung darf dabei nicht schwächer werden.
-- Protokolleinträge der Moodle-Anfragen nennen noch kein Profil.
+- Oberfläche für ein zweites Profil fehlt: Anmeldung, Titelzeile und Dialoge zeigen nur das Hauptprofil (erstes Profil). Weitere Profile kommen über die Einstellungsdatei, ein Anmeldefeld je Profil fehlt.
+- Freigabestufe je Profil: Die Stufe (E20) gilt noch global; eine Stufe je Instanz ist offen.
+- Sitzungsanzeige (`sitzungLaeuft`) und Titelzeile beziehen sich auf das Hauptprofil.
+- Einrichtung nur für das Hauptprofil: Claude Code und Codex bekommen den Eintrag mit dessen Namen und Port; für weitere Profile fehlt der Aufruf im Einrichtungsdialog. Die Brücke für Bionic kennt nur den Namen `moodle`.
+- Freigabe-Dialoge nennen das Profil nicht; bei mehreren Profilen soll der Dialog den Profilnamen zeigen.
+- Arbeitsordner: Bei mehreren Profilen je ein Unterordner nach Kennung (umgesetzt); Aufräumen beim Beenden prüfen, wenn Unterordner in Benutzung sind.
+- Der Wechsel des Eintrags `moodle` zur Produktivinstanz (E31, Folgen) ist mit dem Umstellen des Spike-Eintrags zu tun, nicht erledigt.

@@ -18,6 +18,7 @@ import 'package:path/path.dart' as p;
 
 import '../einstellungen.dart';
 import '../freigabe.dart';
+import '../profil.dart';
 import '../log.dart';
 import '../moodle/bewertung.dart';
 import '../moodle/bildschirmfoto.dart';
@@ -51,9 +52,13 @@ const _stufenText = {
 };
 
 class McpDienst {
-  McpDienst(this.einstellungen, this.moodle, this.protokoll, this.freigaben, this.arbeitsordner);
+  McpDienst(this.einstellungen, this.moodle, this.protokoll, this.freigaben, this.arbeitsordner,
+      {required this.profil});
 
   final Einstellungen einstellungen;
+
+  /// Das Instanzprofil dieses Servers (E31): Port, Name und Adresse kommen von dort.
+  final Profil profil;
   final MoodleZugang moodle;
   final Protokoll protokoll;
   final Freigaben freigaben;
@@ -69,7 +74,7 @@ class McpDienst {
     final s = StreamableMcpServer(
       serverFactory: (sessionId) => _erzeugen(),
       host: '127.0.0.1',
-      port: einstellungen.port,
+      port: profil.port,
       path: '/mcp',
       enableJsonResponse: true,
       allowedHosts: const {'127.0.0.1', 'localhost'},
@@ -77,7 +82,7 @@ class McpDienst {
     );
     await s.start();
     _server = s;
-    protokoll.eintrag(Art.info, 'MCP-Server läuft auf http://127.0.0.1:${einstellungen.port}/mcp');
+    protokoll.eintrag(Art.info, 'MCP-Server läuft auf http://127.0.0.1:${profil.port}/mcp (${profil.mcpName})');
   }
 
   /// Die Werkzeugliste für die Brücke (bruecke.dart, Werkzeugliste;
@@ -301,7 +306,8 @@ class McpDienst {
         nurLesen: true,
         ausfuehren: (a) async =>
             'Angemeldet: ${moodle.angemeldet ? "ja" : "nein -- bitte in der App anmelden"}\n'
-            'Moodle: ${moodle.basis?.host ?? einstellungen.moodleAdresse}\n'
+            'Profil: ${profil.name} (${profil.mcpName})\n'
+            'Moodle: ${moodle.basis?.host ?? profil.adresse}\n'
             'Verbunden über: ${_client(server)}\n'
             // Erkannt beim Anmelden (moodle_zugang.dart); vorher unbekannt.
             'Druckaufbereitung „Aufgabenblatt-Druck": ${!moodle.angemeldet ? "unbekannt, erst nach der Anmeldung" : moodle.druckaufbereitung ? "erkannt -- für Blätter zum Ausdrucken gilt references/drucken.md im Skill moodle" : "nicht vorhanden"}\n'

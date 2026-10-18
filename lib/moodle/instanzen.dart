@@ -7,6 +7,7 @@
 // Profils; dass die Registry sie nicht umgeht, folgt daraus, dass jede Anfrage
 // nur über den Zugang des Profils läuft.
 
+import '../profil.dart';
 import '../protokoll.dart';
 import 'moodle_zugang.dart';
 
@@ -17,9 +18,10 @@ class MoodleInstanzen {
   final Map<String, MoodleZugang> _zugaenge = {};
 
   /// Der Zugang zu einem Profil, bei Bedarf angelegt; derselbe Zugang kommt
-  /// bei jeder Anfrage nach derselben Kennung zurück.
-  MoodleZugang zugang(String kennung) =>
-      _zugaenge.putIfAbsent(kennung, () => MoodleZugang(protokoll));
+  /// bei jeder Anfrage nach derselben Kennung zurück. Sein Protokoll nennt
+  /// den Profilnamen (Protokoll.fuer).
+  MoodleZugang zugang(Profil profil) => _zugaenge.putIfAbsent(
+      profil.kennung, () => MoodleZugang(protokoll.fuer(profil.name)));
 
   /// Ob es für die Kennung schon einen Zugang gibt; ohne Anlegen.
   bool hat(String kennung) => _zugaenge.containsKey(kennung);

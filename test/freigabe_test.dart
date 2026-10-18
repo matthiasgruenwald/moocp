@@ -325,10 +325,10 @@ void main() {
 
   test('Die Stufe steht in den Einstellungen und kommt unverändert zurück', () {
     for (final x in Bestaetigungen.values) {
-      final e = Einstellungen(moodleAdresse: '', port: 1, schluessel: 'x', bestaetigungen: x);
+      final e = Einstellungen(schluessel: 'x', bestaetigungen: x);
       expect(e.bestaetigungen, x);
       expect(Bestaetigungen.ausText(e.bestaetigungen.text), x);
     }
-    expect(Einstellungen(moodleAdresse: '', port: 1, schluessel: 'x').bestaetigungen, Bestaetigungen.mittel);
+    expect(Einstellungen(schluessel: 'x').bestaetigungen, Bestaetigungen.mittel);
   });
 }
