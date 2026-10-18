@@ -58,6 +58,7 @@ import 'formular_schreiben.dart';
 import 'kurs.dart';
 import 'moodle_zugang.dart';
 import 'sperrliste.dart';
+import '../plattform/plattform.dart';
 import 'wiki.dart';
 
 /// Breite des Fensters in CSS-Pixeln: Moodle zeigt dabei das Layout eines
@@ -188,76 +189,34 @@ class _Cdp {
   }
 }
 
-Future<String> _reg(List<String> argumente) async {
-  try {
-    return '${(await Process.run('reg', ['query', ...argumente])).stdout}';
-  } on ProcessException {
-    return '';
-  }
-}
+/// Name und Pfad des ersten Browsers in der Suchreihenfolge der Plattform,
+/// der da ist und dessen Fernsteuerung die Verwaltung nicht abgeschaltet hat.
+/// Fehlt einer nur wegen der Richtlinie, sagt der Fehler das.
+Future<(String, String)> _browser({PlattformBrowser? plattform}) => browserWaehlen(plattform ?? plattformBrowser);
 
-/// Wo ein Browser liegt: zuerst laut Registrierung (App Paths), sonst an den
-/// üblichen Orten.
-Future<String?> _finden(String exe, List<String> ordner) async {
-  for (final wurzel in ['HKLM', 'HKCU']) {
-    final m = RegExp(r'REG_SZ\s+(.+)')
-        .firstMatch(await _reg(['$wurzel\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\App Paths\\$exe', '/ve']));
-    final pfad = m?.group(1)?.trim();
-    if (pfad != null && File(pfad).existsSync()) return pfad;
-  }
-  for (final v in ['ProgramFiles(x86)', 'ProgramFiles', 'LOCALAPPDATA']) {
-    final b = Platform.environment[v];
-    if (b == null) continue;
-    final pfad = p.joinAll([b, ...ordner, exe]);
-    if (File(pfad).existsSync()) return pfad;
-  }
-  return null;
-}
-
-/// Ob die Verwaltung des Rechners die Fernsteuerung per Richtlinie
-/// abgeschaltet hat (RemoteDebuggingAllowed = 0). Der Browser öffnet dann
-/// keinen DevTools-Port, und das Warten darauf liefe bis zur Frist.
-Future<bool> _fernsteuerungVerboten(String richtlinie) async {
-  for (final wurzel in ['HKLM', 'HKCU']) {
-    final t = await _reg(['$wurzel\\$richtlinie', '/v', 'RemoteDebuggingAllowed']);
-    if (RegExp(r'RemoteDebuggingAllowed\s+REG_DWORD\s+0x0+\s*$', multiLine: true).hasMatch(t)) return true;
-  }
-  return false;
-}
-
-/// Programmdatei eines Browsers unter macOS: im Bündel in /Applications oder
-/// im Benutzerordner. Die Registry gibt es dort nicht.
-String? _macFinden(String app, String programm) {
-  final home = Platform.environment['HOME'] ?? '';
-  for (final ordner in ['/Applications', p.join(home, 'Applications')]) {
-    final pfad = p.join(ordner, '$app.app', 'Contents', 'MacOS', programm);
-    if (File(pfad).existsSync()) return pfad;
-  }
-  return null;
-}
-
-/// Name und Pfad des Browsers: Edge, sonst Chrome. Unter macOS gibt es keine
-/// Richtlinie in der Registry; sie wird dort nicht geprüft.
-Future<(String, String)> _browser() async {
+/// Die Auswahl selbst, ohne Betriebssystem: [plattform] liefert Pfade und
+/// Richtlinien, die Tests als Fakes geben.
+Future<(String, String)> browserWaehlen(PlattformBrowser plattform) async {
   final verboten = <String>[];
-  for (final (name, exe, ordner, richtlinie, app) in [
-    ('Microsoft Edge', 'msedge.exe', ['Microsoft', 'Edge', 'Application'], r'SOFTWARE\Policies\Microsoft\Edge', 'Microsoft Edge'),
-    ('Google Chrome', 'chrome.exe', ['Google', 'Chrome', 'Application'], r'SOFTWARE\Policies\Google\Chrome', 'Google Chrome'),
-  ]) {
-    final pfad = Platform.isMacOS ? _macFinden(app, app) : await _finden(exe, ordner);
+  for (final art in plattform.arten) {
+    final pfad = await plattform.programm(art);
     if (pfad == null) continue;
-    if (!Platform.isMacOS && await _fernsteuerungVerboten(richtlinie)) {
-      verboten.add(name);
+    if (await plattform.fernsteuerungVerboten(art)) {
+      verboten.add(art.anzeige);
       continue;
     }
-    return (name, pfad);
+    return (art.anzeige, pfad);
   }
-  throw MoodleFehler(verboten.isNotEmpty
-      ? 'Auf diesem Rechner ist die Fernsteuerung von ${verboten.join(' und ')} per Richtlinie abgeschaltet '
-          '(RemoteDebuggingAllowed) -- ohne sie gibt es keine Bildschirmfotos. Das entscheidet die Verwaltung des '
-          'Rechners; die App umgeht es nicht.'
-      : 'Weder Microsoft Edge noch Google Chrome ist zu finden -- ohne einen von beiden gibt es keine '
-          'Bildschirmfotos.');
+  if (verboten.isNotEmpty) {
+    throw MoodleFehler('Auf diesem Rechner ist die Fernsteuerung von ${verboten.join(' und ')} per Richtlinie abgeschaltet '
+        '(RemoteDebuggingAllowed) -- ohne sie gibt es keine Bildschirmfotos. Das entscheidet die Verwaltung des '
+        'Rechners; die App umgeht es nicht.');
+  }
+  final namen = [for (final a in plattform.arten) a.anzeige];
+  final weder = namen.length == 1
+      ? namen.single
+      : '${namen.sublist(0, namen.length - 1).join(', ')} noch ${namen.last}';
+  throw MoodleFehler('Weder $weder ist zu finden -- ohne einen davon gibt es keine Bildschirmfotos.');
 }
 
 /// Der Grund, den die Lehrkraft im Dialog liest: ein Satz, was das Bild
@@ -659,54 +618,14 @@ Future<_Aufnahme> _aufnehmen(
       await aboNetz.cancel();
     }
   } finally {
-    await _beenden(cdp, netz, port, browserPfad, proz, profil, p.basename(programm), protokoll);
+    await _beenden(cdp, netz, port, browserPfad, proz, profil, programm, protokoll);
   }
 }
 
-/// Beendet hart jeden Prozess von [exe], der mit [profil] läuft, und gibt
-/// ihre Zahl zurück. Gefunden werden sie am Profil im Aufruf, das jeder
-/// Prozess des Browsers trägt -- nicht an der Nummer des gestarteten
-/// Prozesses: Edge beendet ihn gleich nach dem Start und läuft in einem
-/// neuen weiter, dessen Elternprozess es nicht mehr gibt (gemessen);
-/// taskkill /T über die gestartete Nummer trifft dann nichts.
-Future<int> _profilProzesseBeenden(Directory profil, String exe) async {
-  if (Platform.isMacOS) return _macProzesseBeenden(profil);
-  String ps(String s) => s.replaceAll("'", "''");
-  try {
-    final r = await Process.run('powershell', [
-      '-NoProfile',
-      '-NonInteractive',
-      '-Command',
-      "\$p = @(Get-CimInstance Win32_Process -Filter \"Name='${ps(exe)}'\" | Where-Object "
-          "{ \$_.CommandLine -and \$_.CommandLine.Contains('${ps(profil.path)}') }); "
-          r"$p | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }; $p.Count",
-    ]);
-    return int.tryParse('${r.stdout}'.trim()) ?? -1;
-  } on ProcessException {
-    return -1;
-  }
-}
-
-/// macOS-Gegenstück zu [_profilProzesseBeenden]: `ps` nennt die Prozesse mit
-/// ihrem Aufruf, und die mit dem Profil im Aufruf bekommen ein `kill -9`.
-Future<int> _macProzesseBeenden(Directory profil) async {
-  try {
-    final r = await Process.run('ps', ['-axww', '-o', 'pid=,command=']);
-    final pids = <String>[];
-    for (final zeile in '${r.stdout}'.split('\n')) {
-      final m = RegExp(r'^\s*(\d+)\s(.*)$').firstMatch(zeile);
-      if (m == null || !m.group(2)!.contains(profil.path)) continue;
-      pids.add(m.group(1)!);
-    }
-    for (final pid in pids) {
-      await Process.run('kill', ['-9', pid]);
-    }
-    return pids.length;
-  } on ProcessException {
-    return -1;
-  }
-}
-
+/// Beendet hart jeden Prozess des Browsers, der mit [profil] läuft (Aufruf
+/// von [plattformBrowser]), und gibt ihre Zahl zurück. Gefunden werden sie
+/// am Profil im Aufruf, nicht an der Nummer des gestarteten Prozesses: Edge
+/// beendet ihn gleich nach dem Start und läuft in einem neuen weiter (gemessen).
 Future<bool> _profilLoeschen(Directory profil, int versuche) async {
   for (var i = 0; i < versuche; i++) {
     try {
@@ -723,11 +642,11 @@ Future<bool> _profilLoeschen(Directory profil, int versuche) async {
 /// über den Browser-Endpunkt (Browser.close): Das beendet alle Prozesse und
 /// gibt das Profil frei. Ging das nicht -- der Port erschien nie, der
 /// Browser hängt --, hält noch ein Prozess das Profil fest; dann hart über
-/// das Profil ([_profilProzesseBeenden]). Was dabei misslingt, steht im
+/// das Profil ([PlattformBrowser.prozesseBeenden]). Was dabei misslingt, steht im
 /// Protokoll; ein Rest im Arbeitsordner verschwindet spätestens beim
 /// nächsten Leeren.
 Future<void> _beenden(_Cdp? cdp, _Cdp? netz, String? port, String? browserPfad, Process proz, Directory profil,
-    String exe, Protokoll protokoll) async {
+    String programm, Protokoll protokoll) async {
   for (final v in [cdp, netz]) {
     try {
       await v?.schliessen().timeout(const Duration(seconds: 5));
@@ -745,7 +664,7 @@ Future<void> _beenden(_Cdp? cdp, _Cdp? netz, String? port, String? browserPfad, 
     }
   }
   if (await _profilLoeschen(profil, 10)) return;
-  final n = await _profilProzesseBeenden(profil, exe);
+  final n = await plattformBrowser.prozesseBeenden(profil, programm);
   if (n != 0) protokoll.eintrag(Art.info, 'Browser hart beendet: ${n < 0 ? 'Zahl unbekannt' : '$n Prozess(e)'}');
   // Der gestartete Prozess selbst, falls er noch läuft.
   if (await proz.exitCode.timeout(const Duration(seconds: 2), onTimeout: () => -1) == -1) proz.kill();
