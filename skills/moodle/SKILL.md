@@ -172,6 +172,38 @@ Was sich gegenüber dem Original geändert hat, gehört in die Meldung am Ende, 
 Entsteht das Neue zuerst als Entwurf (Skill `lernsituation`), gilt „Das Neue steht allein" schon für den Entwurf, und die Frage direkt oder Kopie beantwortet der Plan für den Schritt nach Moodle.
 <!-- >>> gemeinsam/ueberarbeiten.md -->
 
+## Übertragung: Rollen, Projektkontext und Rückfragen
+
+Eine Übertragung kopiert Kurse von einer Instanz in eine andere. Die App braucht
+dafür zwei Angaben, die du nicht aus Kursnamen erraten darfst: welches Profil die
+**Quelle** ist und welche Kurse die **Ziele** sind. Beides steht in der App, nicht
+in deinem Kopf.
+
+- **Rollen** setzt `uebertragung_rolle_setzen` je Profil auf Quelle, Ziel oder
+  keine. Das ist eine lokale Einstellung der App: Moodle wird weder angefragt
+  noch geändert, deshalb gibt es dafür keine Freigabe. Setze eine Rolle nur, wenn
+  die Lehrkraft sie im Auftrag nennt. Gespeichert bleibt sie über Neustarts.
+- **Projektkontext** sind der Quellkurs und die Durchführungskurse. `uebertragung_kontext`
+  zeigt sie zusammen mit den Rollen und der Richtung, oder die Rückfrage, die noch
+  offen ist. `uebertragung_kontext_setzen` setzt sie, auch einzeln, und
+  `zuruecksetzen` leert sie. Auch das fragt Moodle nicht an.
+- **Die Richtung ist fest:** Ohne ausdrückliche Angabe gilt Quelle → Ziel. Die
+  Gegenrichtung, bei der ein Durchführungskurs zur Quelle und der Quellkurs zum Ziel
+  wird, gilt nur, wenn der Auftrag sie ausdrücklich verlangt; dann
+  `gegenrichtung: true`. Die Gegenrichtung leitest du nie aus dem Kontext ab.
+- **Rückfragen statt Annahmen.** Fehlt etwas oder widerspricht es sich, gibt die
+  Richtungsbestimmung eine Rückfrage zurück und keinen Plan. Das ist der Fall bei
+  keinem oder mehreren Profilen mit Rolle Quelle, bei einem Quellkurs außerhalb
+  des Quellprofils, bei einem Durchführungskurs ohne bekanntes Profil, ohne Rolle
+  Ziel und nicht als Quelle, bei einem Durchführungskurs, der derselbe Kurs wie der
+  Quellkurs ist, und bei einem doppelt gelisteten Kurs. Die Rückfrage geht an die
+  Lehrkraft, konkret genug, dass sie direkt antworten kann. Du entscheidest das nicht
+  an ihrer Stelle.
+- **Vor dem ersten Schreibschritt** nennt der Plan die Richtung, Quellinstanz und
+  Quellkurs mit Namen und Nummer, die Inhaltsauswahl, jeden Zielkurs mit Namen,
+  Nummer und Instanz, und den Wiederherstellungsweg (A5). Fehlt ein Kursname, ist
+  der Plan nicht vollständig: Dann frag nach, statt eine Lücke zu zeigen.
+
 <!-- <<< gemeinsam/luecken.md - von build.py erzeugt, hier nicht bearbeiten -->
 ## Was der Skill nicht kann: fragen, nicht improvisieren
 

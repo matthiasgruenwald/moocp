@@ -2,6 +2,7 @@
 
 ## 0.9.23
 - macOS: Die App startet als Entwicklerversion auf dem Mac; ein zweiter Start holt das laufende Fenster nach vorn, ohne den Arbeitsordner zu berühren.
+- Übertragung: Jedes Profil bekommt eine Rolle (Quelle, Ziel), der Projektkontext hält Quellkurs und Durchführungskurse fest; fehlt etwas, fragt die KI nach, statt zu raten.
 
 ## 0.9.22
 - Freigaben: Warten weitere Anfragen hinter der offenen, zeigt der Dialog, wie viele, und das Protokoll nennt jede, die sich einreiht.

@@ -20,6 +20,7 @@ import '../einstellungen.dart';
 import '../freigabe.dart';
 import '../profil.dart';
 import '../log.dart';
+import '../uebertragung.dart';
 import '../moodle/bewertung.dart';
 import '../moodle/bildschirmfoto.dart';
 import '../moodle/board.dart';
@@ -1192,7 +1193,140 @@ class McpDienst {
         ausfuehren: (a) => testAendern(moodle, freigaben,
             cmid: _zahl(a, 'cmid'), name: _text(a, 'name'), aktionen: objekte(a['aktionen'], 'aktionen')));
 
+    // ---- Übertragung (Issue #5): Rollen und Projektkontext, nur in der App gespeichert
+    _werkzeug(server, 'uebertragung_rolle_setzen',
+        titel: 'Rolle des Profils setzen',
+        beschreibung: 'Setzt, ob dieses Profil für eine Übertragung Quelle oder Ziel ist, oder entfernt die Rolle '
+            '(keine). Die Rolle ist eine Einstellung der App und ändert nichts in Moodle, dafür gibt es keine '
+            'Freigabe. Setze sie nur auf ausdrücklichen Wunsch der Lehrkraft, nie von dir aus.',
+        parameter: {
+          'rolle': JsonSchema.string(enumValues: const ['quelle', 'ziel', 'keine'], description: 'quelle, ziel oder keine'),
+        },
+        pflicht: ['rolle'],
+        ausfuehren: (a) async {
+          final Rolle? rolle = switch (_text(a, 'rolle')) {
+            'quelle' => Rolle.quelle,
+            'ziel' => Rolle.ziel,
+            'keine' => null,
+            _ => throw MoodleFehler('rolle muss quelle, ziel oder keine sein.'),
+          };
+          if (!einstellungen.rolleSetzen(profil.kennung, rolle)) {
+            throw MoodleFehler('Dieses Profil gibt es in den Einstellungen nicht mehr.');
+          }
+          await einstellungen.speichern();
+          // Mehrere Profile mit derselben Rolle sind möglich; die Richtung fragt
+          // dann nach (uebertragung.dart). Hier wird nur gewarnt.
+          final andere = rolle == null
+              ? const <String>[]
+              : [for (final p in einstellungen.profile) if (p.kennung != profil.kennung && p.rolle == rolle) p.name];
+          final hinweis = andere.isEmpty
+              ? ''
+              : '\nAchtung: „${andere.join('", „')}" hat schon die Rolle ${rolle!.anzeige}. Eine Übertragung '
+                  'braucht genau eine Quelle; bei mehreren Zielen ist das in Ordnung.';
+          return 'Rolle von „${profil.name}" (${profil.mcpName}): ${rolle?.anzeige ?? 'keine'}. '
+              'In den Einstellungen gespeichert.$hinweis';
+        });
+
+    _werkzeug(server, 'uebertragung_kontext',
+        titel: 'Projektkontext',
+        beschreibung: 'Zeigt den Projektkontext der Übertragung: Quellkurs, Durchführungskurse, die Rolle jedes '
+            'Profils und die Richtung, die sich daraus ergibt, oder die Rückfrage, die noch offen ist. Nur lesen.',
+        nurLesen: true,
+        ausfuehren: (a) async => _kontextText());
+
+    final kursbezugSchema = JsonSchema.object(
+      properties: {
+        'profil': JsonSchema.string(description: 'mcpName des Profils, wie ihn uebertragung_kontext zeigt'),
+        'kurs': _kurs,
+      },
+      required: const ['profil', 'kurs'],
+    );
+    _werkzeug(server, 'uebertragung_kontext_setzen',
+        titel: 'Projektkontext setzen',
+        beschreibung: 'Setzt den Projektkontext in den Einstellungen der App: den Quellkurs (quelle) und die '
+            'Durchführungskurse (durchfuehrung), je {profil (mcpName), kurs}. Ein angegebenes Feld ersetzt das '
+            'bisherige ganz; durchfuehrung ist immer die vollständige Liste. zuruecksetzen: true leert den Kontext '
+            'vor dem Setzen. Ändert nichts in Moodle; die Lehrkraft muss es ausdrücklich wollen. Gibt danach den '
+            'Kontext und die Richtung zurück.',
+        parameter: {
+          'quelle': kursbezugSchema,
+          'durchfuehrung': JsonSchema.array(items: kursbezugSchema, description: 'Die Durchführungskurse, vollständig'),
+          'zuruecksetzen': JsonSchema.boolean(description: 'true leert den Projektkontext vor dem Setzen'),
+        },
+        ausfuehren: (a) async {
+          final quelle = a['quelle'] == null ? null : _kursbezugAus(a['quelle'], 'quelle');
+          final durchfuehrung = a['durchfuehrung'] == null
+              ? null
+              : [for (final j in objekte(a['durchfuehrung'], 'durchfuehrung')) _kursbezugAus(j, 'durchfuehrung')];
+          final zuruecksetzen = a['zuruecksetzen'] == true;
+          if (quelle == null && durchfuehrung == null && !zuruecksetzen) {
+            throw MoodleFehler('Nichts angegeben: quelle, durchfuehrung oder zuruecksetzen nennen.');
+          }
+          final alt = zuruecksetzen ? const Projektkontext() : (einstellungen.projektkontext ?? const Projektkontext());
+          einstellungen.projektkontext = Projektkontext(
+            quelle: quelle ?? alt.quelle,
+            durchfuehrung: durchfuehrung ?? alt.durchfuehrung,
+          );
+          await einstellungen.speichern();
+          return _kontextText();
+        });
+
     return server;
+  }
+
+  /// Das Profil zu einem Servernamen (mcpName), wie ihn die KI nennt.
+  Profil? _profilNachMcpName(String mcp) {
+    for (final p in einstellungen.profile) {
+      if (p.mcpName == mcp) return p;
+    }
+    return null;
+  }
+
+  Profil? _profilZuKennung(String kennung) {
+    for (final p in einstellungen.profile) {
+      if (p.kennung == kennung) return p;
+    }
+    return null;
+  }
+
+  /// Ein Kursbezug aus einer Werkzeugangabe {profil, kurs}; die Kennung des
+  /// Profils kommt aus dem Servernamen, den die KI angibt.
+  Kursbezug _kursbezugAus(Object? j, String feld) {
+    if (j is! Map) throw MoodleFehler('$feld muss ein Objekt {profil, kurs} sein.');
+    final mcp = j['profil'];
+    final kurs = j['kurs'];
+    if (mcp is! String || mcp.isEmpty) throw MoodleFehler('$feld: profil fehlt (mcpName des Profils).');
+    if (kurs is! num || kurs <= 0 || kurs != kurs.toInt()) {
+      throw MoodleFehler('$feld: kurs muss eine Kurs-ID sein (Zahl).');
+    }
+    final p = _profilNachMcpName(mcp);
+    if (p == null) {
+      final bekannt = einstellungen.profile.map((p) => p.mcpName).join(', ');
+      throw MoodleFehler('$feld: Profil „$mcp" gibt es nicht. Bekannt: $bekannt.');
+    }
+    return Kursbezug(p.kennung, kurs.toInt());
+  }
+
+  /// Der Projektkontext mit den Rollen und der Richtung, für die Werkzeuge.
+  String _kontextText() {
+    final k = einstellungen.projektkontext;
+    String kursText(Kursbezug b) {
+      final p = _profilZuKennung(b.profilKennung);
+      return p == null
+          ? 'Kurs ${b.kurs} (Profil nicht mehr vorhanden)'
+          : 'Kurs ${b.kurs} in „${p.name}" (${p.mcpName})';
+    }
+
+    final dk = k?.durchfuehrung ?? const <Kursbezug>[];
+    final zeilen = [
+      'Quellkurs: ${k?.quelle == null ? 'nicht gesetzt' : kursText(k!.quelle!)}',
+      'Durchführungskurse${dk.isEmpty ? ': keine' : ':'}',
+      for (final b in dk) '  - ${kursText(b)}',
+      'Rollen der Profile:',
+      for (final p in einstellungen.profile) '  - „${p.name}" (${p.mcpName}): ${p.rolle?.anzeige ?? 'keine'}',
+      richtungText(bestimmeRichtung(einstellungen.profile, k)),
+    ];
+    return zeilen.join('\n');
   }
 
   CallToolResult _fehler(String text) => CallToolResult(content: [TextContent(text: text)], isError: true);

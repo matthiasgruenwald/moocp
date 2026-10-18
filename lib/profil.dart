@@ -1,7 +1,8 @@
 // Instanzprofile: Moodle-Instanzen, mit denen die App gleichzeitig angemeldet
 // sein kann (Issue #4, E31). Ein Profil hat eine stabile Kennung, einen
-// Anzeigenamen, die Adresse, eine optionale Rolle (nur als Feld gespeichert,
-// ohne Wirkung), einen eigenen Port und einen technischen Servernamen.
+// Anzeigenamen, die Adresse, eine optionale Rolle in der Übertragung (Issue #5,
+// Rolle; Richtung und Prüfung in uebertragung.dart), einen eigenen Port und
+// einen technischen Servernamen.
 //
 // Je Profil läuft ein eigener MCP-Server (mcp/mcp_dienst.dart) auf eigenem Port
 // unter eigenem Namen (einrichtung.dart): Die KI-Werkzeuge sehen je Instanz
@@ -20,6 +21,28 @@
 import 'dart:math';
 
 import 'einstellungen_ort.dart';
+
+/// Rolle eines Profils für die Übertragung von Kursen (Issue #5). Die Rolle
+/// ist eine lokale App-Einstellung; Moodle wird dadurch nicht geändert. Gespeichert
+/// wird der Name des Werts (`quelle`, `ziel`), nicht die Anzeige.
+enum Rolle {
+  quelle('Quelle'),
+  ziel('Ziel');
+
+  const Rolle(this.anzeige);
+
+  /// Die Bezeichnung in Texten für die Lehrkraft und die KI.
+  final String anzeige;
+
+  /// Null für nichts Gespeichertes oder einen unbekannten Wert: Ein Profil
+  /// ohne brauchbare Rolle ist ohne Rolle, die Datei wird dafür nicht verworfen.
+  static Rolle? ausText(Object? t) {
+    for (final r in Rolle.values) {
+      if (r.name == t) return r;
+    }
+    return null;
+  }
+}
 
 class Profil {
   Profil({
@@ -51,13 +74,16 @@ class Profil {
   /// Umbenennen die Einrichtung in den Werkzeugen nicht still verstellt.
   final String mcpName;
 
-  /// Nur ein Feld, ohne Wirkung auf Rechte oder Werkzeuge.
-  final String? rolle;
+  /// Rolle in der Übertragung, null = keine. Wirkt nur auf die Richtung
+  /// einer Übertragung, nie auf Rechte oder die Werkzeuge der Instanz.
+  final Rolle? rolle;
 
   bool get istStandard => kennung == standardKennung;
 
   /// Ändert nur den Anzeigenamen, der Servername bleibt (siehe [mcpName]).
-  Profil copyWith({String? name, String? adresse, String? rolle, int? port}) => Profil(
+  /// Ohne [rolle] bleibt die Rolle; eine Rolle wegnehmen geht über
+  /// [mitRolle] (Einstellungen.rolleSetzen).
+  Profil copyWith({String? name, String? adresse, Rolle? rolle, int? port}) => Profil(
         kennung: kennung,
         name: name ?? this.name,
         adresse: adresse ?? this.adresse,
@@ -66,13 +92,23 @@ class Profil {
         rolle: rolle ?? this.rolle,
       );
 
+  /// Dieselbe Instanz mit anderer Rolle, auch ohne Rolle (null).
+  Profil mitRolle(Rolle? neu) => Profil(
+        kennung: kennung,
+        name: name,
+        adresse: adresse,
+        port: port,
+        mcpName: mcpName,
+        rolle: neu,
+      );
+
   Map<String, Object?> toJson() => {
         'kennung': kennung,
         'name': name,
         'adresse': adresse,
         'port': port,
         'mcpName': mcpName,
-        if (rolle != null) 'rolle': rolle,
+        if (rolle != null) 'rolle': rolle!.name,
       };
 
   /// Null, wenn die Angabe unbrauchbar ist; die Einstellungen fallen dann auf
@@ -95,7 +131,7 @@ class Profil {
       adresse: adresse,
       port: port is int && port > 0 ? port : 0,
       mcpName: mcpName is String && mcpNameGueltig(mcpName) ? mcpName : mcpNameFuer(name, kennung),
-      rolle: rolle is String && rolle.isNotEmpty ? rolle : null,
+      rolle: Rolle.ausText(rolle),
     );
   }
 

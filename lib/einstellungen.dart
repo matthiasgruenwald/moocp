@@ -15,6 +15,7 @@ import 'dart:math';
 import 'einstellungen_ort.dart';
 import 'freigabe.dart';
 import 'profil.dart';
+import 'uebertragung.dart';
 
 class Einstellungen {
   /// [moodleAdresse] ist der Altbestand eines einzelnen Moodle und wird zum
@@ -29,7 +30,22 @@ class Einstellungen {
     this.updatePruefen,
     this.updateZuletzt,
     this.updateErwartet,
+    this.projektkontext,
   }) : profile = _verteilt(profile ?? (moodleAdresse.isEmpty ? [] : [Profil.migriert(moodleAdresse)]));
+
+  /// Quellkurs und Durchführungskurse der Übertragung (uebertragung.dart,
+  /// Issue #5). Null, solange die Lehrkraft noch keinen Kontext gesetzt hat.
+  Projektkontext? projektkontext;
+
+  /// Setzt die Rolle des Profils mit der Kennung [kennung] nur im Speicher;
+  /// das Speichern macht der Aufruf. Liefert false, wenn es kein solches
+  /// Profil gibt.
+  bool rolleSetzen(String kennung, Rolle? rolle) {
+    final i = profile.indexWhere((p) => p.kennung == kennung);
+    if (i < 0) return false;
+    profile[i] = profile[i].mitRolle(rolle);
+    return true;
+  }
 
   /// Die Moodle-Instanzen, mit denen die App angemeldet sein kann. Das erste
   /// Profil hat die Kennung `standard` (profil.dart), wenn es aus dem
@@ -167,6 +183,7 @@ class Einstellungen {
       updatePruefen: j['updatePruefen'] as bool?,
       updateZuletzt: j['updateZuletzt'] as String?,
       updateErwartet: j['updateErwartet'] as String?,
+      projektkontext: Projektkontext.ausJson(j['projektkontext']),
     );
   }
 
@@ -182,6 +199,7 @@ class Einstellungen {
         if (updatePruefen != null) 'updatePruefen': updatePruefen,
         if (updateZuletzt != null) 'updateZuletzt': updateZuletzt,
         if (updateErwartet != null) 'updateErwartet': updateErwartet,
+        if (projektkontext != null) 'projektkontext': projektkontext!.toJson(),
       };
 
   Future<void> speichern() async {

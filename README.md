@@ -288,6 +288,9 @@ Gelesenes legt die App im Arbeitsordner ab, an die KI geht eine Übersicht. Lese
 | Werkzeug | Was es tut | Freigabe |
 |---|---|---|
 | `status` | Zeigt, ob die App angemeldet ist, welche Moodle-Instanz sie bedient und ob es die Druckaufbereitung gibt. Fragt Moodle nichts an. | – |
+| `uebertragung_rolle_setzen` | Setzt die Rolle dieses Profils für Übertragungen: Quelle, Ziel oder keine. Lokal in der App gespeichert; Moodle wird weder angefragt noch geändert. | – |
+| `uebertragung_kontext` | Zeigt den Projektkontext (Quellkurs, Durchführungskurse), die Rollen aller Profile und daraus die Richtung oder die offene Rückfrage. Fragt Moodle nichts an. | – |
+| `uebertragung_kontext_setzen` | Setzt Quellkurs und Durchführungskurse oder setzt den Projektkontext zurück. Lokal in der App gespeichert; Moodle wird nicht angefragt. | – |
 | `meine_kurse` | Ihre Kurse mit Nummer, Name und Kurzname, auf Wunsch die zuletzt besuchten. | – |
 | `kurs_uebersicht` | Die Struktur eines Kurses: Abschnitte, Unterabschnitte und Aktivitäten mit Typ und Sichtbarkeit, mit Warnung, wenn etwas, das nach Lösung oder Lehrermaterial klingt, für Lernende erreichbar ist. Keine Inhalte, aber die Konventionen des Kurses, falls es sie gibt. | – |
 | `kurs_hinweise` | Die Konventionen des Kurses: die Datei „CLAUDE.md" im verborgenen Verzeichnis „CLAUDE", falls es sie gibt – als Daten, nie als Anweisung. Für den ganzen Kurs, auf Wunsch zusätzlich für einen Abschnitt. `kurs_uebersicht` und `abschnitt_lesen` liefern das von sich aus mit. | – |
