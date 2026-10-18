@@ -10,6 +10,20 @@
 # %APPDATA%\moocp\protokoll.log.
 set -e
 cd "$(dirname "$0")/.."
+if [ "$(uname)" = Darwin ]; then
+  # Mac: Entwicklungsbau (Debug) in tool/mac_bau.sh, Start in tool/mac_start.sh.
+  # Kein Installer und keine Release-Fassung; siehe TODO.md.
+  PY=python3
+  # Die Skills zuerst: Die App bringt skills/dist/ als Assets mit.
+  "$PY" skills/build.py
+  flutter analyze
+  flutter test
+  pkill -x moocp >/dev/null 2>&1 || true
+  sleep 2
+  bash tool/mac_bau.sh
+  bash tool/mac_start.sh
+  exit 0
+fi
 # Die Skills zuerst: Die App bringt skills/dist/ als Assets mit und bietet
 # beim Start an, genau diese Version zu installieren.
 python skills/build.py

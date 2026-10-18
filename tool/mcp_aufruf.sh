@@ -8,7 +8,8 @@
 # Schreibende Werkzeuge warten auf die Freigabe in der App (bis 30 Minuten);
 # deshalb ohne Zeitgrenze.
 #
-# In Git Bash aufrufen, nicht aus Python heraus: Das Python auf dem
+# Unter Windows in Git Bash aufrufen, unter macOS in der Shell. Nicht aus
+# Python heraus: Das Python auf dem
 # Entwicklungsrechner ist ein gepacktes Programm, dem Windows %APPDATA%
 # umleitet -- es und jede Bash, die es startet, sehen die Einstellungen der App
 # nicht, und die App weist die Anfrage „ohne gültigen Schlüssel" ab.

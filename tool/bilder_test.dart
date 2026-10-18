@@ -66,11 +66,19 @@ const _nachher = '''<h3>Der Vorwiderstand</h3>
 
 void main() {
   setUpAll(() async {
-    const fonts = r'C:\Windows\Fonts';
     // flutter_tester liegt unter <flutter>/bin/cache/artifacts/engine/<plattform>/.
     final artefakte = p.dirname(p.dirname(p.dirname(Platform.resolvedExecutable)));
-    await _schrift('Segoe UI', ['$fonts\\segoeui.ttf', '$fonts\\seguisb.ttf', '$fonts\\segoeuib.ttf']);
-    await _schrift('Consolas', ['$fonts\\consola.ttf']);
+    if (Platform.isMacOS) {
+      // Die Schriften des Mac. Die Bilder in docs/bilder/ stammen von Windows
+      // und sehen hier anders aus; zum Nachsehen reicht das.
+      const fonts = '/System/Library/Fonts';
+      await _schrift('Segoe UI', ['$fonts/Supplemental/Arial.ttf', '$fonts/Supplemental/Arial Bold.ttf']);
+      await _schrift('Consolas', ['$fonts/Menlo.ttc']);
+    } else {
+      const fonts = r'C:\Windows\Fonts';
+      await _schrift('Segoe UI', ['$fonts\\segoeui.ttf', '$fonts\\seguisb.ttf', '$fonts\\segoeuib.ttf']);
+      await _schrift('Consolas', ['$fonts\\consola.ttf']);
+    }
     await _schrift('MaterialIcons', [p.join(artefakte, 'material_fonts', 'MaterialIcons-Regular.otf')]);
     // Ein Test, nur eben unter tool/ (siehe oben) -- das weiß der Analyzer nicht.
     // ignore: invalid_use_of_visible_for_testing_member

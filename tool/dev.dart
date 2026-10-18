@@ -24,7 +24,8 @@ Future<void> main(List<String> args) async {
   void schreib(String s) =>
       log.writeln('${DateTime.now().toIso8601String().substring(11, 19)} $s');
 
-  final p = await Process.start('flutter', ['run', '-d', 'windows', '--machine'], runInShell: true);
+  final geraet = Platform.isMacOS ? 'macos' : 'windows';
+  final p = await Process.start('flutter', ['run', '-d', geraet, '--machine'], runInShell: true);
   String? appId;
   var id = 0;
 
