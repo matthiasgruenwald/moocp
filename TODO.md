@@ -93,9 +93,6 @@ Im Testkurs (Präfix `ZZ`, Quelle und Ziel, nie ein Produktivkurs) nachprüfen:
   Aktivitäten hält) ist nicht gemessen.
 - **#5 Rollen und Projektkontext:** Rein lokal; Moodle wird nicht angefragt. Die
   Richtungsregeln sind offline geprüft, ein Test auf der Instanz steht aus.
-- **#4 Instanzprofile:** Zweites Profil in der Oberfläche, zwei laufende Server und
-  die Freigabe-Dialoge mit Profilnamen. Die offenen Punkte stehen im Abschnitt
-  „Instanzprofile (Issue #4)" unten.
 - **Bau:** Release-Bau und Windows-Installer sind mit dieser Änderung nicht geprüft.
 
 ## Anonyme Aufgabenbewertung
@@ -235,11 +232,7 @@ Umgesetzt (`zielwegPruefen`, `Zielweg` in `lib/moodle/wiederherstellung_regeln.d
 
 ## Instanzprofile (Issue #4): offene Teile
 
-- Oberfläche für ein zweites Profil fehlt: Anmeldung, Titelzeile und Dialoge zeigen nur das Hauptprofil (erstes Profil). Weitere Profile kommen über die Einstellungsdatei, ein Anmeldefeld je Profil fehlt.
-- Freigabestufe je Profil: Die Stufe (E20) gilt noch global; eine Stufe je Instanz ist offen.
-- Sitzungsanzeige (`sitzungLaeuft`) und Titelzeile beziehen sich auf das Hauptprofil.
-- Einrichtung nur für das Hauptprofil: Claude Code und Codex bekommen den Eintrag mit dessen Namen und Port; für weitere Profile fehlt der Aufruf im Einrichtungsdialog. Die Brücke für Bionic kennt nur den Namen `moodle`.
-- Freigabe-Dialoge nennen das Profil nicht; bei mehreren Profilen soll der Dialog den Profilnamen zeigen.
+- Die Brücke für Bionic kennt nur den Namen `moodle`; weitere Profile sind dort nicht eingerichtet.
 - Arbeitsordner: Bei mehreren Profilen je ein Unterordner nach Kennung (umgesetzt); Aufräumen beim Beenden prüfen, wenn Unterordner in Benutzung sind.
 - Der Wechsel des Eintrags `moodle` zur Produktivinstanz (E31, Folgen) ist mit dem Umstellen des Testinstanz-Eintrags zu tun, nicht erledigt.
 
