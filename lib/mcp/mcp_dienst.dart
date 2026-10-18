@@ -883,6 +883,9 @@ class McpDienst {
               description: 'Nur bei neuer_kurs: Kurzname des neuen Kurses.'),
           'kategorie_id': JsonSchema.integer(
               description: 'Nur bei neuer_kurs, optional: Kategorie-Nummer. Ohne Angabe die Vorgabe des Kursformulars.'),
+          'sammlung': JsonSchema.integer(
+              description: 'Optional: cmid der eigenen Fragensammlung (fragensammlungen). Nur mit ihr prüft die App, '
+                  'ob die Fragen eines Quiz aus der eigenen Sammlung stammen; ohne Angabe bleibt das eine Prüflücke.'),
         },
         pflicht: ['datei', 'weg'],
         ausfuehren: (a) => _zeitlimit(
@@ -895,6 +898,7 @@ class McpDienst {
                   neuerKursName: a['neuer_kurs_name'] as String?,
                   kurzname: a['kurzname'] as String?,
                   kategorieId: _zahlOder(a, 'kategorie_id'),
+                  sammlung: _zahlOder(a, 'sammlung'),
                   wiederholungVon: a['wiederholung_von'] as String?,
                   instanz: profil.name),
               const Duration(minutes: 1),

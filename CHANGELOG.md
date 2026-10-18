@@ -1,6 +1,7 @@
 # Changelog
 
 ## 0.9.23
+- Wiederherstellung: Enthält die Sicherung ein Quiz, nennt die Freigabe die Fragenherkunft je Quiz, und nach dem Wiederherstellen vergleicht die App Anzahl und Namen der Fragen mit der Quelle; nur ein stimmender Vergleich gilt als bestätigt.
 - Sicherung und Wiederherstellung: Bleibt der Fortschritt 15 Minuten stehen, meldet die App einen Stillstand mit der letzten Beobachtung, nicht einen Fehler und nicht einen Erfolg.
 - Fragen lesen: Dasselbe Lesen mehrfach oder gleichzeitig bricht nicht mehr mit einem Ordnerfehler ab; der Ordner einer Frage gehört jeweils nur einem Lesen.
 - Moodle-Profile: Mehrere Instanzen lassen sich in einem Fenster verwalten; Anmeldung, Freigabestufe und KI-Werkzeug-Einrichtung gelten je Profil.
