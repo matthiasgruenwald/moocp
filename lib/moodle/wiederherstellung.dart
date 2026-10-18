@@ -40,6 +40,10 @@ import 'wiederherstellung_regeln.dart';
 /// Vorgänge, die gerade laufen (Freigabe, Upload oder Abfrage) in dieser Sitzung.
 final Set<String> _laufendeWiederherstellungen = {};
 
+/// Fingerabdrücke, für die gerade eine Freigabe oder ein Vorgang läuft (Ticket #19).
+/// Hält den Doppelstart-Schutz auch dann, wenn der Vorgang noch nicht gespeichert ist.
+final Set<String> _reserviert = {};
+
 /// Setzt den Stand nur nach einem erlaubten Übergang.
 Future<void> _uebergang(
   Vorgaenge vorgaenge,
@@ -87,6 +91,7 @@ Future<String> wiederherstellen(
   String? kurzname,
   int? kategorieId,
   void Function(String vorgangId)? beiVorgang,
+  String? wiederholungVon,
 }) async {
   // 1. Datei: nur ein .mbz innerhalb des Sicherungsordners, nicht zu groß.
   final fehler = pfadFehler(datei);
@@ -145,7 +150,25 @@ Future<String> wiederherstellen(
     kontext = await _kategorieKontext(moodle, kategorie);
   }
 
+  // 4b. Doppelstart-Schutz (Ticket #19, Spec #17): Vor der Freigabe prüfen, damit ein
+  // abgewiesener Aufruf nichts fragt. Der Inhalt zählt, nicht der Dateiname.
+  final fp = fingerabdruck(bytes, kurs: kurs ?? 0, weg: zielweg);
+  if (_reserviert.contains(fp)) {
+    throw MoodleFehler('Diese Datei wird für diesen Zielweg gerade schon wiederhergestellt. Nichts geändert.');
+  }
+  final sperre = doppelstartSperre(
+    doppelstartEintraege(await vorgaenge.alle()),
+    fingerabdruck: fp,
+    wiederholungVon: wiederholungVon,
+    kurs: kurs ?? 0,
+  );
+  if (sperre != null) {
+    throw MoodleFehler('Dieselbe Datei für diesen Zielweg ist schon im Vorgang Nummer $sperre offen. '
+        'Mit wiederherstellung_status prüfen. Eine erneute Wiederherstellung nur mit wiederholung_von=$sperre. Nichts geändert.');
+  }
+
   // 5. Freigabe in der App, vor jedem Schreiben (beim neuen Kurs vor dem Platzhalter).
+  _reserviert.add(fp);
   final aktivitaeten = [
     for (final a in befund.aktivitaeten) '„${a.titel}" (${a.modul})',
   ];
@@ -173,18 +196,22 @@ Future<String> wiederherstellen(
       'Moodle stellt die neuen Aktivitäten sichtbar wieder her; die App verbirgt sie danach. Sie können '
           'kurzzeitig für Lernende sichtbar sein. Verborgen ist kein Schutz: Wer im Kurs Rechte hat, sieht sie und kann sie sichtbar machen.',
       'Nutzerdaten sind im Archiv nicht enthalten (geprüft). Rechte und Einschreibungen bleiben unverändert.',
+      if (wiederholungVon != null)
+        'Wiederholung des Vorgangs $wiederholungVon, der nicht abgeschlossen ist. Moodle kann ihn schon ausgeführt haben.',
     ],
     vergleich: const [],
     knopf: zielweg.loescht ? 'Löschen und wiederherstellen' : 'Wiederherstellen',
     ohneEntscheidung: 'wird nichts wiederhergestellt',
   ));
   if (!ja) {
+    _reserviert.remove(fp);
     return 'Nicht wiederhergestellt: in der App abgelehnt oder nicht innerhalb von '
         '${freigaben.frist.inMinutes} Minuten freigegeben. Nichts geändert.';
   }
 
   // 6. Vorgang anlegen und Datei hochladen (jedes Mal neu, nie eine alte Kennung).
-  final vg = await vorgaenge.neuWiederherstellung(kurs: kurs ?? 0, datei: datei);
+  final vg = await vorgaenge.neuWiederherstellung(
+      kurs: kurs ?? 0, datei: datei, fingerabdruck: fp, wiederholungVon: wiederholungVon);
   _laufendeWiederherstellungen.add(vg.id);
   // Die Nummer geht nur an den Aufrufer, damit er das Ergebnis je Ziel
   // zuordnen kann (uebertragen, Issue #10). Ohne Rückruf unverändert.
@@ -204,6 +231,7 @@ Future<String> wiederherstellen(
         name: p.basename(datei));
   } finally {
     _laufendeWiederherstellungen.remove(vg.id);
+    _reserviert.remove(fp);
   }
 }
 
