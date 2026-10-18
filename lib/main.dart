@@ -85,7 +85,8 @@ Future<void> main(List<String> argumente) async {
   // Schließen läuft über _beenden, damit der Arbeitsordner geleert wird.
   await windowManager.setPreventClose(true);
   final moodle = MoodleZugang(protokoll);
-  final freigaben = Freigaben(protokoll, stufe: einstellungen.bestaetigungen);
+  final freigaben = Freigaben(protokoll,
+      stufe: einstellungen.bestaetigungen, testmodus: Anmeldedaten.testzugangAktiv);
   // Reste früherer Updates im Temp-Verzeichnis; der Installer, der die App
   // gerade neu gestartet hat, läuft noch und bleibt bis zum nächsten Start.
   resteWegraeumen();

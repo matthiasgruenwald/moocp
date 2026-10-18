@@ -21,6 +21,7 @@ Die Anforderung A10 (Testkurs, Präfix `ZZ`, `flutter analyze` und `flutter test
 
 - Die Zugangsdaten des Lehrkraft-Kontos (Teacher-Edit) für die Spike-Instanz liegen außerhalb des Repos in `~/.config/moocp/e2e/spike-credentials.env` (Rechte 600). Sie haben das Format `SCHLUESSEL=WERT` mit `TEACHER_USERNAME` und `TEACHER_PASSWORD`; `URL_INTERNAL` und `Host` darin betreffen die Testumgebung selbst, nicht die App.
 - Die App liest sie nur im Debug-Bau, wenn `MOOCP_TESTZUGANG` auf diese Datei zeigt (`lib/anmeldedaten.dart`). Dann kein Schlüsselbund und keine Abfrage des Mac-Passworts. Der Release-Bau ignoriert die Variable.
+- **Testmodus:** Mit `MOOCP_TESTZUGANG` gilt jede Freigabe ohne Bilder als erteilt (`Freigaben.testmodus`, `lib/freigabe.dart`); das Protokoll vermerkt „Testmodus, automatisch freigegeben". Bildschirmfotos bleiben Handarbeit (E18). Die Vorab-Liste der Freigaben für den Nutzer entfällt dort; geschrieben wird trotzdem nur im Testkurs (A10).
 - Start: `MOOCP_TESTZUGANG="$HOME/.config/moocp/e2e/spike-credentials.env" flutter run -d macos`
 - **Mac-Bau im Temp-Ordner.** Im iCloud-Ordner scheitert CodeSign: iCloud (File Provider) hängt an Bundle und Ressourcen die Attribute `com.apple.fileprovider.fpfs#P` und `com.apple.FinderInfo`, und CodeSign lehnt sie ab. Deshalb läuft der Bau in einer Kopie im Temp-Ordner:
   1. Kopie anlegen: `TMP=$(mktemp -d /tmp/moocp-bau.XXXXXX)` und `rsync -a --delete --exclude build --exclude .git --exclude .dart_tool <Repo>/ "$TMP/"`.
