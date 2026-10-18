@@ -188,7 +188,7 @@ Future<String> wiederherstellen(
       _ => 'Modus: ${zielweg.nennung}. Im Kurs gilt: vorhandene Inhalte werden gelöscht, dann wiederhergestellt. '
           'Die Übersicht vor dem Lauf wird im Vorgang festgehalten. Nicht rückgängig zu machen.',
     };
-    final herkunftZeilen = await _herkunftZeilen(moodle, befund, sammlung);
+    final herkunft = await _herkunftZeilen(moodle, befund, sammlung);
     final ja = await freigaben.anfragen(FreigabeAnfrage(
       titel: zielweg.loescht ? 'Vorhandene Inhalte löschen und wiederherstellen?' : 'Wiederherstellen ausführen?',
       punkte: [
@@ -200,7 +200,7 @@ Future<String> wiederherstellen(
           'Im Kurs „$kursName" werden vorhandene Inhalte gelöscht, bevor die Datei wieder hineinkommt.',
         if (aktivitaeten.isNotEmpty) 'Angelegt werden: ${aktivitaeten.join(', ')}',
         // Fragenherkunft (Issue #20) vor dem Start; die Lesart ist UNGEMESSEN (TODO.md).
-        ...herkunftZeilen,
+        ...herkunft.zeilen,
         'Moodle stellt die neuen Aktivitäten sichtbar wieder her; die App verbirgt sie danach. Sie können '
             'kurzzeitig für Lernende sichtbar sein. Verborgen ist kein Schutz: Wer im Kurs Rechte hat, sieht sie und kann sie sichtbar machen.',
         'Nutzerdaten sind im Archiv nicht enthalten (geprüft). Rechte und Einschreibungen bleiben unverändert.',
@@ -235,6 +235,7 @@ Future<String> wiederherstellen(
           vorherCmids: vorherCmids,
           wiederherstellungAktivitaeten: befund.aktivitaeten,
           quizQuelle: befund.quizFragen.length == 1 ? befund.quizFragen.values.first : null,
+          herkunftEigen: herkunft.eigen,
           vorherText: vorherText,
           name: p.basename(datei));
     } finally {
@@ -293,6 +294,7 @@ Future<String> _ausfuehren(
   required List<int> vorherCmids,
   required List<ArchivAktivitaet> wiederherstellungAktivitaeten,
   List<QuizFrage>? quizQuelle,
+  bool herkunftEigen = false,
   required String vorherText,
   required String name,
 }) async {
@@ -399,6 +401,7 @@ Future<String> _ausfuehren(
         vorherCmids: vorherCmids,
         wiederherstellungAktivitaeten: wiederherstellungAktivitaeten,
         quizQuelle: quizQuelle,
+        herkunftEigen: herkunftEigen,
         sichtbarGesetzt: sichtbarGesetzt);
     return ergebnis;
   } catch (e) {
@@ -480,6 +483,7 @@ Future<String> _warten(
   required List<int> vorherCmids,
   required List<ArchivAktivitaet> wiederherstellungAktivitaeten,
   List<QuizFrage>? quizQuelle,
+  bool herkunftEigen = false,
   bool sichtbarGesetzt = false,
   Duration gesamt = const Duration(minutes: 10),
   Duration takt = const Duration(seconds: 3),
@@ -543,7 +547,7 @@ Future<String> _warten(
           '(nicht verifiziert).${sichtbarGesetzt ? ' Verborgen gesetzt, sofern das Formular es bot.' : ''}';
     }
     return await _gegenlesen(moodle, vorgaenge, vg, kurs: kurs, vorherCmids: vorherCmids,
-        erwartet: wiederherstellungAktivitaeten, quizQuelle: quizQuelle);
+        erwartet: wiederherstellungAktivitaeten, quizQuelle: quizQuelle, herkunftEigen: herkunftEigen);
   } on MoodleFehler {
     await _uebergang(vorgaenge, vg, WiederherstellungStand.unklar,
         text: 'Abfrage nicht gelungen; wiederherstellung_status prüft erneut.');
@@ -554,28 +558,46 @@ Future<String> _warten(
 /// Die Zeilen zur Fragenherkunft in der Freigabe (Issue #20), vor dem Start. Ohne eigene
 /// Sammlung ist es eine Prüflücke, nie ein Nachweis. Die Sachnummern liest die App wie
 /// fragen_lesen über Kategorien und Export.
-Future<List<String>> _herkunftZeilen(MoodleZugang moodle, ArchivBefund befund, int? sammlung) async {
-  if (!befund.aktivitaeten.any((a) => a.modul == 'quiz')) return const [];
+Future<({List<String> zeilen, bool eigen})> _herkunftZeilen(
+    MoodleZugang moodle, ArchivBefund befund, int? sammlung) async {
+  if (!befund.aktivitaeten.any((a) => a.modul == 'quiz')) return (zeilen: const <String>[], eigen: false);
   if (sammlung == null) {
-    return const ['Fragenherkunft nicht geprüft: keine eigene Fragensammlung angegeben (Prüflücke).'];
+    return (
+      zeilen: const ['Fragenherkunft nicht geprüft: keine eigene Fragensammlung angegeben (Prüflücke).'],
+      eigen: false,
+    );
   }
-  if (befund.quizFragen.isEmpty) {
-    return [herkunftPruefen(verwendet: null, eigeneSachnummern: const {}, eigeneAnzahl: 0).text];
+  if (befund.quizFragen.isEmpty && befund.quizUnlesbar.isEmpty) {
+    final h = herkunftPruefen(verwendet: null, eigeneSachnummern: const {}, eigeneAnzahl: 0);
+    return (zeilen: [h.text], eigen: false);
   }
   final nummern = <String>{};
   var anzahl = 0;
-  for (final k in await kategorienLesen(moodle, sammlung)) {
-    if (k.anzahl == 0) continue;
-    for (final f in fragenAusXml(await exportieren(moodle, sammlung, k))) {
-      anzahl++;
-      final nr = f.idnummer;
-      if (nr != null) nummern.add(nr);
+  if (befund.quizFragen.isNotEmpty) {
+    for (final k in await kategorienLesen(moodle, sammlung)) {
+      if (k.anzahl == 0) continue;
+      for (final f in fragenAusXml(await exportieren(moodle, sammlung, k))) {
+        anzahl++;
+        final nr = f.idnummer;
+        if (nr != null) nummern.add(nr);
+      }
     }
   }
-  return [
-    for (final e in befund.quizFragen.entries)
-      'Quiz ${e.key}: ${herkunftPruefen(verwendet: e.value, eigeneSachnummern: nummern, eigeneAnzahl: anzahl).text}',
-  ];
+  final befunde = <HerkunftBefund>[];
+  final zeilen = <String>[];
+  for (final e in befund.quizFragen.entries) {
+    final h = herkunftPruefen(verwendet: e.value, eigeneSachnummern: nummern, eigeneAnzahl: anzahl);
+    befunde.add(h);
+    zeilen.add('Quiz ${e.key}: ${h.text}');
+  }
+  // Unlesbare Quizze (Befund 7): Prüflücke statt Abbruch des Archivs.
+  for (final q in befund.quizUnlesbar) {
+    final h = HerkunftBefund(HerkunftArt.pruefluecke,
+        'Herkunft nicht geprüft: quiz.xml oder questions.xml ist nicht lesbar (Prüflücke).');
+    befunde.add(h);
+    zeilen.add('Quiz $q: ${h.text}');
+  }
+  return (zeilen: zeilen, eigen: herkunftVerifiziert(befunde));
 }
 
 /// Verbirgt die neuen Aktivitäten und liest den Kurs zurück. Moodle stellt die
@@ -592,6 +614,7 @@ Future<String> _gegenlesen(
   required List<int> vorherCmids,
   required List<ArchivAktivitaet> erwartet,
   List<QuizFrage>? quizQuelle,
+  bool herkunftEigen = false,
 }) async {
   // Erneut aufrufbar (nach „unklar"): Verborgenes wird nicht noch einmal angefasst.
   final vorVerbergen = await kursLesen(moodle, kurs);
@@ -656,8 +679,16 @@ Future<String> _gegenlesen(
   // verified nur, wenn alle Prüfungen es erlauben: Verbergen, Anhänge und Fragenvergleich.
   final anhangOk = anhang == null || anhang.vollstaendig;
   final vergleichOk = vergleich == null || quizVerifiziert(vergleich);
-  final verifiziert = alleVerborgen && anhangOk && vergleichOk;
-  final zusatz = [if (anhang != null) anhang.text, if (vergleich != null) vergleich.text].join(' ');
+  // Befund 7: Fragenherkunft nur bei eigenen Fragen; Befund 8: nicht schreibbare Typen nie verifiziert.
+  final herkunftOk = erwartet.every((a) => a.modul != 'quiz') || herkunftEigen;
+  final schreibPruefluecke = nichtSchreibbarePruefluecke(erwartet.map((a) => a.modul));
+  final verifiziert = alleVerborgen && anhangOk && vergleichOk && herkunftOk && schreibPruefluecke == null;
+  final zusatz = [
+    if (anhang != null) anhang.text,
+    if (vergleich != null) vergleich.text,
+    if (!herkunftOk) 'Fragenherkunft nicht bestätigt (siehe Freigabe).',
+    ?schreibPruefluecke,
+  ].join(' ');
   final text = zusatz.isEmpty ? basis : '$basis $zusatz';
   await _uebergang(vorgaenge, vg, WiederherstellungStand.fertig, text: text, verified: verifiziert);
   final befund = verifiziert ? 'verborgen: verified' : 'verborgen oder Anhänge/Vergleich nicht bestätigt, siehe Zustand oben';

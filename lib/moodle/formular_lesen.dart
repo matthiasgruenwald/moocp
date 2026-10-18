@@ -201,8 +201,8 @@ class FormularGelesen {
     if (ziel.art == Zielart.aktivitaet &&
         modul != null &&
         !MoodleZugang.schreibbareModule.contains(modul)) {
-      b.writeln('Prüflücke: Typ „$modul" ist nicht schreibbar -- Lesen und Verweisprüfung '
-          'gelten, Ändern nicht (aendern lehnt ab).');
+      b.writeln('Prüflücke: Typ „$modul" ist nicht schreibbar -- gelesen, nicht geändert (aendern lehnt ab). '
+          'Die Verweisprüfung erfasst nur Textfelder; Auswahlfelder werden nicht geprüft.');
     }
     if (fehlend.isNotEmpty) {
       b.writeln('NICHT gelesen (${fehlend.length}): ${fehlend.join(", ")}');

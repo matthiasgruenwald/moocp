@@ -152,4 +152,29 @@ void main() {
       expect(quizVerifiziert(v), isFalse);
     });
   });
+
+  // Befund 7: Herkunft fließt nur bei lauter eigenen Fragen in verified ein.
+  group('herkunftVerifiziert', () {
+    test('alle Quizze eigene Herkunft: verifiziert', () {
+      expect(herkunftVerifiziert([HerkunftBefund(HerkunftArt.eigene, 'ok')]), isTrue);
+    });
+
+    test('eine Prüflücke genügt, um nicht zu verifizieren', () {
+      expect(
+        herkunftVerifiziert([
+          HerkunftBefund(HerkunftArt.eigene, 'ok'),
+          HerkunftBefund(HerkunftArt.pruefluecke, 'Zufallsfragen'),
+        ]),
+        isFalse,
+      );
+    });
+
+    test('fremde Herkunft verifiziert nicht', () {
+      expect(herkunftVerifiziert([HerkunftBefund(HerkunftArt.fremdOderUnbekannt, 'fremd')]), isFalse);
+    });
+
+    test('kein Quiz geprüft: nicht verifiziert', () {
+      expect(herkunftVerifiziert(const []), isFalse);
+    });
+  });
 }

@@ -13,6 +13,7 @@ import 'dart:typed_data';
 import 'package:crypto/crypto.dart';
 import 'package:xml/xml.dart';
 
+import 'moodle_zugang.dart' show MoodleZugang;
 import 'sicherung_regeln.dart' show nutzerdatenOptionen;
 import 'wiederherstellung_fragen.dart' show QuizFrage, quizFragenAusXml;
 
@@ -104,7 +105,14 @@ List<int>? importierteCmidsEindeutig({required List<ArchivAktivitaet> erwartet, 
 
 /// Ergebnis der Prüfung. [grund] ist null, wenn das Archiv angenommen ist.
 class ArchivBefund {
-  const ArchivBefund({this.grund, this.moodleVersion, this.typ, this.aktivitaeten = const [], this.quizFragen = const {}});
+  const ArchivBefund({
+    this.grund,
+    this.moodleVersion,
+    this.typ,
+    this.aktivitaeten = const [],
+    this.quizFragen = const {},
+    this.quizUnlesbar = const {},
+  });
   final String? grund;
   final String? moodleVersion;
 
@@ -114,6 +122,10 @@ class ArchivBefund {
 
   /// Fragen je Quiz (Ordnername wie quiz_21), aus quiz.xml und questions.xml (Issue #20).
   final Map<String, List<QuizFrage>> quizFragen;
+
+  /// Quizze, deren quiz.xml oder questions.xml nicht lesbar ist (Befund 7): kein Abbruch
+  /// des Archivs, sondern eine Prüflücke bei der Herkunft.
+  final Set<String> quizUnlesbar;
 
   bool get ok => grund == null;
 }
@@ -238,13 +250,14 @@ Future<ArchivBefund> archivPruefen(
   // Fragen der Quizze (Issue #20). Lesbar nur, wenn beide Dateien es sind.
   final fragenXml = dateien['questions.xml'] == null ? null : utf8.decode(dateien['questions.xml']!, allowMalformed: true);
   final quizFragen = <String, List<QuizFrage>>{};
+  final quizUnlesbar = <String>{};
   for (final e in dateien.entries) {
     final ordner = _quizOrdner(e.key);
     if (ordner == null) continue;
     try {
       quizFragen[ordner] = quizFragenAusXml(utf8.decode(e.value, allowMalformed: true), fragenXml);
     } on XmlException {
-      return nein('${e.key} oder questions.xml ist nicht lesbar.');
+      quizUnlesbar.add(ordner);
     }
   }
   return ArchivBefund(
@@ -252,6 +265,7 @@ Future<ArchivBefund> archivPruefen(
     typ: typ,
     aktivitaeten: aktivitaeten,
     quizFragen: quizFragen,
+    quizUnlesbar: quizUnlesbar,
   );
 }
 
@@ -470,3 +484,12 @@ bool _sperrt(DoppelstartEintrag e, int kurs) => switch (e.stand) {
       WiederherstellungStand.fehlgeschlagen => e.kurs == 0 && kurs == 0,
       null => false,
     };
+
+/// Befund 8: Typen außerhalb der Positivliste (nicht schreibbar) werden nicht
+/// verifiziert. Liefert den Prüflücke-Text oder null, wenn alle schreibbar sind.
+String? nichtSchreibbarePruefluecke(Iterable<String> moduln) {
+  final nein = {for (final m in moduln) if (!MoodleZugang.schreibbareModule.contains(m)) m}.toList()..sort();
+  if (nein.isEmpty) return null;
+  return 'Prüflücke: ${nein.map((m) => 'Typ „$m"').join(', ')} ist nicht schreibbar. '
+      'Wiederhergestellt, aber nicht gegengeprüft; nicht verifiziert.';
+}

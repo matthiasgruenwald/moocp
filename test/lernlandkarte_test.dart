@@ -152,6 +152,9 @@ void main() {
     // Der Typ ist nicht schreibbar: die Lücke wird benannt.
     expect(text, contains('Prüflücke'));
     expect(text, contains('zzkarte'));
+    // Ehrlich: nur Textfelder werden auf Verweise geprüft, Auswahlfelder nicht (Befund 8).
+    expect(text, contains('Auswahlfelder werden nicht geprüft'));
+    expect(text, isNot(contains('Verweisprüfung gelten')));
     // Das Auswahlfeld zeigt den Anzeigetext des Ziels, nicht die Nummer (Lücke, siehe TODO.md).
     final einstellungen = File(p.join(arbeitsordner.path, 'cm-31', 'einstellungen.json')).readAsStringSync();
     expect(einstellungen, contains('ZZ Seite'));

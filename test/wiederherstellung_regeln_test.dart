@@ -409,4 +409,17 @@ void main() {
       expect(get('https://m.example/backup/restore.php?contextid=5&filename=k.mbz&extra=1'), isFalse);
     });
   });
+
+  // Befund 8: ein nicht schreibbarer Typ darf nie verifiziert werden.
+  group('nichtSchreibbarePruefluecke', () {
+    test('nur schreibbare Typen: keine Prüflücke', () {
+      expect(nichtSchreibbarePruefluecke(['page', 'quiz', 'resource']), isNull);
+    });
+
+    test('nicht schreibbarer Typ: Prüflücke nennt den Typ', () {
+      final t = nichtSchreibbarePruefluecke(['page', 'lernlandkarte']);
+      expect(t, isNotNull);
+      expect(t, contains('lernlandkarte'));
+    });
+  });
 }

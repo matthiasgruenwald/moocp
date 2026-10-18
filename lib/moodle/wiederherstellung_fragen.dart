@@ -42,6 +42,11 @@ class HerkunftBefund {
 
 /// Herkunft aus den tatsächlich verwendeten Fragen. [verwendet] null heißt: die
 /// Quelle wurde nicht gelesen.
+/// Befund 7: Herkunft darf nur in verified einfließen, wenn jedes Quiz eigene
+/// Fragen nachweist. Eine Prüflücke oder eine fremde Herkunft genügt zum Nein.
+bool herkunftVerifiziert(List<HerkunftBefund> befunde) =>
+    befunde.isNotEmpty && befunde.every((b) => b.art == HerkunftArt.eigene);
+
 HerkunftBefund herkunftPruefen({
   required List<QuizFrage>? verwendet,
   required Set<String> eigeneSachnummern,

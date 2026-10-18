@@ -167,13 +167,19 @@ void main() {
       expect(b.quizFragen, isEmpty);
     });
 
-    test('kaputtes quiz.xml im Archiv: abgelehnt, nichts hochgeladen', () async {
+    test('kaputtes quiz.xml: das Archiv bleibt gültig, das Quiz ist unlesbar (Prüflücke, Befund 7)', () async {
       final b = await archivPruefen(_mbz([
         _eintrag('moodle_backup.xml', _xml(_sicherungXml)),
         _eintrag('activities/quiz_21/quiz.xml', _xml('<activity><quiz>')),
       ]));
-      expect(b.ok, isFalse);
-      expect(b.grund, contains('quiz.xml'));
+      expect(b.ok, isTrue, reason: b.grund);
+      expect(b.quizUnlesbar, {'quiz_21'});
+      expect(b.quizFragen, isNot(contains('quiz_21')));
+    });
+
+    test('lesbares Quiz: nicht als unlesbar markiert', () async {
+      final b = await archivPruefen(archiv());
+      expect(b.quizUnlesbar, isEmpty);
     });
   });
 }
