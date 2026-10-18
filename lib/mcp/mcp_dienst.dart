@@ -702,6 +702,60 @@ class McpDienst {
               () => 'Die Sicherung läuft noch. Bitte später erneut prüfen.',
             ));
 
+    _werkzeug(server, 'sichern_auswahl',
+        titel: 'Auswahl sichern',
+        beschreibung: 'Sichert mehrere Aktivitäten, Abschnitte oder den ganzen Kurs als eine Datei (.mbz) in den '
+            'Sicherungsordner der App, ohne Nutzerdaten. Ohne aktivitaeten und abschnitte, mit ganzer_kurs=true: '
+            'der ganze Kurs. Mit Angaben und ganzer_kurs=true: der Kurs, eingeschränkt auf die Angaben. Namen und '
+            'Nummern müssen zusammenpassen. Vor dem Start fragt die App nach einer Freigabe, die alles Gewählte, '
+            'die Nutzerdaten, die fehlen, und die Datei zeigt. Dauert die Sicherung länger als eine Minute, läuft '
+            'sie weiter: dann sicherung_status mit der Nummer aufrufen.',
+        parameter: {
+          'kurs': _kurs,
+          'name_des_kurses': JsonSchema.string(
+              description: 'Der Kursname, wie er jetzt in Moodle steht (aus kurs_uebersicht). Passt er nicht, '
+                  'bricht das Werkzeug ab, bevor etwas geschieht.'),
+          'aktivitaeten': JsonSchema.array(
+              items: JsonSchema.object(
+                properties: {'cmid': _cmid, 'name': _name},
+                required: ['cmid', 'name'],
+              ),
+              description: 'Die Aktivitäten, die gesichert werden, mit cmid und Name aus kurs_uebersicht.'),
+          'abschnitte': JsonSchema.array(
+              items: JsonSchema.object(
+                properties: {
+                  'id': JsonSchema.integer(description: 'Abschnitts-ID aus kurs_uebersicht'),
+                  'name': JsonSchema.string(description: 'Der Titel des Abschnitts, wie er jetzt dasteht'),
+                },
+                required: ['id', 'name'],
+              ),
+              description: 'Die Abschnitte, die gesichert werden; ihre Aktivitäten kommen mit.'),
+          'ganzer_kurs': JsonSchema.boolean(
+              description: 'true: der Kurs (ohne Angaben: alles; mit Angaben: eingeschränkt auf sie). '
+                  'false: nur die genannten Teile.'),
+          'ziel_ordner': JsonSchema.string(
+              description: 'Optional: Unterordner im Sicherungsordner, nur einfache Ordnernamen (kein „..", '
+                  'kein Laufwerk).'),
+        },
+        pflicht: ['kurs', 'name_des_kurses'],
+        ausfuehren: (a) {
+          List<Map<String, dynamic>> liste(String n) => [
+                for (final x in (a[n] as List?) ?? const []) (x as Map).cast<String, dynamic>(),
+              ];
+          return _zeitlimit(
+            auswahlSichern(moodle, freigaben, vorgaenge,
+                kurs: _zahl(a, 'kurs'),
+                name: _text(a, 'name_des_kurses'),
+                aktivitaeten: [for (final x in liste('aktivitaeten')) (cmid: _zahl(x, 'cmid'), name: _text(x, 'name'))],
+                abschnitte: [for (final x in liste('abschnitte')) (id: _zahl(x, 'id'), name: _text(x, 'name'))],
+                ganzerKurs: a['ganzer_kurs'] == true,
+                zielOrdner: a['ziel_ordner'] as String?),
+            const Duration(minutes: 1),
+            () => 'Die Sicherung läuft weiter. Mit sicherung_status und der Nummer später prüfen, '
+                'ob sie fertig ist.',
+          );
+        });
+
     // ---- Bücher
     final buchCmid =JsonSchema.integer(description: 'cmid des Buchs, die Zahl hinter mod/book/view.php?id=');
     final kapitelId = JsonSchema.integer(description: 'id des Kapitels (aus buch_lesen, „[id …]")');

@@ -52,6 +52,7 @@ class Vorgang {
     this.text = '',
     this.bytes,
     this.verified = false,
+    this.auswahl,
   }) : aktualisiert = aktualisiert ?? begonnen;
 
   final String id;
@@ -76,6 +77,9 @@ class Vorgang {
   int? bytes;
   bool verified;
 
+  /// Bei einer Auswahl aus dem Kurs (sichern_auswahl) statt der einen cmid: Art und Zahlen.
+  String? auswahl;
+
   Map<String, Object?> zuJson() => {
         'id': id,
         'kurs': kurs,
@@ -90,6 +94,7 @@ class Vorgang {
         'text': text,
         'bytes': bytes,
         'verified': verified,
+        'auswahl': auswahl,
       };
 
   static Vorgang? ausJson(Object? o) {
@@ -111,6 +116,7 @@ class Vorgang {
       text: o['text'] as String? ?? '',
       bytes: o['bytes'] as int?,
       verified: o['verified'] == true,
+      auswahl: o['auswahl'] as String?,
     );
   }
 }
@@ -154,7 +160,7 @@ class Vorgaenge {
     return null;
   }
 
-  Future<Vorgang> neu({required int kurs, required int cmid, required String datei}) async {
+  Future<Vorgang> neu({required int kurs, required int cmid, required String datei, String? auswahl}) async {
     final v = Vorgang(
       id: '${DateTime.now().millisecondsSinceEpoch.toRadixString(36)}'
           '${Random.secure().nextInt(0xffff).toRadixString(36)}',
@@ -163,6 +169,7 @@ class Vorgaenge {
       datei: datei,
       stand: SicherungStand.anstehend,
       begonnen: DateTime.now(),
+      auswahl: auswahl,
     );
     (await alle()).add(v);
     await _speichern();
@@ -281,16 +288,37 @@ Future<String> aktivitaetSichern(
   await Directory(ordner).create(recursive: true);
   final dateiName = await freierName(ordner, sicherungsName(a.modul, cmid, DateTime.now()));
   final vg = await vorgaenge.neu(kurs: kurs, cmid: cmid, datei: p.join(ziel, dateiName));
-  _laufend.add(vg.id);
-  try {
-    final kursText = await kursBezeichnung(moodle, kurs);
-    final ja = await freigaben.anfragen(FreigabeAnfrage(
-      titel: 'Sicherung ausführen?',
+  final kursText = await kursBezeichnung(moodle, kurs);
+  return _nachFreigabe(moodle, freigaben, vorgaenge, vg,
+      s4: s4,
+      backupid: backupid,
+      kontext: kontext,
+      dateiname: dateiname,
       punkte: [
         'Sicherung der Aktivität „${a.name}" (cmid $cmid, $kursText)',
         'Ohne Nutzerdaten: keine Teilnehmenden, Abgaben, Bewertungen. Im Kurs ändert sich nichts.',
         'Datei: Sicherungsordner der App${ziel.isEmpty ? '' : '/$ziel'}, Name $dateiName',
-      ],
+      ]);
+}
+
+/// Der gemeinsame Teil nach der Prüfung: Freigabe in der App, dann Schritt 4
+/// starten und auf das Ergebnis warten. Ohne Freigabe nichts an Moodle.
+Future<String> _nachFreigabe(
+  MoodleZugang moodle,
+  Freigaben freigaben,
+  Vorgaenge vorgaenge,
+  Vorgang vg, {
+  required ({String aktion, Felder felder, Seitenangaben seite}) s4,
+  required String backupid,
+  required int kontext,
+  required String dateiname,
+  required List<String> punkte,
+}) async {
+  _laufend.add(vg.id);
+  try {
+    final ja = await freigaben.anfragen(FreigabeAnfrage(
+      titel: 'Sicherung ausführen?',
+      punkte: punkte,
       vergleich: const [],
       knopf: 'Sichern',
       ohneEntscheidung: 'wird nichts gesichert',
@@ -316,6 +344,136 @@ Future<String> aktivitaetSichern(
   } finally {
     _laufend.remove(vg.id);
   }
+}
+
+/// Sichert mehrere Aktivitäten, Abschnitte oder den ganzen Kurs in eine Datei
+/// (sichern_auswahl). Der Ablauf läuft über `/backup/backup.php?id=KURS` ohne
+/// cm, Schritte 1, 2 und 4, Nutzerdaten aus.
+///
+/// Ohne [aktivitaeten] und [abschnitte], mit [ganzerKurs]: der ganze Kurs. Mit
+/// Angaben und [ganzerKurs]: der Kurs, eingeschränkt auf die Auswahl (die Art
+/// bleibt „Kurs"). Ein Abschnitt nimmt alle seine Aktivitäten mit.
+Future<String> auswahlSichern(
+  MoodleZugang moodle,
+  Freigaben freigaben,
+  Vorgaenge vorgaenge, {
+  required int kurs,
+  required String name,
+  required List<({int cmid, String name})> aktivitaeten,
+  required List<({int id, String name})> abschnitte,
+  required bool ganzerKurs,
+  String? zielOrdner,
+}) async {
+  final ziel = zielOrdnerPruefen(zielOrdner);
+  if (ziel == null) {
+    throw MoodleFehler('ziel_ordner ist ungültig: nur Ordnernamen relativ zum Sicherungsordner, ohne „..", '
+        'ohne Laufwerk und ohne Sonderzeichen.');
+  }
+  final nurGenannte = aktivitaeten.isNotEmpty || abschnitte.isNotEmpty;
+  if (!ganzerKurs && !nurGenannte) {
+    throw MoodleFehler('Nichts ausgewählt: aktivitaeten, abschnitte oder ganzer_kurs angeben.');
+  }
+  final art = auswahlArt(ganzerKurs: ganzerKurs, nurGenannte: nurGenannte);
+
+  // Namen prüfen, bevor etwas bei Moodle geschieht.
+  final k = await kursLesen(moodle, kurs);
+  nameBestaetigen(name, await kursname(moodle, kurs) ?? '', 'Kurs $kurs');
+  for (final a in aktivitaeten) {
+    final x = k.nachCmid[a.cmid];
+    if (x == null) throw MoodleFehler('cmid ${a.cmid} gibt es in Kurs $kurs nicht. Nummer prüfen (kurs_uebersicht).');
+    nameBestaetigen(a.name, x.name, 'cmid ${a.cmid}');
+  }
+  for (final s in abschnitte) {
+    final x = k.nachId[s.id];
+    if (x == null) throw MoodleFehler('Abschnitt ${s.id} gibt es in Kurs $kurs nicht. Nummer prüfen (kurs_uebersicht).');
+    nameBestaetigen(s.name, x.titel, 'Abschnitt ${s.id}');
+  }
+
+  // Erwartete Auswahl: bei „nur Genannte" die Angaben plus alle Aktivitäten der
+  // genannten Abschnitte. Bei „ganzer Kurs" die Seite selbst, die mit der
+  // Kursübersicht verglichen wird.
+  final genannteAbschnitte = {for (final s in abschnitte) s.id};
+  final genannteCmids = {
+    for (final a in aktivitaeten) a.cmid,
+    for (final s in abschnitte) ...?k.nachId[s.id]?.aktivitaeten.map((x) => x.cmid),
+  };
+
+  // Schritt 1: Nutzerdaten aus, weiter.
+  final f1 = await formularHolen(moodle, '/backup/backup.php?id=$kurs');
+  if (schrittVon(f1.felder) != '1') {
+    throw MoodleFehler('Die Sicherung beginnt nicht auf Schritt 1. Nichts gestartet.');
+  }
+  final r2 = await moodle.senden(f1.aktion, [...nutzerdatenAus(f1.felder), const MapEntry('submitbutton', 'Weiter')]);
+  final s2 = _seite(r2);
+  if (schrittVon(s2.felder) != '2') {
+    throw MoodleFehler('Die Auswahlseite der Sicherung kommt nicht wie gemessen. Nichts gestartet.');
+  }
+
+  final seiteCmids = eingeschlosseneAktivitaeten(s2.felder).keys.toSet();
+  final seiteAbschnitte = eingeschlosseneAbschnitte(s2.felder).keys.toSet();
+  final Set<int> wahlCmids;
+  final Set<int> wahlAbschnitte;
+  if (nurGenannte) {
+    wahlCmids = genannteCmids;
+    wahlAbschnitte = genannteAbschnitte;
+  } else {
+    if (seiteCmids.length != k.nachCmid.length || !seiteCmids.containsAll(k.nachCmid.keys)) {
+      throw MoodleFehler('Die Auswahlseite nennt andere Aktivitäten als die Kursübersicht. Nichts gestartet.');
+    }
+    wahlCmids = seiteCmids;
+    wahlAbschnitte = seiteAbschnitte;
+  }
+
+  // Schritt 2: genau die Auswahl.
+  final schema = schemaWahl(s2.felder, cmids: wahlCmids, abschnitte: wahlAbschnitte);
+  if (schema == null) {
+    throw MoodleFehler('Ein gewählter Teil fehlt auf der Auswahlseite der Sicherung. Nichts gestartet.');
+  }
+  final r4 = await moodle.senden(s2.aktion, [...schema, const MapEntry('submitbutton', 'Weiter')]);
+  final s4 = _seite(r4);
+
+  // Bestätigungsseite gegen die Bestellung prüfen, bevor etwas ausgeführt wird.
+  final fehler = bestaetigungWahlFehler(s4.felder, cmids: wahlCmids, abschnitte: wahlAbschnitte);
+  if (fehler != null) throw MoodleFehler('Abgebrochen, nichts gesichert: $fehler');
+  final backupid = wertIn(s4.felder, 'backup');
+  final kontext = int.tryParse(s4.seite.kontext ?? '');
+  final dateiname = wertIn(s4.felder, 'setting_root_filename');
+  if (backupid == null || backupid.isEmpty || kontext == null || dateiname == null) {
+    throw MoodleFehler('Moodle nennt auf der Bestätigungsseite Nummer, Kontext oder Dateinamen nicht. Nichts gestartet.');
+  }
+
+  // Was ausgewählt ist, für die Freigabe: Namen aus der Kursübersicht.
+  final ausgewaehlt = [
+    for (final c in wahlCmids.toList()..sort())
+      if (k.nachCmid[c] != null) k.nachCmid[c]!,
+  ];
+  final abschnittNamen = [
+    for (final id in wahlAbschnitte.toList()..sort())
+      if (k.nachId[id] != null) '„${k.nachId[id]!.titel}"',
+  ];
+  final luecken = inhaltsLuecken(ausgewaehlt.map((a) => a.modul));
+  final kursName = await kursname(moodle, kurs) ?? '';
+  final ordner = p.join(vorgaenge.ordner, ziel);
+  await Directory(ordner).create(recursive: true);
+  final dateiName = await freierName(ordner, kursSicherungsName(kurs, DateTime.now()));
+  final anzahl = '${ausgewaehlt.length} Aktivitäten, ${wahlAbschnitte.length} Abschnitte';
+  final vg = await vorgaenge.neu(
+      kurs: kurs, cmid: 0, datei: p.join(ziel, dateiName), auswahl: '${art.text}: $anzahl');
+
+  return _nachFreigabe(moodle, freigaben, vorgaenge, vg,
+      s4: s4,
+      backupid: backupid,
+      kontext: kontext,
+      dateiname: dateiname,
+      punkte: [
+        'Sicherung (${art.text}) von Kurs $kurs „$kursName"',
+        if (abschnittNamen.isNotEmpty) 'Abschnitte: ${abschnittNamen.join(', ')}',
+        'Aktivitäten ($anzahl): ${ausgewaehlt.map((a) => '„${a.name}"').join(', ')}',
+        if (art != AuswahlArt.ganzerKurs) 'Nicht enthalten: alle übrigen Abschnitte und Aktivitäten des Kurses',
+        'Ohne Nutzerdaten: keine Teilnehmenden, Abgaben, Bewertungen. Im Kurs ändert sich nichts.',
+        for (final l in luecken) 'Nicht mitgesichert, weil ohne Nutzerdaten: $l',
+        'Datei: Sicherungsordner der App${ziel.isEmpty ? '' : '/$ziel'}, Name $dateiName',
+      ]);
 }
 
 /// Fragt den Fortschritt ab, bis Moodle Ende oder Fehler meldet, und holt die
@@ -425,5 +583,6 @@ Future<String> sicherungStatus(MoodleZugang moodle, Vorgaenge vorgaenge, {String
 String _zeile(Vorgang v) {
   final verified = v.stand == SicherungStand.fertig ? ' · verified: ${v.verified}' : '';
   final hinweis = v.text.isEmpty ? '' : '\n${v.text}';
-  return '${v.id} · Kurs ${v.kurs} · cmid ${v.cmid} · ${v.stand.text} · ${v.datei}$verified$hinweis';
+  final wer = v.auswahl ?? 'cmid ${v.cmid}';
+  return '${v.id} · Kurs ${v.kurs} · $wer · ${v.stand.text} · ${v.datei}$verified$hinweis';
 }

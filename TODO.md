@@ -122,6 +122,22 @@ Umgesetzt, nicht auf einer Instanz durchgespielt (A10: kein Testkurs genannt). D
 - Test für den Download fehlt: `herunterladen` hat keinen HTTP-Test. Der Weg braucht `fuerTest` (nur Debug-Bau, `http://127.0.0.1`, Anmeldung) und ein Fake-Moodle wie in `test/instanzen_test.dart`. Nachrüsten, dann mit Messung im Testkurs.
 - Die Sperrliste lässt genau `/pluginfile.php/<ctx>/user/backup/<datei>.mbz?forcedownload=1` durch (itemid-Segment optional); andere Nutzerdateien bleiben gesperrt (Test in `test/sicherung_regeln_test.dart`).
 
+## Auswahl sichern (Issue #7): UNGEMESSEN
+
+Umgesetzt (`sichern_auswahl`, `auswahlSichern` in `lib/moodle/sicherung.dart`), nicht auf einer Instanz durchgespielt. Die folgenden Punkte sind im Code als UNGEMESSEN markiert; sie werden im Testkurs mit `ZZ`-Proben gemessen, bevor die Auswahl-Sicherung als geprüft gilt.
+
+- Feldnamen der Schema-Seite für Abschnitte: `setting_section_section_<abschnittsid>_included` ist nur aus dem Quelltext angenommen, nicht gemessen. Die Aktivitäten bleiben `setting_activity_<art>_<cmid>_included` wie in #6.
+- Abschnitt nimmt seine Aktivitäten mit: die App setzt die Aktivitäten eines genannten Abschnitts selbst ein (sonst bricht die Bestätigungsprüfung ab). Ob Moodle beim Einschalten eines Abschnitts andere Aktivitäten dazunimmt oder nicht, ist ungemessen.
+- Bestätigungsseite (Schritt 4) bei Auswahl: die Prüfung verlangt genau die bestellten Schalter (`bestaetigungWahlFehler`). Ob Moodle auf Schritt 4 Abschnitte und Aktivitäten so ausweist, wie die Prüfung es erwartet, ist nicht gemessen; eine Abweichung bricht ab, bevor etwas läuft.
+- Ganzer Kurs ohne Auswahl: die Auswahlseite muss genau die Aktivitäten der Kursübersicht nennen (`kursLesen`), sonst bricht die App ab. Ob Moodle Versteckte oder Papierkorb-Aktivitäten dort anders führt, ist ungemessen.
+- Ganzer Kurs mit Auswahl bleibt Art „Kurs" (`auswahlArt`, `AuswahlArt.ganzerKursEingeschraenkt`). Die Freigabe nennt den Umfang; ob Moodle selbst im Dateinamen oder auf der Seite eine Unterscheidung macht, ist ungemessen.
+- Inhaltslücken je Modultyp (`_inhaltsLuecke`, `lib/moodle/sicherung_regeln.dart`): die Liste (Glossar, Datenbank, Forum, Wiki, Aufgabe, Feedback, Fragebogen, Test, Lektion, Workshop, Auswahl, Chat, Journal, H5P, SCORM) stammt aus dem Moodle-Aufbau, nicht aus einer Messung. Ob und wie Moodle jeden Typ ohne Nutzerdaten sichert, ist ungemessen; eine Ergänzung oder Streichung ist ein Eintrag in dieser Liste.
+- Dateiname der Kurssicherung `kurs-k<kurs>-<stempel>.mbz` (`kursSicherungsName`): Moodle übernimmt den Namen laut #6 von der Seite; ob das für Kurssicherungen gleich ist, ist ungemessen. Der Downloadlink wird wie bei #6 über `sicherungsLinks` gesucht.
+- Dauer: die Anfrage `sichern_auswahl` hat ein Zeitlimit von einer Minute; danach läuft die Sicherung weiter und `sicherung_status` zeigt den Stand. Wie lange eine Kurssicherung dauert, ist ungemessen.
+- Nutzerdaten-Optionen auf Kursebene (`setting_root_*`): wie bei #6 nur `users` und `enrolments` gemessen; die übrigen stehen auf der Liste, sind aber ungemessen.
+- Positivliste und Sperrliste sind unverändert: der Kursweg `/backup/backup.php?id=<kurs>` ohne `cm` und die Schritte 1, 2 und 4 sind über die bestehenden Einträge erlaubt (Tests in `test/sicherung_regeln_test.dart`). Ob Moodle den Kursweg wie den Aktivitätsweg beantwortet, ist ungemessen.
+- Änderung im Kurs zwischen Schritt 2 und Schritt 4: die Prüfung vergleicht nur die Seite von Schritt 4 mit der Bestellung, nicht mit dem Stand von Schritt 2. Ob das bei gleichzeitigem Bearbeiten reicht, ist ungemessen.
+
 ## Instanzprofile (Issue #4): offene Teile
 
 - Oberfläche für ein zweites Profil fehlt: Anmeldung, Titelzeile und Dialoge zeigen nur das Hauptprofil (erstes Profil). Weitere Profile kommen über die Einstellungsdatei, ein Anmeldefeld je Profil fehlt.

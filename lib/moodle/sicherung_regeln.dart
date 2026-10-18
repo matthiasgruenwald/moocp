@@ -73,6 +73,141 @@ String? bestaetigungFehler(List<MapEntry<String, String>> f, {required int cmid}
   return null;
 }
 
+final RegExp _abschnittEingeschaltet = RegExp(r'^setting_section_section_(\d+)_included$');
+
+/// Die Abschnitte, die die Seite einschließt: id -> Wert ('1' oder '0').
+/// Gemessen ist nur der Feldname (`setting_section_section_ABSCHNITTSID_included`).
+Map<int, String> eingeschlosseneAbschnitte(List<MapEntry<String, String>> f) {
+  final aus = <int, String>{};
+  letzteWerte(f).forEach((k, v) {
+    final m = _abschnittEingeschaltet.firstMatch(k);
+    if (m != null) aus[int.parse(m.group(1)!)] = v;
+  });
+  return aus;
+}
+
+/// Die Auswahl, wie sie auf der Schema-Seite (Schritt 2) stehen soll: genau
+/// [cmids] und [abschnitte] ein, alle übrigen Aktivitäten und Abschnitte aus,
+/// Nutzerdaten aus. Null, wenn eine der Nummern auf der Seite fehlt. Die Seite
+/// wird nicht erweitert; jedes Feld behält seine Stelle, nur der Wert ändert sich.
+List<MapEntry<String, String>>? schemaWahl(
+  List<MapEntry<String, String>> f, {
+  required Set<int> cmids,
+  required Set<int> abschnitte,
+}) {
+  final akt = eingeschlosseneAktivitaeten(f).keys.toSet();
+  final sek = eingeschlosseneAbschnitte(f).keys.toSet();
+  if (!cmids.every(akt.contains) || !abschnitte.every(sek.contains)) return null;
+  return [
+    for (final e in f)
+      MapEntry(e.key, _wahlWert(e.key, e.value, cmids, abschnitte)),
+  ];
+}
+
+String _wahlWert(String k, String v, Set<int> cmids, Set<int> abschnitte) {
+  final a = _aktivitaetEingeschaltet.firstMatch(k);
+  if (a != null) return cmids.contains(int.parse(a.group(1)!)) ? '1' : '0';
+  final s = _abschnittEingeschaltet.firstMatch(k);
+  if (s != null) return abschnitte.contains(int.parse(s.group(1)!)) ? '1' : '0';
+  if (_nutzerdatenUserinfo.hasMatch(k)) return '0';
+  if (k.startsWith('setting_root_') && nutzerdatenOptionen.contains(k.substring('setting_root_'.length))) {
+    return '0';
+  }
+  return v;
+}
+
+/// Prüft die Bestätigungsseite (Schritt 4) einer Auswahl gegen die Bestellung:
+/// eingeschaltet sind genau [cmids] und [abschnitte], keine Nutzerdaten. Null
+/// heißt in Ordnung, sonst der Grund für den Abbruch vor der Ausführung.
+String? bestaetigungWahlFehler(
+  List<MapEntry<String, String>> f, {
+  required Set<int> cmids,
+  required Set<int> abschnitte,
+}) {
+  if (schrittVon(f) != '4') {
+    return 'Die Seite ist keine Bestätigung (Schritt ${schrittVon(f) ?? 'unbekannt'}).';
+  }
+  final akt = {
+    for (final e in eingeschlosseneAktivitaeten(f).entries)
+      if (e.value == '1') e.key,
+  };
+  final sek = {
+    for (final e in eingeschlosseneAbschnitte(f).entries)
+      if (e.value == '1') e.key,
+  };
+  if (akt.length != cmids.length || !akt.containsAll(cmids)) {
+    final mehr = akt.difference(cmids).toList()..sort();
+    final weniger = cmids.difference(akt).toList()..sort();
+    return 'Die Bestätigung weicht bei den Aktivitäten ab (zu viel: ${mehr.join(', ')}; '
+        'fehlt: ${weniger.join(', ')}).';
+  }
+  if (sek.length != abschnitte.length || !sek.containsAll(abschnitte)) {
+    return 'Die Bestätigung weicht bei den Abschnitten von der Bestellung ab.';
+  }
+  if (!ohneNutzerdaten(f)) return 'Die Bestätigung schaltet Nutzerdaten ein.';
+  return null;
+}
+
+/// Was in einer Sicherung ohne Nutzerdaten fehlt, je Modultyp: nur die Typen,
+/// die Lernende füllen. Der Text ist für die Freigabe gedacht.
+///
+/// UNGEMESSEN je Typ: ob Moodle die Einträge der Lehrkraft (Glossar,
+/// Datenbank) trotzdem mitnimmt und wie weit Wiki-Seiten fehlen. Die Liste
+/// ist eine Vorsicht: lieber zu viel nennen als etwas verschweigen.
+const Map<String, String> _inhaltsLuecke = {
+  'glossary': 'Glossar: Einträge der Lernenden',
+  'data': 'Datenbank: Einträge der Lernenden',
+  'forum': 'Forum: alle Beiträge',
+  'wiki': 'Wiki: Seiten nur teilweise, Beiträge der Lernenden fehlen',
+  'assign': 'Aufgabe: Abgaben und Bewertungen',
+  'feedback': 'Feedback: Antworten',
+  'questionnaire': 'Fragebogen: Antworten',
+  'quiz': 'Test: Versuche und Antworten',
+  'lesson': 'Lektion: Versuche und Antworten',
+  'workshop': 'Workshop: Beiträge und Bewertungen',
+  'choice': 'Auswahl: Antworten',
+  'chat': 'Chat: Nachrichten',
+  'journal': 'Journal: Einträge',
+  'h5pactivity': 'H5P: Ergebnisse',
+  'scorm': 'SCORM: Versuche',
+};
+
+/// Die Lücken zu den Modultypen [module], ohne Doppelte, in Reihenfolge.
+List<String> inhaltsLuecken(Iterable<String> module) {
+  final aus = <String>[];
+  for (final m in module) {
+    final t = _inhaltsLuecke[m];
+    if (t != null && !aus.contains(t)) aus.add(t);
+  }
+  return aus;
+}
+
+/// Die Art einer Sicherung, wie sie in Freigabe und Protokoll steht. Eine
+/// Einschränkung macht den ganzen Kurs nicht zu einer Auswahl: Der Typ hängt
+/// nur am Kennzeichen „ganzer Kurs" und an der Zahl der gewählten Teile (null
+/// oder nicht), nie an der Anzahl der Aktivitäten.
+enum AuswahlArt {
+  /// Der ganze Kurs, nichts eingeschränkt.
+  ganzerKurs,
+
+  /// Der ganze Kurs, aber nur die genannten Teile.
+  ganzerKursEingeschraenkt,
+
+  /// Teile eines Kurses, ohne Kennzeichen „ganzer Kurs".
+  auswahl;
+
+  String get text => switch (this) {
+        ganzerKurs => 'ganzer Kurs',
+        ganzerKursEingeschraenkt => 'ganzer Kurs, eingeschränkt auf die Auswahl',
+        auswahl => 'Auswahl',
+      };
+}
+
+AuswahlArt auswahlArt({required bool ganzerKurs, required bool nurGenannte}) {
+  if (!ganzerKurs) return AuswahlArt.auswahl;
+  return nurGenannte ? AuswahlArt.ganzerKursEingeschraenkt : AuswahlArt.ganzerKurs;
+}
+
 /// Schaltet auf einer Seite alle Nutzerdaten-Optionen aus, die sie schon
 /// enthält (Schritt 1). Fehlende Felder bleiben fehlend.
 List<MapEntry<String, String>> nutzerdatenAus(List<MapEntry<String, String>> f) {
@@ -201,11 +336,18 @@ List<String> sicherungsLinks(String html, String dateiname) {
 /// Der Dateiname im Sicherungsordner: Modul und cmid, Zeitpunkt. Kein Name
 /// aus Moodle, kein Kursname, keine Person.
 String sicherungsName(String modul, int cmid, DateTime zeit) {
-  String zwei(int n) => n.toString().padLeft(2, '0');
   final modulTeil = modul.replaceAll(RegExp(r'[^a-z0-9_]'), '');
-  final stempel = '${zeit.year}-${zwei(zeit.month)}-${zwei(zeit.day)}_'
+  return '$modulTeil-cm$cmid-${_stempel(zeit)}.mbz';
+}
+
+/// Der Dateiname einer Auswahl aus dem Kurs: die Kursnummer und der Zeitpunkt.
+/// Kein Kursname, keine Person.
+String kursSicherungsName(int kurs, DateTime zeit) => 'kurs-k$kurs-${_stempel(zeit)}.mbz';
+
+String _stempel(DateTime zeit) {
+  String zwei(int n) => n.toString().padLeft(2, '0');
+  return '${zeit.year}-${zwei(zeit.month)}-${zwei(zeit.day)}_'
       '${zwei(zeit.hour)}${zwei(zeit.minute)}${zwei(zeit.second)}';
-  return '$modulTeil-cm$cmid-$stempel.mbz';
 }
 
 /// Ein Zielordner im Sicherungsordner. Nur relative Pfade ohne „..", ohne

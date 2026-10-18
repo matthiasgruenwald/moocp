@@ -23,7 +23,7 @@ Moodle-Instanz hat einen eigenen Server mit eigenem Präfix (etwa
 | Anlegen | `aktivitaet_anlegen`, `abschnitt_anlegen`, `buchkapitel_anlegen`, `wikiseite_schreiben` |
 | Ändern | `aendern`, `aendern_mehrere`, `links_setzen`, `claude_schreiben`, `fortschrittsliste_aendern`, `board_aendern`, `kanban_aendern`, `bewertungsschema_setzen`, `buch_ordnen`, `buchkapitel_verschieben` |
 | Kursrahmen | `sichtbarkeit_setzen`, `verschieben`, `duplizieren`, `loeschen`, `buchkapitel_loeschen`, `wikiseite_loeschen` |
-| Sichern | `sichern_aktivitaet`, `sicherung_status` |
+| Sichern | `sichern_aktivitaet`, `sichern_auswahl`, `sicherung_status` |
 | Ansehen | `bildschirmfoto` |
 | Tests und Fragen | im Skill `moodle-fragen` |
 
@@ -32,6 +32,17 @@ als Datei im Sicherungsordner der App. Sie ändert im Kurs nichts. Die Lehrkraft
 gibt sie vorher frei; nenne ihr Name und Nummer genau wie in `aktivitaet_lesen`.
 Läuft sie länger als der Aufruf, rufe `sicherung_status` mit der Nummer auf,
 statt sie neu zu starten.
+
+Mehrere Teile in einer Datei sichert `sichern_auswahl`: ausgewählte Aktivitäten,
+ganze Abschnitte oder den ganzen Kurs, auch nur mit den genannten Teilen. Auch
+hier ohne Nutzerdaten. Anregungen, wofür sich das eignet: einen Abschnitt als
+Vorlage an Kolleginnen und Kollegen weitergeben, einen Kurs als Grundlage für
+das nächste Schuljahr sichern. Ein anderer Einsatz mit Grund ist willkommen.
+Die Freigabe zeigt, was genau mitgeht; die Lehrkraft sieht dort auch, welche
+Inhalte fehlen, weil Lernende sie füllen (etwa Glossareinträge oder Forenbeiträge).
+Das sag ihr auch selbst, bevor sie zustimmt. Ob ein Abschnitt seine Aktivitäten
+mitnimmt und wie Moodle den Kurs bei einer Auswahl benennt, prüft die Lehrkraft
+vor dem Einsatz.
 
 **Fehlen die Werkzeuge**, oder meldet `status` „nicht angemeldet", dann bitte
 die Lehrkraft, die App zu starten bzw. sich darin anzumelden, und warte. Weich
