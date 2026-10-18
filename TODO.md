@@ -255,7 +255,7 @@ Prüfen unter Windows (nach dem Umbau in #11):
 - Claude Desktop (MSIX), klassischer Installer und VS-Code-Erweiterung finden claude.exe; Bionic mit der Brücke.
 - Die übersprungenen Mac-Tests laufen unter Windows (`flutter test`).
 - `python` in `skills/lernsituation/SKILL.md` (Zeilen 148 und 158) ruft `python` wörtlich; auf dem Mac gibt es oft nur `python3`. Entscheidung offen, ob der Skill beide nennt.
-- Ein Start ohne `HOME` (Mac) oder `APPDATA` (Windows) beendet die App mit `StateError` in `einstellungen_ort.dart`; Hauptprogramm fängt das nicht eigens ab.
+- Ein Start ohne `HOME` (Mac) oder `APPDATA` (Windows) wirft `StateError` in `einstellungen_ort.dart`; ob der Start das als Meldung zeigt, ist ungeprüft.
 
 Nicht Teil dieses Umbaus (eigene Aufgabe):
 - Installer, Signierung, Notarisierung und Release-Bau für den Mac. Der Mac bleibt bei E24 ein Entwicklungsbau.

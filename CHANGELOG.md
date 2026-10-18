@@ -2,7 +2,7 @@
 
 ## 0.9.23
 - macOS: Bildschirmfotos finden Edge, Chrome oder Chromium im Programmordner; eine Richtlinie, die die Fernsteuerung abschaltet, nennt die App. UNGEMESSEN: noch nicht auf einem Mac durchgespielt.
-- macOS: Die App darf Verbindungen aufbauen (Netzwerkrechte im Entwicklungsbau); Einstellungen ohne Benutzerordner nennen den Fehler, statt still zu scheitern.
+- macOS: Die App darf Verbindungen aufbauen (Netzwerkrechte im Entwicklungsbau); Fehlt der Benutzerordner, wirft die App einen klaren Fehler, statt einen falschen Ort zu nehmen.
 - macOS: Der Einstellungsdialog sagt ausdrücklich, dass sich die Version auf dem Mac nicht selbst aktualisiert und nichts bei GitHub prüft.
 - macOS: Die Einrichtung findet `python3`, wenn kein `python` da ist.
 - Wiederherstellung: Eine Sicherungsdatei lässt sich in einen bestehenden Kurs einfügen, ohne etwas zu ersetzen; die Freigabe nennt Kurs, Datei und was neu angelegt wird, und die Datei wird vor dem Hochladen geprüft. UNGEMESSEN: noch nicht auf einer Instanz durchgespielt.
