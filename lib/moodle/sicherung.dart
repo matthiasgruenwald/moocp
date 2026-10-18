@@ -65,6 +65,8 @@ class Vorgang {
     this.wiederherstellungDatei,
     this.vorherCmids,
     this.wiederherstellungAktivitaeten,
+    this.fingerabdruck,
+    this.wiederholungVon,
   }) : aktualisiert = aktualisiert ?? begonnen;
 
   final String id;
@@ -105,6 +107,11 @@ class Vorgang {
   List<int>? vorherCmids;
   List<ArchivAktivitaet>? wiederherstellungAktivitaeten;
 
+  /// Doppelstart-Schutz (Ticket #19): Inhalts- und Zielschlüssel (fingerabdruck) und
+  /// bei einer bewusst wiederholten Wiederherstellung die Nummer des überholten Vorgangs.
+  String? fingerabdruck;
+  String? wiederholungVon;
+
   Map<String, Object?> zuJson() => {
         'id': id,
         'kurs': kurs,
@@ -126,6 +133,8 @@ class Vorgang {
         'wiederherstellung_laufzeit': wiederherstellungDatei,
         'vorher_cmids': vorherCmids,
         'wiederherstellung_aktivitaeten': wiederherstellungAktivitaeten?.map((a) => {'modul': a.modul, 'titel': a.titel}).toList(),
+        'fingerabdruck': fingerabdruck,
+        'wiederholung_von': wiederholungVon,
       };
 
   static Vorgang? ausJson(Object? o) {
@@ -158,6 +167,8 @@ class Vorgang {
           .where((a) => a['modul'] is String && a['titel'] is String)
           .map((a) => (modul: a['modul'] as String, titel: a['titel'] as String))
           .toList(),
+      fingerabdruck: o['fingerabdruck'] as String?,
+      wiederholungVon: o['wiederholung_von'] as String?,
     );
   }
 }
@@ -219,9 +230,16 @@ class Vorgaenge {
 
   /// Ein Vorgang für die Wiederherstellung. Die Datei liegt relativ zum
   /// Sicherungsordner; der Kurs ist der Zielkurs.
-  Future<Vorgang> neuWiederherstellung({required int kurs, required String datei}) async {
+  Future<Vorgang> neuWiederherstellung({
+    required int kurs,
+    required String datei,
+    String? fingerabdruck,
+    String? wiederholungVon,
+  }) async {
     final v = await neu(kurs: kurs, cmid: 0, datei: datei);
     v.wiederherstellung = WiederherstellungStand.anstehend;
+    v.fingerabdruck = fingerabdruck;
+    v.wiederholungVon = wiederholungVon;
     await _speichern();
     return v;
   }
@@ -266,6 +284,18 @@ class Vorgaenge {
     await tmp.rename(_datei.path);
   }
 }
+
+/// Die Angaben der Doppelstart-Prüfung zu allen Vorgängen, in der gespeicherten Reihenfolge.
+List<DoppelstartEintrag> doppelstartEintraege(Iterable<Vorgang> alle) => [
+      for (final v in alle)
+        (
+          id: v.id,
+          fingerabdruck: v.fingerabdruck,
+          wiederholungVon: v.wiederholungVon,
+          stand: v.wiederherstellung,
+          kurs: v.kurs,
+        ),
+    ];
 
 /// Ein Dateiname, den es in [ordner] noch nicht gibt, auch nicht als Teil einer
 /// laufenden Übertragung. Nie überschreiben: aus `x.mbz` wird `x-2.mbz`.

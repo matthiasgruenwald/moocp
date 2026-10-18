@@ -214,6 +214,14 @@ Umgesetzt (`wiederherstellen_datei`, `wiederherstellung_status`, `lib/moodle/wie
 - Abbruch oder verlorene Antwort nach dem Absenden von Schritt 16: Die App liest den Stand nach und wiederholt nie blind. Ob Moodle den Lauf nach einem Abbruch der Sitzung tatsächlich weiterführt, ist ungemessen.
 - Freigabe-Test „Die Stufe steht in den Einstellungen …" schlug einmal im Gesamtlauf fehl und lief beim Wiederholen durch (Flake, nicht durch diese Änderung verursacht). Beobachten.
 
+## Doppelstart-Schutz (Ticket #19): offene Punkte
+- Die Ende-zu-Ende-Prüfung fehlt: Die Reihenfolge (Doppelstart-Prüfung vor der Freigabe) ist nur im Code; ein Test braucht eine gültige .mbz-Vorlage (Testfixture) und einen Moodle-Doppel.
+- Die Reservierung im Speicher (`_reserviert`) bleibt stehen, wenn die Freigabe mit einem Fehler endet statt mit „nein" (heute nicht vorgesehen, `anfragen` wirft nicht).
+- `wiederherstellung_status` setzt einen Vorgang „anstehend" oder „hochgeladen" ohne laufende Sitzung auf „fehlgeschlagen". Das gibt die Sperre frei, obwohl das Senden vor dem Absturz geschehen sein kann. Bisheriges Verhalten, nicht geändert; prüfen.
+- Ein Platzhalterkurs bei „neuer_kurs" nach einem Abbruch ist nicht gemessen; deshalb sperrt „fehlgeschlagen" bei neuem Kurs weiter.
+- Fertige Wiederherstellungen sperren, bis sie ausdrücklich wiederholt werden (konservativ, ungemessen ob gewollt).
+- Vorgänge ohne Fingerabdruck (vor diesem Stand) sperren nichts.
+
 ## Wiederherstellen: alle Zielwege und Abbruch (Issue #9): UNGEMESSEN
 
 Umgesetzt (`zielwegPruefen`, `Zielweg` in `lib/moodle/wiederherstellung_regeln.dart`; `wiederherstellen` in `lib/moodle/wiederherstellung.dart`; Positivliste je Weg in `lib/moodle/moodle_zugang.dart`), offline getestet (`test/wiederherstellung_weg_test.dart`). Nicht auf einer Instanz durchgespielt. Die Werte der fünf Wege (2, 1, 0, 4, 3) stammen aus `docs/plans/moodle-sicherung-formulare.md`; was dort nicht steht, ist unten als UNGEMESSEN geführt.
