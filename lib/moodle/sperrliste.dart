@@ -21,6 +21,18 @@
 /// genau sie -- und nur sie -- eine Ausnahme hat ([bewertungsschema]).
 final RegExp _notenRegel = RegExp(r'/grade/');
 
+/// Alle Dateien unter user/ (Profilbild, private Dateien, Sicherungen).
+final RegExp _nutzerDateien = RegExp(r'^/pluginfile\.php/\d+/user/');
+
+/// Die eine Ausnahme bei den Nutzerdateien: die Sicherungsdatei, die Moodle
+/// nach einer Aktivitätssicherung bereitstellt. Ob sie ohne Nutzerdaten ist,
+/// prüft der Ablauf vor dem Herunterladen (bestaetigungFehler in
+/// moodle/sicherung_regeln.dart). Nur mit genau diesem Pfad und forcedownload=1,
+/// nicht mit einem Prefix.
+/// Gemessen: der Link trägt kein itemid-Segment (`user/backup/<datei>`). Das
+/// Segment bleibt optional, falls Moodle es anderswo mit einer Zahl setzt.
+final RegExp _sicherungDatei = RegExp(r'^/pluginfile\.php/\d+/user/backup/(?:\d+/)?[^/?#]+\.mbz\?forcedownload=1$');
+
 final List<RegExp> _gesperrt = [
   // Bewertungen, Abgaben, Versuche
   _notenRegel,
@@ -75,7 +87,7 @@ final List<RegExp> _gesperrt = [
   // Moodle-Kerns. Der eigene Entwurfsbereich liegt unter draftfile.php und
   // bleibt offen; die Dateien einer Aktivität (mod_page/content,
   // mod_assign/intro, mod_folder/content …) ebenso.
-  RegExp(r'^/pluginfile\.php/\d+/user/'), // Profilbild, private Dateien
+  _nutzerDateien, // Profilbild, private Dateien
   RegExp(r'^/pluginfile\.php/\d+/assign(submission|feedback)_'), // Abgaben, Feedback
   RegExp(r'^/pluginfile\.php/\d+/question/response_'), // Antworten im Test
   RegExp(r'^/pluginfile\.php/\d+/mod_forum/(post|attachment)/'), // Forenbeiträge
@@ -104,8 +116,10 @@ final List<RegExp> _bewertungsschema = [
 String? sperrregel(Uri uri) {
   final u = uri.hasQuery ? '${uri.path}?${uri.query}' : uri.path;
   final schema = _bewertungsschema.any((r) => r.hasMatch(u));
+  final sicherung = _sicherungDatei.hasMatch(u);
   for (final r in _gesperrt) {
     if (schema && identical(r, _notenRegel)) continue;
+    if (sicherung && identical(r, _nutzerDateien)) continue;
     if (r.hasMatch(u)) return r.pattern;
   }
   return null;

@@ -28,11 +28,14 @@ import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:html/dom.dart' as dom;
 import 'package:html/parser.dart' as html_parser;
 
 import '../protokoll.dart';
 import 'browserliste.dart';
+import 'sicherung_regeln.dart';
+import 'wiederherstellung_regeln.dart';
 import 'sperrliste.dart';
 
 class MoodleFehler implements Exception {
@@ -81,12 +84,17 @@ class Anhang {
 
 /// Eine Regel der Positivliste.
 class Erlaubt {
-  const Erlaubt(this.methode, this.pfad, this.zweck, {this.parameter, this.formular, this.inhalt});
+  const Erlaubt(this.methode, this.pfad, this.zweck,
+      {this.parameter, this.formular, this.inhalt, this.anhang});
   final String methode;
   final String pfad;
   final String zweck;
   final bool Function(Map<String, String> q)? parameter;
   final bool Function(Felder f)? formular;
+
+  /// Prüft die hochgeladene Datei. Eine Regel mit diesem Prüfer passt nur auf
+  /// Anfragen mit Datei.
+  final bool Function(Anhang a)? anhang;
 
   /// Prüft einen JSON-Rumpf (Moodle-AJAX-Dienste), mit den Parametern der Adresse.
   final bool Function(Map<String, String> q, String rumpf)? inhalt;
@@ -137,7 +145,7 @@ class MoodleZugang {
 
   final Protokoll protokoll;
 
-  static bool _zahl(String? s) => s != null && RegExp(r'^\d+$').hasMatch(s);
+  static bool _zahl(String? s) => istZahl(s);
   static bool _gesetzt(String? s) => s != null && s.isNotEmpty;
 
   /// Das Formular trägt die Marke seiner Klasse (`_qf__<klasse>`). Die Klassen
@@ -249,6 +257,13 @@ class MoodleZugang {
           'mod_kanban_$k': (a) => _nur(a, {'cmid', 'boardid', 'data'}),
         // Dynamische Formulare, nur die gemessenen Klassen.
         'core_form_dynamic_form': (a) => _nur(a, {'form', 'formdata'}) && dynamischeFormulare.contains(a['form']),
+        // Sicherung: Fortschritt lesen.
+        // Operation „restore" ist UNGEMESSEN (TODO.md); ohne Schlüssel gilt die Sicherung.
+        'core_backup_get_async_backup_progress': (a) =>
+            _nur(a, {'backupids', 'contextid', 'operation'}) &&
+            a['backupids'] is List &&
+            a['contextid'] is num &&
+            (a['operation'] == null || a['operation'] == 'backup' || a['operation'] == 'restore'),
       };
 
   /// Formularklassen für core_form_dynamic_form.
@@ -332,6 +347,14 @@ class MoodleZugang {
                 _nurSchluessel(q, {'cmid', 'id', 'pagenum', 'subchapter'}) &&
                 _zahl(q['cmid']) &&
                 (_zahl(q['id']) || _zahl(q['pagenum']))),
+        // Sicherung einer Aktivität (sicherung.dart). Nur die gemessenen Schritte
+        // der Assistenten; Nutzerdaten bleiben aus (sicherung_regeln.dart).
+        Erlaubt('GET', r'^/backup/backup\.php$', 'Sicherung: Einstiegsseite einer Aktivität',
+            parameter: (q) => _nurSchluessel(q, {'id', 'cm'}) && _zahl(q['id']) && (q['cm'] == null || _zahl(q['cm']))),
+        Erlaubt('GET', r'^/backup/restorefile\.php$', 'Sicherung: Seite Wiederherstellen (Downloadlink suchen)',
+            parameter: (q) => _nurSchluessel(q, {'contextid'}) && _zahl(q['contextid'])),
+        Erlaubt('GET', r'^/pluginfile\.php/\d+/user/backup/(?:\d+/)?[^/?#]+\.mbz$', 'Sicherungsdatei',
+            parameter: (q) => q.length == 1 && q['forcedownload'] == '1'),
         Erlaubt('GET', r'^/draftfile\.php/\d+/user/draft/\d+/.+', 'Datei im Entwurfsbereich'),
         Erlaubt('GET', r'^/pluginfile\.php/\d+/.+', 'Datei im Kurs'),
         Erlaubt('POST', r'^/lib/ajax/service\.php$', 'Moodle-Dienst (nur lesend, siehe dienste)',
@@ -354,6 +377,17 @@ class MoodleZugang {
               return _zahl(wertIn(f, 'course')) &&
                   schreibbareModule.contains(modul) &&
                   wertIn(f, '_qf__mod_${modul}_mod_form') != null;
+            }),
+        // Sicherung: die Schritte 1, 2 und 4 des Assistenten, nur ohne
+        // Nutzerdaten. Schritt 4 startet die Sicherung (sicherung.dart).
+        Erlaubt('POST', r'^/backup/backup\.php$', 'Sicherung: Schritte 1, 2 und 4 (ohne Nutzerdaten)',
+            parameter: (q) => q.isEmpty,
+            formular: (f) {
+              final schritt = wertIn(f, 'stage');
+              return const {'1', '2', '4'}.contains(schritt) &&
+                  (_marke(f, RegExp(r'^_qf__backup_(initial|schema|confirmation)_form$'))) &&
+                  _gesetzt(wertIn(f, 'sesskey')) &&
+                  ohneNutzerdaten(f);
             }),
         Erlaubt('POST', r'^/course/editsection\.php$', 'Abschnitt speichern',
             parameter: (q) => q.isEmpty,
@@ -501,8 +535,92 @@ class MoodleZugang {
                 _zahl(q['chapterid']) &&
                 (q['up'] == '0' || q['up'] == '1') &&
                 _gesetzt(q['sesskey'])),
+        // Upload einer Datei in den Entwurfsbereich. Eine .mbz-Datei geht nur über
+        // die Regel darunter (wiederherstellung_regeln.dart prüft das Archiv vorher).
         Erlaubt('POST', r'^/repository/repository_ajax\.php$', 'Datei in den Entwurfsbereich',
-            parameter: (q) => q.length == 1 && q['action'] == 'upload'),
+            parameter: (q) => q.length == 1 && q['action'] == 'upload',
+            anhang: (a) => !a.dateiname.toLowerCase().endsWith('.mbz')),
+        Erlaubt('POST', r'^/repository/repository_ajax\.php$', 'Sicherungsdatei (.mbz) in den Entwurfsbereich',
+            parameter: (q) => q.length == 1 && q['action'] == 'upload',
+            formular: (f) => _zahl(wertIn(f, 'itemid')) && _gesetzt(wertIn(f, 'sesskey')),
+            // UNGEMESSEN: der MIME-Typ, den Moodle für .mbz erwartet (TODO.md).
+            anhang: (a) =>
+                a.feld == 'repo_upload_file' &&
+                RegExp(r'^[A-Za-z0-9_.-]{1,120}\.mbz$').hasMatch(a.dateiname) &&
+                (a.mime == 'application/octet-stream' || a.mime == 'application/vnd.moodle.backup')),
+        // Wiederherstellen (wiederherstellung.dart): die gemessenen Schritte.
+        Erlaubt('GET', r'^/course/view\.php$', 'Kurs ansehen (Gegenlesen, Kontext; UNGEMESSEN)',
+            parameter: (q) => _nurSchluessel(q, {'id'}) && _zahl(q['id'])),
+        // Nur diese Felder: Marke, Sitzung, Draft-Itemid und ggf. der Absendeknopf und die Kurs-ID.
+        // Jedes andere Feld lehnt die Regel ab (UNGEMESSEN: Feldnamen, TODO.md).
+        Erlaubt('POST', r'^/backup/restorefile\.php$', 'Wiederherstellen: Datei hochladen (Formular)',
+            parameter: (q) => _nurSchluessel(q, {'contextid'}) && (q['contextid'] == null || _zahl(q['contextid'])),
+            formular: (f) =>
+                f.every((e) => const {'contextid', 'sesskey', '_qf__course_restore_form', 'backupfile', 'submitbutton'}
+                    .contains(e.key)) &&
+                _marke(f, RegExp(r'^_qf__course_restore_form$')) &&
+                _gesetzt(wertIn(f, 'sesskey')) &&
+                _zahl(wertIn(f, 'backupfile')) &&
+                (wertIn(f, 'contextid') == null || _zahl(wertIn(f, 'contextid')))),
+        Erlaubt('GET', r'^/backup/restore\.php$', 'Wiederherstellen: Seite des Assistenten',
+            parameter: (q) =>
+                _nurSchluessel(q, {'contextid', 'filename'}) &&
+                _zahl(q['contextid']) &&
+                RegExp(r'^[A-Za-z0-9_.-]{1,200}$').hasMatch(q['filename'] ?? '')),
+        // Weiterleitung nach dem Hochladen (UNGEMESSEN): Moodle nennt die Datei über ihren Dateiablagen-Hash.
+        Erlaubt('GET', r'^/backup/restore\.php$', 'Wiederherstellen: Weiterleitung nach dem Hochladen (UNGEMESSEN)',
+            parameter: (q) =>
+                _nurSchluessel(q, {'contextid', 'pathnamehash', 'component', 'filearea'}) &&
+                _zahl(q['contextid']) &&
+                RegExp(r'^[a-f0-9]{40}$').hasMatch(q['pathnamehash'] ?? '') &&
+                RegExp(r'^[a-z_]{1,50}$').hasMatch(q['component'] ?? 'backup') &&
+                RegExp(r'^[a-z_]{1,50}$').hasMatch(q['filearea'] ?? 'draft')),
+        // Sicherungsdetails (gemessen auf der Testinstanz): das Weiter-Formular trägt nur diese Felder und stage=2.
+        Erlaubt('POST', r'^/backup/restore\.php$', 'Wiederherstellen: Sicherungsdetails bestätigen',
+            parameter: (q) => _nurSchluessel(q, {'contextid', 'filename'}),
+            formular: (f) =>
+                f.every((e) => const {'contextid', 'filepath', 'filename', 'stage', 'sesskey'}.contains(e.key)) &&
+                wertIn(f, 'stage') == '2' &&
+                _gesetzt(wertIn(f, 'sesskey'))),
+        // Zielwahl je Zielweg (Issue #9): jeder Weg hat eine eigene, enge Schlüsselmenge.
+        // Der Wert target ist der gemessene Moodle-Wert des Weges; ein anderer wird abgelehnt.
+        // Kein _qf__-Feld auf dieser Seite (gemessen). Die Felder search (Kurssuche) und
+        // catsearch (Kategoriesuche) gehören je nur zu den Wegen, die sie brauchen.
+        for (final ziel in Zielweg.values)
+          Erlaubt('POST', r'^/backup/restore\.php$', 'Wiederherstellen: Ziel „${ziel.nennung}" (Formular mit stage=2 oder 4)',
+              parameter: (q) => _nurSchluessel(q, {'contextid', 'filename'}),
+              formular: (f) {
+                final erlaubt = {
+                  'contextid', 'filepath', 'filename', 'stage', 'sesskey', 'target', 'targetid',
+                  if (ziel == Zielweg.neuerKurs) 'catsearch',
+                  if (ziel == Zielweg.anderKursVerschmelzen || ziel == Zielweg.anderKursErsetzen) 'search',
+                };
+                return const {'2', '4'}.contains(wertIn(f, 'stage')) &&
+                    wertIn(f, 'target') == '${ziel.moodle}' &&
+                    _zahl(wertIn(f, 'targetid')) &&
+                    _gesetzt(wertIn(f, 'sesskey')) &&
+                    f.every((e) => erlaubt.contains(e.key));
+              }),
+        // Kursformular (nur für die Kategorie eines neuen Kurses): ohne Angabe oder mit category.
+        Erlaubt('GET', r'^/course/edit\.php$', 'Kursformular lesen (Kategorie des neuen Kurses)',
+            parameter: (q) => _nurSchluessel(q, {'category'}) && (q['category'] == null || _zahl(q['category']))),
+        // Kursverwaltung der Kategorie (Kontext der Kategorie; UNGEMESSEN).
+        Erlaubt('GET', r'^/course/management\.php$', 'Kategorie ansehen (Kontext; UNGEMESSEN)',
+            parameter: (q) => _nurSchluessel(q, {'categoryid'}) && _zahl(q['categoryid'])),
+        // Einstellungen, Schema und Prüfung: ohne Nutzerdaten, mit dem Schalter „restore".
+        for (final (schritt, form) in const [
+          ('4', 'settings'),
+          ('8', 'schema'),
+          ('16', 'review'),
+        ])
+          Erlaubt('POST', r'^/backup/restore\.php$', 'Wiederherstellen: Schritt $schritt ($form)',
+              parameter: (q) => _nurSchluessel(q, {'contextid', 'filename'}),
+              formular: (f) =>
+                  wertIn(f, 'stage') == schritt &&
+                  _marke(f, RegExp('^_qf__restore_${form}_form\$')) &&
+                  wertIn(f, 'restore') != null &&
+                  _gesetzt(wertIn(f, 'sesskey')) &&
+                  ohneNutzerdaten(f)),
         Erlaubt('POST', r'^/repository/draftfiles_ajax\.php$', 'Unterordner eines Dateibereichs lesen',
             parameter: (q) => q.length == 1 && q['action'] == 'list',
             formular: (f) =>
@@ -520,11 +638,13 @@ class MoodleZugang {
       ];
 
   /// Prüft eine Anfrage gegen die Positivliste, ohne sie zu senden.
-  bool erlaubt(String methode, Uri uri, [Felder? formular, String? rumpf]) {
+  bool erlaubt(String methode, Uri uri, [Felder? formular, String? rumpf, Anhang? anhang]) {
     for (final e in positivliste) {
       if (e.methode != methode || !RegExp(e.pfad).hasMatch(uri.path)) continue;
       if (e.parameter != null && !e.parameter!(uri.queryParameters)) continue;
       if (e.formular != null && (formular == null || !e.formular!(formular))) continue;
+      if ((e.anhang == null) != (anhang == null)) continue;
+      if (e.anhang != null && !e.anhang!(anhang!)) continue;
       if ((e.inhalt == null) != (rumpf == null)) continue;
       if (e.inhalt != null && !e.inhalt!(uri.queryParameters, rumpf!)) continue;
       return true;
@@ -538,6 +658,36 @@ class MoodleZugang {
   final Map<String, String> _cookies = {};
   bool _angemeldet = false;
   Completer<void>? _anmeldungLaeuft;
+
+  /// Nur gesetzt von [fuerTest]: Die Instanz ist eine lokale Testadresse mit
+  /// http. Sonst gilt überall https.
+  bool _testInstanz = false;
+
+  /// Ein Zugang gegen eine lokale Testinstanz (Test-Doppel auf 127.0.0.1), mit
+  /// derselben Anmeldung wie [anmelden], aber ohne die https-Pflicht. Der
+  /// einzige Weg, http zu erlauben; die Positivliste lässt http nur für genau
+  /// diese Adresse und diesen Port zu ([_schemeErlaubt]).
+  ///
+  /// Im Release-Bau wirft die Methode, bevor etwas geschieht.
+  @visibleForTesting
+  static Future<MoodleZugang> fuerTest(
+    Protokoll protokoll,
+    Uri basis, {
+    required String benutzer,
+    required String passwort,
+  }) async {
+    if (!kDebugMode) throw StateError('Testzugang nur im Testbau verfügbar.');
+    if (basis.scheme != 'http' || basis.host != '127.0.0.1') {
+      throw ArgumentError('Testzugang nur über http://127.0.0.1.');
+    }
+    final z = MoodleZugang(protokoll);
+    z._testInstanz = true;
+    z._basis = basis;
+    z._benutzer = benutzer;
+    z._passwort = passwort;
+    await z._anmelden();
+    return z;
+  }
 
   /// Der sesskey der Sitzung, mitgelesen aus jeder HTML-Antwort (M.cfg).
   String? _sesskey;
@@ -827,6 +977,70 @@ class MoodleZugang {
     return r;
   }
 
+  /// Lädt eine Sicherungsdatei (Pfad mit `?forcedownload=1`) als Stream nach
+  /// [ziel]. Geschrieben wird zuerst nach `<ziel>.teil`; erst wenn die Größe
+  /// mit der angekündigten übereinstimmt, wird umbenannt. Bei jedem Fehler
+  /// verschwindet der Teil. Eine vorhandene Datei wird nie überschrieben.
+  /// Gibt die Zahl der Bytes zurück.
+  Future<int> herunterladen(String pfadMitQuery, File ziel) async {
+    _pruefeAngemeldet();
+    final uri = _adresse(pfadMitQuery);
+    _pruefePositivliste('GET', uri, null, null);
+    if (await ziel.exists()) throw MoodleFehler('Zieldatei existiert schon; nichts überschrieben.');
+    final teil = File('${ziel.path}.teil');
+    final client = HttpClient()
+      ..userAgent = 'moocp (lokal)'
+      ..connectionTimeout = verbindungsgrenze;
+    IOSink? senke;
+    var fertig = false;
+    try {
+      final req = await client.getUrl(uri);
+      req.followRedirects = false;
+      _cookies.forEach((k, v) => req.cookies.add(Cookie(k, v)));
+      final res = await req.close().timeout(antwortgrenze);
+      protokoll.eintrag(Art.moodle, 'GET ${uri.path}${_querySicher(uri)} → ${res.statusCode}');
+      if (res.statusCode != 200) throw MoodleFehler('Download abgelehnt (HTTP ${res.statusCode}).');
+      if (res.headers.contentType?.mimeType == 'text/html') {
+        throw MoodleFehler('Download liefert eine Seite statt einer Datei (Anmeldung abgelaufen?).');
+      }
+      final erwartet = res.contentLength;
+      if (erwartet < 0) {
+        // Ohne angekündigte Größe gibt es keine Prüfung; dann wird nichts übernommen.
+        throw MoodleFehler('Moodle nennt die Größe der Datei nicht; nicht übernommen.');
+      }
+      senke = teil.openWrite();
+      var gelesen = 0;
+      await for (final d in res.timeout(antwortgrenze)) {
+        gelesen += d.length;
+        senke.add(d);
+      }
+      final s = senke;
+      senke = null;
+      await s.close();
+      if (gelesen != erwartet) {
+        throw MoodleFehler('Die Datei ist unvollständig ($gelesen von $erwartet Bytes).');
+      }
+      await teil.rename(ziel.path);
+      fertig = true;
+      return gelesen;
+    } on SocketException catch (e) {
+      protokoll.eintrag(Art.fehler, 'GET ${uri.path}: nicht erreichbar');
+      throw MoodleNichtErreichbar('Moodle nicht erreichbar: ${e.message}');
+    } on TimeoutException {
+      protokoll.eintrag(Art.fehler, 'GET ${uri.path}: keine Antwort innerhalb der Zeitgrenze');
+      throw MoodleNichtErreichbar('Moodle antwortet nicht (${uri.path}). Später noch einmal versuchen.');
+    } on IOException catch (e) {
+      protokoll.eintrag(Art.fehler, 'GET ${uri.path}: Verbindung abgebrochen (${e.runtimeType})');
+      throw MoodleNichtErreichbar('Verbindung zu Moodle abgebrochen (${e.runtimeType}). Später noch einmal versuchen.');
+    } finally {
+      client.close(force: true);
+      try {
+        await senke?.close();
+      } catch (_) {}
+      if (!fertig && await teil.exists()) await teil.delete();
+    }
+  }
+
   Future<void> _pruefeSitzungNachSchreiben(Antwort r) async {
     final ziel = _umleitung(r);
     final json = (r.inhaltstyp ?? '').contains('json') ? r.text : '';
@@ -868,8 +1082,14 @@ class MoodleZugang {
   // Eine einzelne Anfrage -- hier sitzt die Positivliste
   // ---------------------------------------------------------------------
 
-  void _pruefePositivliste(String methode, Uri uri, Felder? formular, String? rumpf) {
-    if (_basis == null || uri.host != _basis!.host || uri.scheme != 'https') {
+  /// https ist Pflicht. Ausnahme nur die Testinstanz ([fuerTest]) auf ihrer
+  /// eigenen Adresse und ihrem eigenen Port.
+  bool _schemeErlaubt(Uri uri) =>
+      uri.scheme == 'https' ||
+      (_testInstanz && _basis!.scheme == 'http' && uri.scheme == 'http' && uri.port == _basis!.port);
+
+  void _pruefePositivliste(String methode, Uri uri, Felder? formular, String? rumpf, [Anhang? anhang]) {
+    if (_basis == null || uri.host != _basis!.host || !_schemeErlaubt(uri)) {
       throw MoodleFehler('Gesperrt: fremder Rechner oder kein https (${uri.host}).');
     }
     final regel = sperrregel(uri);
@@ -883,7 +1103,7 @@ class MoodleZugang {
           'Dem Nutzer sagen, dass dieser Teil der Aufgabe offen bleibt, oder -- falls die '
           'Adresse harmlos ist -- dass die Sperre zu weit ist (Regel $regel).');
     }
-    if (erlaubt(methode, uri, formular, rumpf)) return;
+    if (erlaubt(methode, uri, formular, rumpf, anhang)) return;
     // Zur Fehlersuche die NAMEN der Parameter und Felder, nie ihre Werte.
     protokoll.eintrag(
         Art.gesperrt,
@@ -915,7 +1135,7 @@ class MoodleZugang {
       {Felder? formular, Anhang? anhang, String? rumpf, bool browser = false}) async {
     // Anfragen des Browsers sind in fuerBrowser geprüft, gegen ihre eigene
     // Liste; die Sperrliste gilt dort zuerst wie hier.
-    if (!browser) _pruefePositivliste(methode, uri, formular, rumpf);
+    if (!browser) _pruefePositivliste(methode, uri, formular, rumpf, anhang);
     final client = HttpClient()
       ..userAgent = 'moocp (lokal)'
       ..connectionTimeout = verbindungsgrenze;

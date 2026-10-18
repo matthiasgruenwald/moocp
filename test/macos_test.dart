@@ -18,6 +18,14 @@ void main() {
       );
     });
 
+    test('ohne HOME auf dem Mac ein klarer Fehler statt Temp-Ordner', () {
+      expect(() => einstellungenOrdnerFuer({}, macos: true), throwsA(isA<StateError>()));
+    });
+
+    test('ohne APPDATA unter Windows ein klarer Fehler statt Temp-Ordner', () {
+      expect(() => einstellungenOrdnerFuer({}, macos: false), throwsA(isA<StateError>()));
+    });
+
     test('unter Windows unter APPDATA', () {
       expect(
         einstellungenOrdnerFuer({'APPDATA': r'C:\Users\x\AppData\Roaming'}, macos: false),

@@ -17,8 +17,12 @@ import 'package:mcp_dart/mcp_dart.dart';
 import 'package:path/path.dart' as p;
 
 import '../einstellungen.dart';
+import '../einstellungen_ort.dart';
 import '../freigabe.dart';
+import '../profil.dart';
 import '../log.dart';
+import '../uebertragung.dart';
+import '../uebertragung_lauf.dart';
 import '../moodle/bewertung.dart';
 import '../moodle/bildschirmfoto.dart';
 import '../moodle/board.dart';
@@ -33,8 +37,12 @@ import '../moodle/kursfilter.dart';
 import '../moodle/kurshinweise.dart';
 import '../moodle/links.dart';
 import '../moodle/moodle_zugang.dart';
+import '../moodle/sicherung_regeln.dart';
+import '../moodle/sicherung.dart';
 import '../moodle/stack.dart';
 import '../moodle/test.dart';
+import '../moodle/wiederherstellung.dart';
+import '../moodle/wiederherstellung_regeln.dart';
 import '../moodle/wiki.dart';
 import '../protokoll.dart';
 
@@ -50,10 +58,34 @@ const _stufenText = {
       'Freigaben kommen (eine je Aufruf; Mehreres in einem Aufruf bündelt die App).',
 };
 
+/// Wartet höchstens [z] auf [f]. Danach kommt [weiter] als Text zurück, und
+/// [f] läuft im Hintergrund weiter: Eine Sicherung verliert sich nicht, nur weil
+/// der Client nicht mehr wartet. Ein Fehler von [f] geht an den Aufrufer, auch
+/// wenn er nach dem Zeitlimit kommt.
+Future<String> _zeitlimit(Future<String> f, Duration z, String Function() weiter) {
+  final c = Completer<String>();
+  f.then(
+    (t) {
+      if (!c.isCompleted) c.complete(t);
+    },
+    onError: (Object e, StackTrace st) {
+      if (!c.isCompleted) c.completeError(e, st);
+    },
+  );
+  Timer(z, () {
+    if (!c.isCompleted) c.complete(weiter());
+  });
+  return c.future;
+}
+
 class McpDienst {
-  McpDienst(this.einstellungen, this.moodle, this.protokoll, this.freigaben, this.arbeitsordner);
+  McpDienst(this.einstellungen, this.moodle, this.protokoll, this.freigaben, this.arbeitsordner,
+      {required this.profil});
 
   final Einstellungen einstellungen;
+
+  /// Das Instanzprofil dieses Servers (E31): Port, Name und Adresse kommen von dort.
+  final Profil profil;
   final MoodleZugang moodle;
   final Protokoll protokoll;
   final Freigaben freigaben;
@@ -69,7 +101,7 @@ class McpDienst {
     final s = StreamableMcpServer(
       serverFactory: (sessionId) => _erzeugen(),
       host: '127.0.0.1',
-      port: einstellungen.port,
+      port: profil.port,
       path: '/mcp',
       enableJsonResponse: true,
       allowedHosts: const {'127.0.0.1', 'localhost'},
@@ -77,7 +109,7 @@ class McpDienst {
     );
     await s.start();
     _server = s;
-    protokoll.eintrag(Art.info, 'MCP-Server läuft auf http://127.0.0.1:${einstellungen.port}/mcp');
+    protokoll.eintrag(Art.info, 'MCP-Server läuft auf http://127.0.0.1:${profil.port}/mcp (${profil.mcpName})');
   }
 
   /// Die Werkzeugliste für die Brücke (bruecke.dart, Werkzeugliste;
@@ -221,6 +253,146 @@ class McpDienst {
           'Freigabe an, die nicht kommt, und schlage nicht vor, die Stufe zu ändern -- das ist '
           'ihre Entscheidung.';
 
+  static Map<String, dynamic> _karte(Object? x) => (x as Map).cast<String, dynamic>();
+
+  /// Übertragung in einem Auftrag (Issue #10). Die Entscheidungen stehen in
+  /// uebertragung_lauf.dart; hier nur die Verdrahtung mit Moodle und Freigabe.
+  /// Reihenfolge: prüfen, Wiederholungsschutz, eine Freigabe mit der
+  /// Zusammenfassung, sichern (nur ohne datei), dann je Ziel wiederherstellen.
+  Future<String> _uebertragen(Vorgaenge vorgaenge, Map<String, dynamic> a) async {
+    final ziele = <ZielAngabe>[];
+    for (final x in (a['ziele'] as List?) ?? const []) {
+      final m = _karte(x);
+      ziele.add(ZielAngabe(
+          kurs: _zahl(m, 'kurs'),
+          name: _text(m, 'name'),
+          weg: m['weg'] as String?,
+          loeschend: m['loeschend'] == true));
+    }
+    final angegeben = a['datei'] as String?;
+    final erneut = a['erneut'] == true;
+    final quellkurs = angegeben == null ? _zahlOder(a, 'kurs') : null;
+    if (angegeben == null && (quellkurs == null || a['name_des_kurses'] == null)) {
+      return 'Ohne datei braucht es kurs (Quellkurs) und name_des_kurses. Nichts geschehen.';
+    }
+
+    final planung = pruefeZiele(ziele, quellkurs: quellkurs);
+    if (planung case PlanungRueckfrage(:final text)) return text;
+    final geprueft = (planung as PlanungOk).ziele;
+
+    final protokoll = await Uebertragungsprotokoll.laden(p.join(einstellungenOrdner, 'uebertragungen.json'));
+    final rueckfragen = <String>[];
+    for (final z in geprueft) {
+      final r = wiederholungsRueckfrage(protokoll.eintraege,
+          profil: profil.kennung, kurs: z.kurs, datei: angegeben, quellkurs: quellkurs, erneut: erneut);
+      if (r != null) rueckfragen.add('Kurs ${z.kurs} („${z.name}"): $r');
+    }
+    if (rueckfragen.isNotEmpty) return rueckfragen.join('\n\n');
+
+    // Die Zusammenfassung vor dem ersten Schreibschritt (Issue #5, uebertragungsZusammenfassung).
+    final zielZeilen = [for (final z in geprueft) '„${z.name}" (Kurs ${z.kurs}): ${z.weg.nennung}'];
+    final List<String> punkte;
+    if (quellkurs != null) {
+      final anzahlAkt = (a['aktivitaeten'] as List?)?.length ?? 0;
+      final anzahlAbs = (a['abschnitte'] as List?)?.length ?? 0;
+      punkte = uebertragungsZusammenfassung(
+        Plan(quelle: Endpunkt(profil, quellkurs), ziele: [for (final z in geprueft) Endpunkt(profil, z.kurs)]),
+        kursnamen: {
+          Endpunkt(profil, quellkurs): _text(a, 'name_des_kurses'),
+          for (final z in geprueft) Endpunkt(profil, z.kurs): z.name,
+        },
+        inhalt: anzahlAkt == 0 && anzahlAbs == 0 ? 'ganzer Kurs' : '$anzahlAkt Aktivitäten, $anzahlAbs Abschnitte',
+        wiederherstellung: geprueft.map((z) => '„${z.name}": ${z.weg.nennung}').join('; '),
+      ).split('\n');
+    } else {
+      punkte = [
+        'Profil: ${profil.name}',
+        'Quelle: Sicherungsdatei $angegeben (vorhanden, wird nicht neu gesichert)',
+        'Zielkurse (${geprueft.length}):',
+        for (final z in zielZeilen) '  - $z',
+      ];
+    }
+    final ja = await freigaben.anfragen(FreigabeAnfrage(
+      titel: 'Übertragung in ${geprueft.length} ${geprueft.length == 1 ? 'Kurs' : 'Kurse'} starten?',
+      punkte: [
+        ...punkte,
+        'Je Ziel ein eigener Vorgang, nacheinander. Ein Fehler stoppt die anderen Ziele nicht; eine Ablehnung schon.',
+        'Eine Einfüge-Wiederherstellung kann Inhalte doppelt anlegen. Ein Aktualisieren ist nicht zugesagt.',
+      ],
+      vergleich: const [],
+      knopf: 'Übertragen',
+      ohneEntscheidung: 'wird nichts übertragen',
+    ));
+    if (!ja) {
+      return 'Nicht übertragen: in der App abgelehnt oder nicht innerhalb von '
+          '${freigaben.frist.inMinutes} Minuten freigegeben. Nichts geändert.';
+    }
+
+    // Ohne datei zuerst auf dieser Instanz sichern. Die Datei gilt nur, wenn der Vorgang fertig ist.
+    final String datei;
+    String? sicherungNummer;
+    if (angegeben != null) {
+      datei = angegeben;
+    } else {
+      String? sicherungVid;
+      final sicherungText = await auswahlSichern(moodle, freigaben, vorgaenge,
+          kurs: quellkurs!,
+          name: _text(a, 'name_des_kurses'),
+          aktivitaeten: [
+            for (final x in (a['aktivitaeten'] as List?) ?? const [])
+              (cmid: _zahl(_karte(x), 'cmid'), name: _text(_karte(x), 'name')),
+          ],
+          abschnitte: [
+            for (final x in (a['abschnitte'] as List?) ?? const [])
+              (id: _zahl(_karte(x), 'id'), name: _text(_karte(x), 'name')),
+          ],
+          ganzerKurs: a['ganzer_kurs'] == true,
+          zielOrdner: a['ziel_ordner'] as String?,
+          beiVorgang: (id) {
+            sicherungVid = id;
+          });
+      final id = sicherungVid;
+      if (id == null) return sicherungText;
+      final sv = await vorgaenge.finde(id);
+      if (sv == null || sv.stand != SicherungStand.fertig || sv.datei.isEmpty) {
+        return 'Die Sicherung ist nicht fertig (Nummer $id). Nichts übertragen.\n$sicherungText';
+      }
+      datei = sv.datei;
+      sicherungNummer = id;
+    }
+
+    // Ein Ziel: eigener Vorgang, Stand aus dem Vorgang. Ohne Vorgangsnummer hat die
+    // App abgelehnt (wiederherstellen legt den Vorgang erst nach der Freigabe an).
+    Future<ZielErgebnis> lauf(PlanZiel z) async {
+      String? vid;
+      String text = '';
+      try {
+        text = await wiederherstellen(moodle, freigaben, vorgaenge,
+            datei: datei,
+            instanz: profil.name,
+            weg: z.weg.nennung,
+            kurs: z.kurs,
+            name: z.name,
+            loeschend: z.weg.loescht,
+            beiVorgang: (id) {
+              vid = id;
+            });
+      } on MoodleFehler catch (e) {
+        if (vid == null) return ZielErgebnis(ZielStand.fehlgeschlagen, text: e.meldung);
+        text = e.meldung;
+      }
+      final id = vid;
+      if (id == null) return ZielErgebnis(ZielStand.abgelehnt, text: text);
+      final v = await vorgaenge.finde(id);
+      return ZielErgebnis(zielStandAus(v?.wiederherstellung), vorgang: id, text: text);
+    }
+
+    final berichte = await uebertragungAusfuehren(geprueft,
+        datei: datei, profil: profil.kennung, quellkurs: quellkurs, protokoll: protokoll, lauf: lauf);
+    final kopf = sicherungNummer == null ? '' : 'Quelle gesichert: Nummer $sicherungNummer, Datei $datei.\n';
+    return '$kopf${uebertragungsBericht(berichte)}';
+  }
+
   int _zahl(Map<String, dynamic> a, String n) {
     final z = (a[n] as num?)?.toInt();
     if (z == null || z < 0) throw MoodleFehler('$n muss eine Zahl sein.');
@@ -291,6 +463,7 @@ class McpDienst {
       server.server.oninitialized = () => protokoll.eintrag(Art.info, 'KI-Werkzeug verbunden: ${_client(server)}');
     }
     final ao = arbeitsordner;
+    final vorgaenge = Vorgaenge(sicherungenOrdner);
 
     _werkzeug(server, 'status',
         titel: 'Status',
@@ -301,7 +474,8 @@ class McpDienst {
         nurLesen: true,
         ausfuehren: (a) async =>
             'Angemeldet: ${moodle.angemeldet ? "ja" : "nein -- bitte in der App anmelden"}\n'
-            'Moodle: ${moodle.basis?.host ?? einstellungen.moodleAdresse}\n'
+            'Profil: ${profil.name} (${profil.mcpName})\n'
+            'Moodle: ${moodle.basis?.host ?? profil.adresse}\n'
             'Verbunden über: ${_client(server)}\n'
             // Erkannt beim Anmelden (moodle_zugang.dart); vorher unbekannt.
             'Druckaufbereitung „Aufgabenblatt-Druck": ${!moodle.angemeldet ? "unbekannt, erst nach der Anmeldung" : moodle.druckaufbereitung ? "erkannt -- für Blätter zum Ausdrucken gilt references/drucken.md im Skill moodle" : "nicht vorhanden"}\n'
@@ -632,8 +806,228 @@ class McpDienst {
             abschnittId: _zahlOder(a, 'abschnitt_id'),
             name: _text(a, 'name')));
 
+    // ---- Sicherung einer Aktivität (E29, moodle/sicherung.dart)
+    _werkzeug(server, 'sichern_aktivitaet',
+        titel: 'Aktivität sichern',
+        beschreibung: 'Sichert eine Aktivität als Datei (.mbz) in den Sicherungsordner der App, außerhalb des '
+            'Arbeitsordners, ohne Nutzerdaten. Nummer und Name müssen zusammenpassen. Vor dem Start fragt die App '
+            'nach einer Freigabe, die Kurs, Namen und Datei zeigt. Dauert die Sicherung länger als eine Minute, '
+            'läuft sie weiter: dann sicherung_status mit der Nummer aufrufen.',
+        parameter: {
+          'kurs': _kurs,
+          'cmid': _cmid,
+          'name': _name,
+          'ziel_ordner': JsonSchema.string(
+              description: 'Optional: Unterordner im Sicherungsordner, nur einfache Ordnernamen (kein „..", '
+                  'kein Laufwerk).'),
+        },
+        pflicht: ['kurs', 'cmid', 'name'],
+        ausfuehren: (a) => _zeitlimit(
+              aktivitaetSichern(moodle, freigaben, vorgaenge,
+                  kurs: _zahl(a, 'kurs'),
+                  cmid: _zahl(a, 'cmid'),
+                  name: _text(a, 'name'),
+                  zielOrdner: a['ziel_ordner'] as String?),
+              const Duration(minutes: 1),
+              () => 'Die Sicherung läuft weiter. Mit sicherung_status und der Nummer später prüfen, '
+                  'ob sie fertig ist.',
+            ));
+
+    _werkzeug(server, 'sicherung_status',
+        titel: 'Sicherung prüfen',
+        beschreibung: 'Zeigt den Stand einer Sicherung (anstehend, laufend, fertig, fehlgeschlagen, unklar) und '
+            'fragt laufende bei Moodle nach. Ohne Nummer: die letzten Sicherungen. Nur lesen, außer wenn eine '
+            'Sicherung noch bei Moodle läuft.',
+        parameter: {'id': JsonSchema.string(description: 'Nummer der Sicherung, wie sichern_aktivitaet sie nennt')},
+        nurLesen: true,
+        ausfuehren: (a) => _zeitlimit(
+              sicherungStatus(moodle, vorgaenge, id: a['id'] as String?),
+              const Duration(minutes: 1),
+              () => 'Die Sicherung läuft noch. Bitte später erneut prüfen.',
+            ));
+
+    // ---- Wiederherstellen einer Sicherungsdatei in einen bestehenden Kurs (E29, moodle/wiederherstellung.dart)
+    _werkzeug(server, 'wiederherstellen_datei',
+        titel: 'Datei in Kurs wiederherstellen',
+        beschreibung: 'Stellt eine Sicherungsdatei (.mbz) aus dem Sicherungsordner wieder her. Der Zielweg steht im '
+            'Parameter weg: neuer_kurs (neuer Kurs, braucht neuer_kurs_name und kurzname, optional kategorie_id), '
+            'aktueller_kurs_verschmelzen und anderer_kurs_verschmelzen (Inhalte kommen dazu, nichts wird gelöscht; '
+            'brauchen kurs und name), aktueller_kurs_ersetzen und anderer_kurs_ersetzen (löschen vorhandene Inhalte '
+            'des Kurses; brauchen kurs, name und loeschend: true). weg ist Pflicht; fehlt er oder ist er unklar, wird '
+            'nicht geraten: die Antwort nennt die Optionen. Die Datei wird vor dem Hochladen '
+            'geprüft (gepacktes Tar, keine Nutzerdaten, keine Pfade nach außen, höchstens 200 MB). Der Kursname muss '
+            'zu der Nummer passen. Vor dem Start fragt die App nach einer Freigabe, die Kurs, Datei, Modus und die '
+            'neuen Aktivitäten zeigt; bei löschenden Wegen steht dort, dass vorhandene Inhalte gelöscht werden. '
+            'Neue Aktivitäten werden danach verborgen (kurzzeitig können sie sichtbar sein). Verborgen ist kein Schutz. '
+            'Dauert es länger als eine Minute, läuft es weiter: dann wiederherstellung_status mit der Nummer aufrufen. '
+            'Nach dem Start wird nie neu gesendet.',
+        parameter: {
+          'datei': JsonSchema.string(
+              description: 'Dateiname der .mbz relativ zum Sicherungsordner, wie sichern_aktivitaet ihn nennt.'),
+          'weg': JsonSchema.string(
+              enumValues: [for (final z in Zielweg.values) z.nennung],
+              description: 'Zielweg, Pflicht. Die Optionen stehen in enumValues.'),
+          'loeschend': JsonSchema.boolean(
+              description: 'Pflicht und nur true bei aktueller_kurs_ersetzen und anderer_kurs_ersetzen: '
+                  'vorhandene Inhalte des Zielkurses werden gelöscht.'),
+          'kurs': _kurs,
+          'name': _name,
+          'neuer_kurs_name': JsonSchema.string(
+              description: 'Nur bei neuer_kurs: vollständiger Name des neuen Kurses.'),
+          'kurzname': JsonSchema.string(
+              description: 'Nur bei neuer_kurs: Kurzname des neuen Kurses.'),
+          'kategorie_id': JsonSchema.integer(
+              description: 'Nur bei neuer_kurs, optional: Kategorie-Nummer. Ohne Angabe die Vorgabe des Kursformulars.'),
+        },
+        pflicht: ['datei', 'weg'],
+        ausfuehren: (a) => _zeitlimit(
+              wiederherstellen(moodle, freigaben, vorgaenge,
+                  datei: _text(a, 'datei'),
+                  weg: a['weg'] as String?,
+                  loeschend: a['loeschend'] == true,
+                  kurs: _zahlOder(a, 'kurs'),
+                  name: a['name'] as String?,
+                  neuerKursName: a['neuer_kurs_name'] as String?,
+                  kurzname: a['kurzname'] as String?,
+                  kategorieId: _zahlOder(a, 'kategorie_id'),
+                  instanz: profil.name),
+              const Duration(minutes: 1),
+              () => 'Die Wiederherstellung läuft weiter. Mit wiederherstellung_status und der Nummer später prüfen.',
+            ));
+
+    _werkzeug(server, 'wiederherstellung_status',
+        titel: 'Wiederherstellung prüfen',
+        beschreibung: 'Zeigt den Stand einer Wiederherstellung (anstehend, hochgeladen, laufend, fertig, '
+            'fehlgeschlagen, unklar) und fragt eine laufende bei Moodle nach. Startet nie neu. Ein Vorgang, der nie bei '
+            'Moodle begonnen hat, wird als fehlgeschlagen vermerkt.',
+        parameter: {'id': JsonSchema.string(description: 'Nummer der Wiederherstellung, wie wiederherstellen_datei sie nennt')},
+        pflicht: ['id'],
+        ausfuehren: (a) => _zeitlimit(
+              wiederherstellungStatus(moodle, vorgaenge, id: _text(a, 'id')),
+              const Duration(minutes: 1),
+              () => 'Die Wiederherstellung läuft noch. Bitte später erneut prüfen.',
+            ));
+
+    _werkzeug(server, 'sichern_auswahl',
+        titel: 'Auswahl sichern',
+        beschreibung: 'Sichert mehrere Aktivitäten, Abschnitte oder den ganzen Kurs als eine Datei (.mbz) in den '
+            'Sicherungsordner der App, ohne Nutzerdaten. Ohne aktivitaeten und abschnitte, mit ganzer_kurs=true: '
+            'der ganze Kurs. Mit Angaben und ganzer_kurs=true: der Kurs, eingeschränkt auf die Angaben. Namen und '
+            'Nummern müssen zusammenpassen. Vor dem Start fragt die App nach einer Freigabe, die alles Gewählte, '
+            'die Nutzerdaten, die fehlen, und die Datei zeigt. Dauert die Sicherung länger als eine Minute, läuft '
+            'sie weiter: dann sicherung_status mit der Nummer aufrufen.',
+        parameter: {
+          'kurs': _kurs,
+          'name_des_kurses': JsonSchema.string(
+              description: 'Der Kursname, wie er jetzt in Moodle steht (aus kurs_uebersicht). Passt er nicht, '
+                  'bricht das Werkzeug ab, bevor etwas geschieht.'),
+          'aktivitaeten': JsonSchema.array(
+              items: JsonSchema.object(
+                properties: {'cmid': _cmid, 'name': _name},
+                required: ['cmid', 'name'],
+              ),
+              description: 'Die Aktivitäten, die gesichert werden, mit cmid und Name aus kurs_uebersicht.'),
+          'abschnitte': JsonSchema.array(
+              items: JsonSchema.object(
+                properties: {
+                  'id': JsonSchema.integer(description: 'Abschnitts-ID aus kurs_uebersicht'),
+                  'name': JsonSchema.string(description: 'Der Titel des Abschnitts, wie er jetzt dasteht'),
+                },
+                required: ['id', 'name'],
+              ),
+              description: 'Die Abschnitte, die gesichert werden; ihre Aktivitäten kommen mit.'),
+          'ganzer_kurs': JsonSchema.boolean(
+              description: 'true: der Kurs (ohne Angaben: alles; mit Angaben: eingeschränkt auf sie). '
+                  'false: nur die genannten Teile.'),
+          'ziel_ordner': JsonSchema.string(
+              description: 'Optional: Unterordner im Sicherungsordner, nur einfache Ordnernamen (kein „..", '
+                  'kein Laufwerk).'),
+        },
+        pflicht: ['kurs', 'name_des_kurses'],
+        ausfuehren: (a) {
+          List<Map<String, dynamic>> liste(String n) => [
+                for (final x in (a[n] as List?) ?? const []) (x as Map).cast<String, dynamic>(),
+              ];
+          return _zeitlimit(
+            auswahlSichern(moodle, freigaben, vorgaenge,
+                kurs: _zahl(a, 'kurs'),
+                name: _text(a, 'name_des_kurses'),
+                aktivitaeten: [for (final x in liste('aktivitaeten')) (cmid: _zahl(x, 'cmid'), name: _text(x, 'name'))],
+                abschnitte: [for (final x in liste('abschnitte')) (id: _zahl(x, 'id'), name: _text(x, 'name'))],
+                ganzerKurs: a['ganzer_kurs'] == true,
+                zielOrdner: a['ziel_ordner'] as String?),
+            const Duration(minutes: 1),
+            () => 'Die Sicherung läuft weiter. Mit sicherung_status und der Nummer später prüfen, '
+                'ob sie fertig ist.',
+          );
+        });
+
+    // ---- Übertragung in einem Auftrag (Issue #10): dieser Instanz sichern, dann je Ziel wiederherstellen
+    _werkzeug(server, 'uebertragen',
+        titel: 'Unterrichtseinheit übertragen',
+        beschreibung: 'Überträgt eine Auswahl in einem Auftrag auf mehrere Zielkurse DIESER Instanz. Ohne datei: '
+            'zuerst aus dem Quellkurs (kurs, name_des_kurses, aktivitaeten, abschnitte, ganzer_kurs wie sichern_auswahl) '
+            'sichern, dann die Datei je Ziel wiederherstellen. Mit datei: nur die vorhandene .mbz wiederherstellen. '
+            'Jedes Ziel hat seinen Weg (weg, Pflicht; fehlt er, fragt das Werkzeug nach, es wird nichts geraten) und '
+            'ein eigenes Ergebnis: fertig, fehlgeschlagen, unklar oder abgelehnt. Ziele auf einer anderen Instanz gibt '
+            'es hier nicht: dafür auf der Quellinstanz sichern_auswahl und auf der Zielinstanz wiederherstellen_datei '
+            '(zwei Aufrufe). Vor dem ersten Schreiben zeigt die App eine Zusammenfassung; jeder Schritt fragt danach '
+            'noch einmal. Ist dieselbe Datei für ein Ziel schon übertragen worden, kommt eine Rückfrage statt eines '
+            'erneuten Imports; erneut: true hebt das für diesen Aufruf auf. Eine Einfüge-Wiederherstellung kann Dubletten '
+            'erzeugen. Das Protokoll je Ziel steht in uebertragungen.json im Einstellungsordner.',
+        zerstoerend: true,
+        parameter: {
+          'ziele': JsonSchema.array(
+              items: JsonSchema.object(
+                properties: {
+                  'kurs': _kurs,
+                  'name': _name,
+                  'weg': JsonSchema.string(
+                      enumValues: [for (final z in Zielweg.values) if (z.brauchtKurs) z.nennung],
+                      description: 'Zielweg dieses Ziels. Pflicht; ohne Angabe wird nichts geraten.'),
+                  'loeschend': JsonSchema.boolean(
+                      description: 'Pflicht und nur true bei aktueller_kurs_ersetzen und anderer_kurs_ersetzen: '
+                          'vorhandene Inhalte dieses Zielkurses werden gelöscht. Sonst weglassen.'),
+                },
+                required: const ['kurs', 'name'],
+              ),
+              description: 'Die Zielkurse in dieser Instanz, je {kurs, name, weg}.'),
+          'datei': JsonSchema.string(
+              description: 'Optional: eine vorhandene .mbz im Sicherungsordner, relativ. Ohne Angabe wird zuerst gesichert.'),
+          'erneut': JsonSchema.boolean(
+              description: 'true hebt den Wiederholungsschutz für diesen Aufruf auf. Nur nach ausdrücklichem Wunsch der Lehrkraft.'),
+          'kurs': JsonSchema.integer(description: 'Quellkurs (Kurs-ID), nur ohne datei.'),
+          'name_des_kurses': JsonSchema.string(
+              description: 'Der Name des Quellkurses, wie er jetzt in Moodle steht. Nur ohne datei.'),
+          'aktivitaeten': JsonSchema.array(
+              items: JsonSchema.object(
+                properties: {'cmid': _cmid, 'name': _name},
+                required: ['cmid', 'name'],
+              ),
+              description: 'Nur ohne datei: die Aktivitäten, wie bei sichern_auswahl.'),
+          'abschnitte': JsonSchema.array(
+              items: JsonSchema.object(
+                properties: {
+                  'id': JsonSchema.integer(description: 'Abschnitts-ID aus kurs_uebersicht'),
+                  'name': JsonSchema.string(description: 'Der Titel des Abschnitts, wie er jetzt dasteht'),
+                },
+                required: ['id', 'name'],
+              ),
+              description: 'Nur ohne datei: die Abschnitte, wie bei sichern_auswahl.'),
+          'ganzer_kurs': JsonSchema.boolean(description: 'Nur ohne datei: wie bei sichern_auswahl.'),
+          'ziel_ordner': JsonSchema.string(
+              description: 'Nur ohne datei: Unterordner im Sicherungsordner, wie bei sichern_auswahl.'),
+        },
+        pflicht: ['ziele'],
+        ausfuehren: (a) => _zeitlimit(
+              _uebertragen(vorgaenge, a),
+              const Duration(minutes: 4),
+              () => 'Die Übertragung läuft weiter. Mit wiederherstellung_status und den Nummern prüfen; '
+                  'uebertragungen.json zeigt den Stand je Ziel.',
+            ));
+
     // ---- Bücher
-    final buchCmid = JsonSchema.integer(description: 'cmid des Buchs, die Zahl hinter mod/book/view.php?id=');
+    final buchCmid =JsonSchema.integer(description: 'cmid des Buchs, die Zahl hinter mod/book/view.php?id=');
     final kapitelId = JsonSchema.integer(description: 'id des Kapitels (aus buch_lesen, „[id …]")');
     final kapitelTitel = JsonSchema.string(
         description: 'Der Titel des Kapitels, wie er jetzt dasteht (aus buch_lesen). Passt er nicht zur id, '
@@ -1186,7 +1580,140 @@ class McpDienst {
         ausfuehren: (a) => testAendern(moodle, freigaben,
             cmid: _zahl(a, 'cmid'), name: _text(a, 'name'), aktionen: objekte(a['aktionen'], 'aktionen')));
 
+    // ---- Übertragung (Issue #5): Rollen und Projektkontext, nur in der App gespeichert
+    _werkzeug(server, 'uebertragung_rolle_setzen',
+        titel: 'Rolle des Profils setzen',
+        beschreibung: 'Setzt, ob dieses Profil für eine Übertragung Quelle oder Ziel ist, oder entfernt die Rolle '
+            '(keine). Die Rolle ist eine Einstellung der App und ändert nichts in Moodle, dafür gibt es keine '
+            'Freigabe. Setze sie nur auf ausdrücklichen Wunsch der Lehrkraft, nie von dir aus.',
+        parameter: {
+          'rolle': JsonSchema.string(enumValues: const ['quelle', 'ziel', 'keine'], description: 'quelle, ziel oder keine'),
+        },
+        pflicht: ['rolle'],
+        ausfuehren: (a) async {
+          final Rolle? rolle = switch (_text(a, 'rolle')) {
+            'quelle' => Rolle.quelle,
+            'ziel' => Rolle.ziel,
+            'keine' => null,
+            _ => throw MoodleFehler('rolle muss quelle, ziel oder keine sein.'),
+          };
+          if (!einstellungen.rolleSetzen(profil.kennung, rolle)) {
+            throw MoodleFehler('Dieses Profil gibt es in den Einstellungen nicht mehr.');
+          }
+          await einstellungen.speichern();
+          // Mehrere Profile mit derselben Rolle sind möglich; die Richtung fragt
+          // dann nach (uebertragung.dart). Hier wird nur gewarnt.
+          final andere = rolle == null
+              ? const <String>[]
+              : [for (final p in einstellungen.profile) if (p.kennung != profil.kennung && p.rolle == rolle) p.name];
+          final hinweis = andere.isEmpty
+              ? ''
+              : '\nAchtung: „${andere.join('", „')}" hat schon die Rolle ${rolle!.anzeige}. Eine Übertragung '
+                  'braucht genau eine Quelle; bei mehreren Zielen ist das in Ordnung.';
+          return 'Rolle von „${profil.name}" (${profil.mcpName}): ${rolle?.anzeige ?? 'keine'}. '
+              'In den Einstellungen gespeichert.$hinweis';
+        });
+
+    _werkzeug(server, 'uebertragung_kontext',
+        titel: 'Projektkontext',
+        beschreibung: 'Zeigt den Projektkontext der Übertragung: Quellkurs, Durchführungskurse, die Rolle jedes '
+            'Profils und die Richtung, die sich daraus ergibt, oder die Rückfrage, die noch offen ist. Nur lesen.',
+        nurLesen: true,
+        ausfuehren: (a) async => _kontextText());
+
+    final kursbezugSchema = JsonSchema.object(
+      properties: {
+        'profil': JsonSchema.string(description: 'mcpName des Profils, wie ihn uebertragung_kontext zeigt'),
+        'kurs': _kurs,
+      },
+      required: const ['profil', 'kurs'],
+    );
+    _werkzeug(server, 'uebertragung_kontext_setzen',
+        titel: 'Projektkontext setzen',
+        beschreibung: 'Setzt den Projektkontext in den Einstellungen der App: den Quellkurs (quelle) und die '
+            'Durchführungskurse (durchfuehrung), je {profil (mcpName), kurs}. Ein angegebenes Feld ersetzt das '
+            'bisherige ganz; durchfuehrung ist immer die vollständige Liste. zuruecksetzen: true leert den Kontext '
+            'vor dem Setzen. Ändert nichts in Moodle; die Lehrkraft muss es ausdrücklich wollen. Gibt danach den '
+            'Kontext und die Richtung zurück.',
+        parameter: {
+          'quelle': kursbezugSchema,
+          'durchfuehrung': JsonSchema.array(items: kursbezugSchema, description: 'Die Durchführungskurse, vollständig'),
+          'zuruecksetzen': JsonSchema.boolean(description: 'true leert den Projektkontext vor dem Setzen'),
+        },
+        ausfuehren: (a) async {
+          final quelle = a['quelle'] == null ? null : _kursbezugAus(a['quelle'], 'quelle');
+          final durchfuehrung = a['durchfuehrung'] == null
+              ? null
+              : [for (final j in objekte(a['durchfuehrung'], 'durchfuehrung')) _kursbezugAus(j, 'durchfuehrung')];
+          final zuruecksetzen = a['zuruecksetzen'] == true;
+          if (quelle == null && durchfuehrung == null && !zuruecksetzen) {
+            throw MoodleFehler('Nichts angegeben: quelle, durchfuehrung oder zuruecksetzen nennen.');
+          }
+          final alt = zuruecksetzen ? const Projektkontext() : (einstellungen.projektkontext ?? const Projektkontext());
+          einstellungen.projektkontext = Projektkontext(
+            quelle: quelle ?? alt.quelle,
+            durchfuehrung: durchfuehrung ?? alt.durchfuehrung,
+          );
+          await einstellungen.speichern();
+          return _kontextText();
+        });
+
     return server;
+  }
+
+  /// Das Profil zu einem Servernamen (mcpName), wie ihn die KI nennt.
+  Profil? _profilNachMcpName(String mcp) {
+    for (final p in einstellungen.profile) {
+      if (p.mcpName == mcp) return p;
+    }
+    return null;
+  }
+
+  Profil? _profilZuKennung(String kennung) {
+    for (final p in einstellungen.profile) {
+      if (p.kennung == kennung) return p;
+    }
+    return null;
+  }
+
+  /// Ein Kursbezug aus einer Werkzeugangabe {profil, kurs}; die Kennung des
+  /// Profils kommt aus dem Servernamen, den die KI angibt.
+  Kursbezug _kursbezugAus(Object? j, String feld) {
+    if (j is! Map) throw MoodleFehler('$feld muss ein Objekt {profil, kurs} sein.');
+    final mcp = j['profil'];
+    final kurs = j['kurs'];
+    if (mcp is! String || mcp.isEmpty) throw MoodleFehler('$feld: profil fehlt (mcpName des Profils).');
+    if (kurs is! num || kurs <= 0 || kurs != kurs.toInt()) {
+      throw MoodleFehler('$feld: kurs muss eine Kurs-ID sein (Zahl).');
+    }
+    final p = _profilNachMcpName(mcp);
+    if (p == null) {
+      final bekannt = einstellungen.profile.map((p) => p.mcpName).join(', ');
+      throw MoodleFehler('$feld: Profil „$mcp" gibt es nicht. Bekannt: $bekannt.');
+    }
+    return Kursbezug(p.kennung, kurs.toInt());
+  }
+
+  /// Der Projektkontext mit den Rollen und der Richtung, für die Werkzeuge.
+  String _kontextText() {
+    final k = einstellungen.projektkontext;
+    String kursText(Kursbezug b) {
+      final p = _profilZuKennung(b.profilKennung);
+      return p == null
+          ? 'Kurs ${b.kurs} (Profil nicht mehr vorhanden)'
+          : 'Kurs ${b.kurs} in „${p.name}" (${p.mcpName})';
+    }
+
+    final dk = k?.durchfuehrung ?? const <Kursbezug>[];
+    final zeilen = [
+      'Quellkurs: ${k?.quelle == null ? 'nicht gesetzt' : kursText(k!.quelle!)}',
+      'Durchführungskurse${dk.isEmpty ? ': keine' : ':'}',
+      for (final b in dk) '  - ${kursText(b)}',
+      'Rollen der Profile:',
+      for (final p in einstellungen.profile) '  - „${p.name}" (${p.mcpName}): ${p.rolle?.anzeige ?? 'keine'}',
+      richtungText(bestimmeRichtung(einstellungen.profile, k)),
+    ];
+    return zeilen.join('\n');
   }
 
   CallToolResult _fehler(String text) => CallToolResult(content: [TextContent(text: text)], isError: true);

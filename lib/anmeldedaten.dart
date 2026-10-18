@@ -1,14 +1,15 @@
 // Gespeicherte Anmeldedaten -- nur, wenn die Lehrkraft den Haken setzt.
 //
 // Wo was liegt:
-//   - Haken und Benutzername: shared_preferences (Klartext-JSON unter
-//     %APPDATA%\moocp\moocp\). Kein Geheimnis.
-//   - Passwort: flutter_secure_storage, unter Windows mit DPAPI verschlüsselt
-//     (flutter_secure_storage.dat im selben Ordner). Entschlüsseln kann nur
-//     Ihr Windows-Konto; eine Kopie der Datei, ein Backup oder ein anderes
-//     Konto sieht Datensalat.
+//   - Haken und Benutzername: shared_preferences (Klartext-JSON im
+//     Einstellungsordner, unter Windows %APPDATA%\moocp\moocp\). Kein Geheimnis.
+//   - Passwort: flutter_secure_storage. Unter Windows mit DPAPI verschlüsselt
+//     (flutter_secure_storage.dat im selben Ordner), auf dem Mac im
+//     Schlüsselbund (E26). Entschlüsseln kann nur das Benutzerkonto des
+//     Rechners; eine Kopie der Datei, ein Backup oder ein anderes Konto sieht
+//     Datensalat.
 //
-// Grenze: Ein Programm, das unter demselben Windows-Konto läuft, kann das
+// Grenze: Ein Programm, das unter demselben Benutzerkonto läuft, kann das
 // Passwort gezielt entschlüsseln -- das gilt für jede Speicherung, die ohne
 // Rückfrage auskommt. Das Passwort geht nie über MCP hinaus und nie ins
 // Protokoll.
@@ -23,10 +24,18 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'profil.dart';
+
 class Anmeldedaten {
   static const _merken = 'anmeldung.merken';
   static const _benutzer = 'anmeldung.benutzer';
   static const _passwort = 'moodle.passwort';
+
+  /// Schlüssel je Instanzprofil (profil.dart). Das Standardprofil behält die
+  /// alten Schlüssel, damit gespeicherte Zugangsdaten nach dem Umstieg gelten;
+  /// jedes weitere Profil bekommt die Kennung angehängt.
+  static String _schluessel(String basis, String kennung) =>
+      kennung == Profil.standardKennung ? basis : '$basis.$kennung';
 
   /// Wo das Passwort verschlüsselt liegt, für Protokoll und Hinweise. Auf dem
   /// Mac ist es der Schlüsselbund, unter Windows DPAPI.
@@ -56,7 +65,7 @@ class Anmeldedaten {
 
   /// Nur Entwicklerbau: Zugangsdaten aus einer Datei im Format `SCHLUESSEL=WERT`,
   /// deren Ort die Umgebungsvariable `MOOCP_TESTZUGANG` nennt. Die Datei liegt
-  /// außerhalb des Repos (E2E-Zugang der Spike-Instanz, `TEACHER_USERNAME` und
+  /// außerhalb des Repos (E2E-Zugang der Testinstanz, `TEACHER_USERNAME` und
   /// `TEACHER_PASSWORD`). Dann kein Schlüsselbund und keine Abfrage des
   /// Mac-Passworts; im Release-Bau gibt es das nicht.
   static String? get _testdatei {
@@ -68,9 +77,10 @@ class Anmeldedaten {
   /// Ob der Testzugang aus einer Datei gilt; dann liegt nichts im Schlüsselbund.
   static bool get testzugangAktiv => _testdatei != null;
 
-  static Future<(String, String)?> _testzugang() async {
+  /// Der Testzugang gehört zum ersten Profil ([Profil.standardKennung]).
+  static Future<(String, String)?> _testzugang(String kennung) async {
     final pfad = _testdatei;
-    if (pfad == null) return null;
+    if (pfad == null || kennung != Profil.standardKennung) return null;
     // Nur die Namen stehen in Fehlermeldungen, nie die Werte.
     final werte = <String, String>{};
     for (final zeile in await File(pfad).readAsLines()) {
@@ -89,42 +99,45 @@ class Anmeldedaten {
     return (benutzer, passwort);
   }
 
-  static Future<Anmeldedaten> laden() async {
+  static Future<Anmeldedaten> laden({String kennung = Profil.standardKennung}) async {
     final prefs = await SharedPreferences.getInstance();
-    final merken = prefs.getBool(_merken) ?? false;
+    final merken = prefs.getBool(_schluessel(_merken, kennung)) ?? false;
     if (!merken) return const Anmeldedaten(false, null, null);
-    final test = await _testzugang();
+    final test = await _testzugang(kennung);
     if (test != null) return Anmeldedaten(true, test.$1, test.$2);
     String? passwort;
     try {
-      passwort = await _sicher.read(key: _passwort);
+      passwort = await _sicher.read(key: _schluessel(_passwort, kennung));
     } catch (_) {
       // Nicht zu entschlüsseln (etwa anderes Windows-Konto): dann eben eintippen.
     }
-    return Anmeldedaten(true, prefs.getString(_benutzer), passwort);
+    return Anmeldedaten(true, prefs.getString(_schluessel(_benutzer, kennung)), passwort);
   }
 
   /// Merkt sich den Haken.
-  static Future<void> merkenSetzen(bool an) async {
+  static Future<void> merkenSetzen(bool an, {String kennung = Profil.standardKennung}) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_merken, an);
-    if (!an) await loeschen();
+    await prefs.setBool(_schluessel(_merken, kennung), an);
+    if (!an) await loeschen(kennung: kennung);
   }
 
   /// Nach erfolgreicher Anmeldung, nur mit gesetztem Haken.
-  static Future<void> speichern(String benutzer, String passwort) async {
+  static Future<void> speichern(String benutzer, String passwort,
+      {String kennung = Profil.standardKennung}) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_merken, true);
-    await prefs.setString(_benutzer, benutzer);
-    if (_testdatei == null) await _sicher.write(key: _passwort, value: passwort);
+    await prefs.setBool(_schluessel(_merken, kennung), true);
+    await prefs.setString(_schluessel(_benutzer, kennung), benutzer);
+    if (_testdatei == null) {
+      await _sicher.write(key: _schluessel(_passwort, kennung), value: passwort);
+    }
   }
 
   /// Entfernt Benutzername und Passwort ausdrücklich -- shared_preferences
   /// kennt kein „auf null setzen", remove ist genau das.
-  static Future<void> loeschen() async {
+  static Future<void> loeschen({String kennung = Profil.standardKennung}) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_merken, false);
-    await prefs.remove(_benutzer);
-    if (_testdatei == null) await _sicher.delete(key: _passwort);
+    await prefs.setBool(_schluessel(_merken, kennung), false);
+    await prefs.remove(_schluessel(_benutzer, kennung));
+    if (_testdatei == null) await _sicher.delete(key: _schluessel(_passwort, kennung));
   }
 }

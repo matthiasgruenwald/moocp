@@ -121,7 +121,16 @@ class FreigabeAnfrage {
 }
 
 class Freigaben extends ChangeNotifier {
-  Freigaben(this.protokoll, {this.frist = fristVorgabe, this.stufe = Bestaetigungen.vorgabe});
+  Freigaben(this.protokoll,
+      {this.frist = fristVorgabe, this.stufe = Bestaetigungen.vorgabe, this.testmodus = false});
+
+  /// Testmodus (Debug-Bau mit `MOOCP_TESTZUGANG`, [Anmeldedaten.testzugangAktiv]):
+  /// Jede Anfrage ohne Bilder gilt als erteilt, damit eine KI-Sitzung gegen die
+  /// Testinstanz durchspielen kann. Bilder (E18) bleiben Handarbeit: Was aus
+  /// dem Kurs an die KI geht, entscheidet immer ein Mensch. Das Protokoll hält
+  /// jede übergangene Freigabe fest (A4). Im Release-Bau ist der Testmodus nie
+  /// an, weil der Zugang aus der Datei dort nicht gilt.
+  final bool testmodus;
 
   /// Kürzer als das Zeitlimit, das die App in Bionic einträgt
   /// (`bionicZeitlimit`, einrichtung.dart).
@@ -182,6 +191,11 @@ class Freigaben extends ChangeNotifier {
   /// Solange ein Freigabedialog offen ist, sperrt er die Titelzeile mit dem
   /// Feld für die Stufe, und ohne offenen Dialog wartet keine Anfrage.
   Future<bool> anfragen(FreigabeAnfrage a) async {
+    if (testmodus && a.bilder.isEmpty) {
+      protokoll.eintrag(Art.schreiben, 'Testmodus, automatisch freigegeben: ${a.titel}');
+      a._antwort.complete(true);
+      return true;
+    }
     if (!fragt(a)) {
       ausgelassen++;
       protokoll.eintrag(Art.schreiben, 'Ohne Freigabe (Bestätigungen: ${stufe.text}): ${a.titel}');

@@ -24,8 +24,8 @@ void main() {
       '/mod/book/view.php?id=2047',
       '/mod/book/view.php?id=2047&chapterid=12',
       '/mod/wiki/view.php?pageid=88',
-      '/question/bank/previewquestion/preview.php?id=15287&cmid=2384',
-      '/question/bank/previewquestion/preview.php?id=15287&cmid=2384&previewid=9',
+      '/question/bank/previewquestion/preview.php?id=5010&cmid=5002',
+      '/question/bank/previewquestion/preview.php?id=5010&cmid=5002&previewid=9',
     ]) {
       expect(weg('GET', a, dokument: true), BrowserWeg.ueberApp, reason: a);
     }
@@ -69,7 +69,7 @@ void main() {
   });
 
   test('Seiten: nur die aufgenommene und ihre Umleitung, auch nicht im Rahmen', () {
-    const vorschau = 'https://moodle.schule.example/question/bank/previewquestion/preview.php?id=15287&cmid=2384';
+    const vorschau = 'https://moodle.schule.example/question/bank/previewquestion/preview.php?id=5010&cmid=5002';
     final seiten = {vorschau};
     expect(weg('GET', vorschau, dokument: true, seiten: seiten), BrowserWeg.ueberApp);
     // Ein iframe in der Seite ist auch ein Dokument -- eine andere erlaubte

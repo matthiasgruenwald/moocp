@@ -27,8 +27,10 @@ import 'einzelstart.dart';
 import 'freigabe.dart';
 import 'log.dart';
 import 'mcp/mcp_dienst.dart';
+import 'moodle/instanzen.dart';
 import 'moodle/moodle_zugang.dart';
 import 'moodle/zeilenvergleich.dart';
+import 'profil.dart';
 import 'protokoll.dart';
 import 'ueber.dart';
 import 'update/update.dart';
@@ -84,32 +86,89 @@ Future<void> main(List<String> argumente) async {
   );
   // Schließen läuft über _beenden, damit der Arbeitsordner geleert wird.
   await windowManager.setPreventClose(true);
-  final moodle = MoodleZugang(protokoll);
-  final freigaben = Freigaben(protokoll, stufe: einstellungen.bestaetigungen);
+  // Je Instanzprofil ein Zugang, eine Freigabe und ein MCP-Server mit eigenem
+  // Port und Servernamen (E31). Das erste Profil ist das Hauptprofil, dessen
+  // Anmeldung die Oberfläche zeigt.
+  final profile = einstellungen.profile.isEmpty
+      ? [Profil.migriert('')]
+      : einstellungen.profile;
+  final register = MoodleInstanzen(protokoll);
+  final instanzen = [
+    for (final pr in profile)
+      _instanzFuer(
+        pr,
+        einstellungen,
+        register,
+        protokoll,
+        arbeitsordner,
+        mehrere: profile.length > 1,
+      ),
+  ];
   // Reste früherer Updates im Temp-Verzeichnis; der Installer, der die App
   // gerade neu gestartet hat, läuft noch und bleibt bis zum nächsten Start.
   resteWegraeumen();
   // Gestartet wird der MCP-Server erst, wenn die App eingerichtet und
-  // angemeldet ist (_HauptseiteState._starten).
-  final dienst = McpDienst(
-    einstellungen,
-    moodle,
-    protokoll,
-    freigaben,
-    arbeitsordner.pfad,
-  );
+  // angemeldet ist (_HauptseiteState._mcpStarten).
+  final haupt = instanzen.first;
   runApp(
     MoocpApp(
       einstellungen,
       protokoll,
-      moodle,
-      dienst,
-      freigaben,
+      haupt.moodle,
+      haupt.dienst,
+      haupt.freigaben,
       arbeitsordner,
+      weitere: instanzen.sublist(1),
       updatefaehig: updateMoeglich(argumente, Platform.environment),
       fokus: einzel.fokus,
     ),
   );
+}
+
+/// Ein Instanzprofil mit allem, was daran hängt: Zugang, Freigaben und
+/// MCP-Server. Mit mehreren Profilen bekommt jedes seinen Unterordner im
+/// Arbeitsordner (nach der Kennung), damit Dateien nicht zusammenfallen; bei
+/// einem Profil bleibt der Ordner wie bisher.
+Instanz _instanzFuer(
+  Profil pr,
+  Einstellungen einstellungen,
+  MoodleInstanzen register,
+  Protokoll protokoll,
+  Arbeitsordner arbeitsordner, {
+  required bool mehrere,
+}) {
+  final ansicht = protokoll.fuer(pr.name);
+  final zugang = register.zugang(pr);
+  final ordner = mehrere
+      ? (Directory(p.join(arbeitsordner.pfad, pr.kennung))
+              ..createSync(recursive: true))
+            .path
+      : arbeitsordner.pfad;
+  final freigaben = Freigaben(
+    ansicht,
+    stufe: einstellungen.bestaetigungen,
+    testmodus: Anmeldedaten.testzugangAktiv,
+  );
+  return Instanz(
+    zugang,
+    freigaben,
+    McpDienst(
+      einstellungen,
+      zugang,
+      ansicht,
+      freigaben,
+      ordner,
+      profil: pr,
+    ),
+  );
+}
+
+/// Ein Profil zur Laufzeit: Zugang, Freigaben und MCP-Server (E31).
+class Instanz {
+  const Instanz(this.moodle, this.freigaben, this.dienst);
+  final MoodleZugang moodle;
+  final Freigaben freigaben;
+  final McpDienst dienst;
 }
 
 /// Aufruf durch die Deinstallation (installer/moocp.nsi): die
@@ -151,11 +210,12 @@ Future<int> _werkzeugliste() async {
     mcpLogsUmleiten();
     final protokoll = Protokoll();
     final dienst = McpDienst(
-      Einstellungen(moodleAdresse: '', port: standardPort, schluessel: ''),
+      Einstellungen(schluessel: ''),
       MoodleZugang(protokoll),
       protokoll,
       Freigaben(protokoll),
       '',
+      profil: Profil.migriert(''),
     );
     stdout.writeln(jsonEncode(await dienst.werkzeugliste()));
     await stdout.flush();
@@ -187,6 +247,7 @@ class MoocpApp extends StatelessWidget {
     this.dienst,
     this.freigaben,
     this.arbeitsordner, {
+    this.weitere = const [],
     this.einrichtungsstand,
     this.updatefaehig = false,
     this.fokus,
@@ -198,6 +259,9 @@ class MoocpApp extends StatelessWidget {
   final McpDienst dienst;
   final Freigaben freigaben;
   final Arbeitsordner arbeitsordner;
+
+  /// Die weiteren Profile neben dem Hauptprofil (moodle, dienst, freigaben).
+  final List<Instanz> weitere;
 
   /// Ob diese App sich selbst aktualisieren kann (update.dart,
   /// updateMoeglich). Nur dann wird geprüft und überhaupt gefragt.
@@ -231,6 +295,7 @@ class MoocpApp extends StatelessWidget {
         dienst,
         freigaben,
         arbeitsordner,
+        weitere: weitere,
         einrichtungsstand: einrichtungsstand,
         updatefaehig: updatefaehig,
         fokus: fokus,
@@ -247,6 +312,7 @@ class Hauptseite extends StatefulWidget {
     this.dienst,
     this.freigaben,
     this.arbeitsordner, {
+    this.weitere = const [],
     this.einrichtungsstand,
     this.updatefaehig = false,
     this.fokus,
@@ -258,6 +324,7 @@ class Hauptseite extends StatefulWidget {
   final McpDienst dienst;
   final Freigaben freigaben;
   final Arbeitsordner arbeitsordner;
+  final List<Instanz> weitere;
   final Future<Einrichtungsstand> Function()? einrichtungsstand;
   final bool updatefaehig;
   final Stream<void>? fokus;
@@ -447,16 +514,22 @@ class _HauptseiteState extends State<Hauptseite> with WindowListener {
   /// Sitzungen der KI-Werkzeuge die Verbindung ab; die Werkzeuge melden dann „Nicht
   /// angemeldet".
   Future<void> _mcpStarten() async {
-    if (!_eingerichtet || !widget.moodle.angemeldet || widget.dienst.laeuft) {
-      return;
-    }
-    try {
-      await widget.dienst.starten();
-    } catch (e) {
-      widget.protokoll.eintrag(
-        Art.fehler,
-        'MCP-Server startet nicht auf Port ${widget.einstellungen.port}: $e',
-      );
+    if (!_eingerichtet || !widget.moodle.angemeldet) return;
+    // Jedes Profil startet seinen Server, sobald es angemeldet ist (E31).
+    for (final i in [
+      Instanz(widget.moodle, widget.freigaben, widget.dienst),
+      ...widget.weitere,
+    ]) {
+      if (!i.moodle.angemeldet || i.dienst.laeuft) continue;
+      try {
+        await i.dienst.starten();
+      } catch (e) {
+        widget.protokoll.eintrag(
+          Art.fehler,
+          'MCP-Server (${i.dienst.profil.name}) startet nicht auf Port '
+          '${i.dienst.profil.port}: $e',
+        );
+      }
     }
     if (mounted) setState(() => _mcpVersucht = true);
   }
@@ -499,6 +572,8 @@ class _HauptseiteState extends State<Hauptseite> with WindowListener {
         pruefen: _einrichtungsstand,
         einstellungen: widget.einstellungen,
         protokoll: widget.protokoll,
+        port: widget.dienst.profil.port,
+        servername: widget.dienst.profil.mcpName,
       ),
     );
     if (bereit != true) await _beenden();
@@ -519,7 +594,8 @@ class _HauptseiteState extends State<Hauptseite> with WindowListener {
     ];
     return einrichtungPruefen(
       umgebung: Platform.environment,
-      port: widget.einstellungen.port,
+      port: widget.dienst.profil.port,
+      name: widget.dienst.profil.mcpName,
       schluessel: widget.einstellungen.schluessel,
       skills: pakete,
       abgewaehlt: widget.einstellungen.werkzeugeAbgewaehlt,
@@ -687,11 +763,23 @@ class _HauptseiteState extends State<Hauptseite> with WindowListener {
   }
 
   @override
-  Widget build(BuildContext context) => FreigabeDialoge(
-    freigaben: widget.freigaben,
-    nachVorn: _nachVorn,
-    child: _seite(context),
-  );
+  Widget build(BuildContext context) {
+    // Je Profil ein Freigabe-Dialog: Anfragen eines weiteren Profils erscheinen
+    // sonst bei niemandem und liefen nur bis zur Frist.
+    Widget seite = _seite(context);
+    for (final i in widget.weitere) {
+      seite = FreigabeDialoge(
+        freigaben: i.freigaben,
+        nachVorn: _nachVorn,
+        child: seite,
+      );
+    }
+    return FreigabeDialoge(
+      freigaben: widget.freigaben,
+      nachVorn: _nachVorn,
+      child: seite,
+    );
+  }
 
   Widget _seite(BuildContext context) {
     final angemeldet = widget.moodle.angemeldet;
@@ -726,7 +814,7 @@ class _HauptseiteState extends State<Hauptseite> with WindowListener {
                   size: 18,
                 ),
                 widget.dienst.laeuft
-                    ? 'MCP auf 127.0.0.1:${widget.einstellungen.port}'
+                    ? 'MCP auf 127.0.0.1:${widget.dienst.profil.port}'
                     : _mcpVersucht
                     ? 'MCP-Server läuft nicht'
                     : 'MCP startet nach der Anmeldung',

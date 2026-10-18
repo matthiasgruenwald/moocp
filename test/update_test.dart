@@ -72,6 +72,10 @@ void main() {
   });
 
   group('Wann überhaupt geprüft wird', () {
+    test('unter macOS nie: es gibt keinen Installer zum Selbstersetzen', () {
+      expect(updateMoeglich([], {'LOCALAPPDATA': '/x', 'HOME': '/Users/x'}), isFalse);
+    }, skip: Platform.isMacOS ? null : 'nur unter macOS');
+
     test('der Schalter schaltet ab', () {
       expect(updateMoeglich([keinUpdateSchalter], {'LOCALAPPDATA': r'C:\x'}), isFalse);
     });
@@ -91,7 +95,7 @@ void main() {
     });
 
     test('heute schon geprüft', () {
-      final e = Einstellungen(moodleAdresse: '', port: 1, schluessel: 'x');
+      final e = Einstellungen(schluessel: 'x');
       final jetzt = DateTime(2026, 10, 3, 18);
       expect(heuteSchonGeprueft(e, jetzt), isFalse);
       e.updateZuletzt = '2026-10-03';

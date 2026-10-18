@@ -4,8 +4,8 @@
 // angefragt wurde und was bei der Anmeldung passiert ist. Nicht hinein
 // kommen Passwörter, Formularwerte, Cookies oder Inhalte.
 //
-// Jeder Eintrag geht zusätzlich in eine Datei (%APPDATA%\moocp\
-// protokoll.log), damit sich ein Vorfall auch nach einem Neustart der App
+// Jeder Eintrag geht zusätzlich in eine Datei (protokoll.log im
+// Einstellungsordner, unter Windows %APPDATA%\moocp\), damit sich ein Vorfall auch nach einem Neustart der App
 // nachvollziehen lässt. Über 1 MB wird die Datei einmal umbenannt (.1).
 // Und an den Logger „protokoll" (log.dart), also auf die Konsole.
 
@@ -80,4 +80,27 @@ class Protokoll extends ChangeNotifier {
     _eintraege.clear();
     notifyListeners();
   }
+
+  /// Eine Sicht auf dieses Protokoll für ein Instanzprofil (Issue #4): Jeder
+  /// Eintrag bekommt den Profilnamen voran, damit man ihn Moodle zuordnen kann.
+  /// Die Einträge landen im selben Protokoll und in derselben Datei.
+  Protokoll fuer(String profil) => _ProfilProtokoll(this, profil);
+}
+
+/// Die Sicht aus [Protokoll.fuer]. Sie hat keinen eigenen Speicher; Zuhörer
+/// hängen am Protokoll selbst.
+class _ProfilProtokoll extends Protokoll {
+  _ProfilProtokoll(this._wurzel, this._profil);
+
+  final Protokoll _wurzel;
+  final String _profil;
+
+  @override
+  void eintrag(Art art, String text) => _wurzel.eintrag(art, '[$_profil] $text');
+
+  @override
+  List<Eintrag> get eintraege => _wurzel.eintraege;
+
+  @override
+  void leeren() => _wurzel.leeren();
 }

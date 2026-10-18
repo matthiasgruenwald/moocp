@@ -26,7 +26,7 @@ void main() {
     expect(get('https://m.example/course/modedit.php?update=1&delete=1'), isFalse);
     expect(get('https://m.example/user/index.php?id=43'), isFalse);
     expect(get('https://m.example/grade/report/grader/index.php?id=43'), isFalse);
-    expect(get('https://m.example/mod/assign/view.php?id=4703&action=grading'), isFalse);
+    expect(get('https://m.example/mod/assign/view.php?id=5007&action=grading'), isFalse);
     expect(get('https://m.example/my/'), isFalse);
     expect(get('https://m.example/login/logout.php?sesskey=x'), isFalse);
     expect(post('https://m.example/course/modedit.php?update=15271'), isFalse);
@@ -66,7 +66,8 @@ void main() {
     expect(post('https://m.example/course/editsection.php',
         const [MapEntry('id', '812'), MapEntry('_qf__editsection_form', '1')]), isTrue);
     expect(post('https://m.example/course/editsection.php', const [MapEntry('id', '812')]), isFalse);
-    expect(post('https://m.example/repository/repository_ajax.php?action=upload'), isTrue);
+    // Upload nur mit Datei: ein Aufruf ohne Anhang ist kein Upload mehr.
+    expect(post('https://m.example/repository/repository_ajax.php?action=upload'), isFalse);
     expect(post('https://m.example/repository/repository_ajax.php?action=delete'), isFalse);
     // Verbergen, Löschen, Verschieben laufen über die Kursstruktur-Aktionen,
     // nicht über course/mod.php.
@@ -86,38 +87,38 @@ void main() {
 
   test('Fragen löschen: Rückfrage frei, Bestätigung nur mit den Feldern von Moodle', () {
     const d = 'https://m.example/question/bank/deletequestion/delete.php';
-    const zurueck = 'returnurl=%2Fquestion%2Fedit.php%3Fcmid%3D2384';
-    expect(get('$d?cmid=2384&deleteselected=1&deleteall=1&$zurueck&q14961=1&q14962=1'), isTrue);
-    expect(get('$d?cmid=2384&deleteselected=1&$zurueck&q14961=1'), isTrue);
-    expect(get('$d?cmid=2384&deleteselected=1&q14961=1'), isFalse, reason: 'ohne returnurl stürzt Moodle ab');
-    expect(get('$d?cmid=2384&deleteselected=1&returnurl=%2Fuser%2Findex.php&q14961=1'), isFalse,
+    const zurueck = 'returnurl=%2Fquestion%2Fedit.php%3Fcmid%3D5002';
+    expect(get('$d?cmid=5002&deleteselected=1&deleteall=1&$zurueck&q5006=1&q5009=1'), isTrue);
+    expect(get('$d?cmid=5002&deleteselected=1&$zurueck&q5006=1'), isTrue);
+    expect(get('$d?cmid=5002&deleteselected=1&q5006=1'), isFalse, reason: 'ohne returnurl stürzt Moodle ab');
+    expect(get('$d?cmid=5002&deleteselected=1&returnurl=%2Fuser%2Findex.php&q5006=1'), isFalse,
         reason: 'returnurl nur die eigene Sammlung');
-    expect(get('$d?cmid=2384&deleteselected=1&$zurueck'), isFalse, reason: 'nichts ausgewählt');
-    expect(get('$d?cmid=2384&deleteselected=1&$zurueck&q14961=x'), isFalse);
-    expect(get('$d?cmid=2384&deleteselected=1&$zurueck&q14961=1&userid=5'), isFalse);
+    expect(get('$d?cmid=5002&deleteselected=1&$zurueck'), isFalse, reason: 'nichts ausgewählt');
+    expect(get('$d?cmid=5002&deleteselected=1&$zurueck&q5006=x'), isFalse);
+    expect(get('$d?cmid=5002&deleteselected=1&$zurueck&q5006=1&userid=5'), isFalse);
     const md5 = '0123456789abcdef0123456789abcdef';
     final bestaetigt = [
-      const MapEntry('deleteselected', '14961,14962'),
+      const MapEntry('deleteselected', '5006,5009'),
       const MapEntry('deleteall', '1'),
       const MapEntry('confirm', md5),
       const MapEntry('sesskey', 'abc'),
-      const MapEntry('returnurl', '/question/edit.php?cmid=2384'),
-      const MapEntry('cmid', '2384'),
+      const MapEntry('returnurl', '/question/edit.php?cmid=5002'),
+      const MapEntry('cmid', '5002'),
     ];
     expect(post(d, bestaetigt), isTrue);
-    expect(get('$d?deleteselected=14961&deleteall=1&confirm=$md5&sesskey=abc&cmid=2384'), isTrue);
+    expect(get('$d?deleteselected=5006&deleteall=1&confirm=$md5&sesskey=abc&cmid=5002'), isTrue);
     expect(post(d, [...bestaetigt, const MapEntry('userid', '5')]), isFalse, reason: 'fremdes Feld');
     expect(post(d, [...bestaetigt]..[2] = const MapEntry('confirm', 'ja')), isFalse, reason: 'confirm kein md5');
     expect(post(d, bestaetigt.where((e) => e.key != 'sesskey').toList()), isFalse, reason: 'ohne sesskey');
-    expect(post('$d?cmid=2384', bestaetigt), isFalse, reason: 'Parameter in der Adresse');
+    expect(post('$d?cmid=5002', bestaetigt), isFalse, reason: 'Parameter in der Adresse');
   });
 
   test('CAS-Notizblock: nur über eine Frage, nur rechnen, nie speichern', () {
     const c = 'https://m.example/question/type/stack/adminui/caschat.php';
-    const mitFrage = '$c?questionid=995&cmid=2384';
+    const mitFrage = '$c?questionid=5005&cmid=5002';
     expect(get(mitFrage), isTrue);
     expect(get(c), isFalse, reason: 'ohne Frage nur für Administratoren');
-    expect(get('$c?questionid=995'), isFalse);
+    expect(get('$c?questionid=5005'), isFalse);
     expect(get('$mitFrage&initialise=1'), isFalse, reason: 'füllte das Formular mit Variablen und Feedback der Frage');
     final rechnen = [
       const MapEntry('maximavars', 'x : 3;'),

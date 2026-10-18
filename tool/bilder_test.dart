@@ -19,12 +19,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:moocp/arbeitsordner.dart';
 import 'package:moocp/einrichtung.dart';
 import 'package:moocp/einstellungen.dart';
-import 'package:moocp/einstellungen_ort.dart';
 import 'package:moocp/freigabe.dart';
 import 'package:moocp/main.dart';
 import 'package:moocp/mcp/mcp_dienst.dart';
 import 'package:moocp/moodle/moodle_zugang.dart';
 import 'package:moocp/moodle/zeilenvergleich.dart';
+import 'package:moocp/profil.dart';
 import 'package:moocp/protokoll.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path/path.dart' as p;
@@ -37,7 +37,7 @@ class _Angemeldet extends MoodleZugang {
 }
 
 class _Laeuft extends McpDienst {
-  _Laeuft(super.einstellungen, super.moodle, super.protokoll, super.freigaben, super.arbeitsordner);
+  _Laeuft(super.einstellungen, super.moodle, super.protokoll, super.freigaben, super.arbeitsordner, {required super.profil});
   @override
   bool get laeuft => true;
 }
@@ -66,11 +66,19 @@ const _nachher = '''<h3>Der Vorwiderstand</h3>
 
 void main() {
   setUpAll(() async {
-    const fonts = r'C:\Windows\Fonts';
     // flutter_tester liegt unter <flutter>/bin/cache/artifacts/engine/<plattform>/.
     final artefakte = p.dirname(p.dirname(p.dirname(Platform.resolvedExecutable)));
-    await _schrift('Segoe UI', ['$fonts\\segoeui.ttf', '$fonts\\seguisb.ttf', '$fonts\\segoeuib.ttf']);
-    await _schrift('Consolas', ['$fonts\\consola.ttf']);
+    if (Platform.isMacOS) {
+      // Die Schriften des Mac. Die Bilder in docs/bilder/ stammen von Windows
+      // und sehen hier anders aus; zum Nachsehen reicht das.
+      const fonts = '/System/Library/Fonts';
+      await _schrift('Segoe UI', ['$fonts/Supplemental/Arial.ttf', '$fonts/Supplemental/Arial Bold.ttf']);
+      await _schrift('Consolas', ['$fonts/Menlo.ttc']);
+    } else {
+      const fonts = r'C:\Windows\Fonts';
+      await _schrift('Segoe UI', ['$fonts\\segoeui.ttf', '$fonts\\seguisb.ttf', '$fonts\\segoeuib.ttf']);
+      await _schrift('Consolas', ['$fonts\\consola.ttf']);
+    }
     await _schrift('MaterialIcons', [p.join(artefakte, 'material_fonts', 'MaterialIcons-Regular.otf')]);
     // Ein Test, nur eben unter tool/ (siehe oben) -- das weiß der Analyzer nicht.
     // ignore: invalid_use_of_visible_for_testing_member
@@ -95,7 +103,6 @@ void main() {
     try {
       final einstellungen = Einstellungen(
         moodleAdresse: 'https://moodle.schule.example',
-        port: standardPort,
         schluessel: 'erfunden',
       );
       // Nur der Pfad; geleert wird er erst beim Beenden, und das kommt hier nicht vor.
@@ -104,7 +111,7 @@ void main() {
       final protokoll = Protokoll(uhr: () => DateTime(2026, 9, 24, 10, 15, 3 * sekunde++));
       final moodle = _Angemeldet(protokoll);
       final freigaben = Freigaben(protokoll);
-      final dienst = _Laeuft(einstellungen, moodle, protokoll, freigaben, arbeitsordner.pfad);
+      final dienst = _Laeuft(einstellungen, moodle, protokoll, freigaben, arbeitsordner.pfad, profil: Profil.migriert('https://moodle.schule.example'));
 
       for (final (art, text) in [
         (Art.info, 'App gestartet'),

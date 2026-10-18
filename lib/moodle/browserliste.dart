@@ -47,7 +47,8 @@ enum BrowserWeg {
   gesperrt,
 }
 
-bool _zahl(String? s) => s != null && RegExp(r'^\d+$').hasMatch(s);
+/// Ob [s] nur aus Ziffern besteht (Kurs-, Modul- und Fragen-Nummern in Adressen und Formularen).
+bool istZahl(String? s) => s != null && RegExp(r'^\d+$').hasMatch(s);
 
 bool _nur(Map<String, String> q, Set<String> erlaubt) => q.keys.every(erlaubt.contains);
 
@@ -56,18 +57,18 @@ bool _nur(Map<String, String> q, Set<String> erlaubt) => q.keys.every(erlaubt.co
 String? ansichtErlaubt(Uri uri) {
   final q = uri.queryParameters;
   return switch (uri.path) {
-    '/mod/page/view.php' when q.length == 1 && _zahl(q['id']) => 'Textseite',
-    '/mod/book/view.php' when _nur(q, {'id', 'chapterid'}) && _zahl(q['id']) && (q['chapterid'] == null || _zahl(q['chapterid'])) =>
+    '/mod/page/view.php' when q.length == 1 && istZahl(q['id']) => 'Textseite',
+    '/mod/book/view.php' when _nur(q, {'id', 'chapterid'}) && istZahl(q['id']) && (q['chapterid'] == null || istZahl(q['chapterid'])) =>
       'Buchkapitel',
     // Nur über pageid: bildschirmfoto.dart prüft vorher, dass die Seite zu
     // einem gemeinsamen Wiki gehört (wiki.dart, wikiAnsicht).
-    '/mod/wiki/view.php' when q.length == 1 && _zahl(q['pageid']) => 'Wikiseite',
+    '/mod/wiki/view.php' when q.length == 1 && istZahl(q['pageid']) => 'Wikiseite',
     // Die Vorschau legt beim ersten Aufruf einen Vorschauversuch an und
     // leitet auf dieselbe Adresse mit previewid um.
     '/question/bank/previewquestion/preview.php'
         when _nur(q, {'id', 'cmid', 'courseid', 'previewid', 'restartversion'}) &&
-            _zahl(q['id']) &&
-            q.values.every(_zahl) =>
+            istZahl(q['id']) &&
+            q.values.every(istZahl) =>
       'Fragenvorschau',
     _ => null,
   };

@@ -267,17 +267,17 @@ void main() {
 <quiz>
 <!-- question: 0  -->
   <question type="category"><category><text>\$course\$/Standard</text></category></question>
-<!-- question: 13880  -->
+<!-- question: 5011  -->
   <question type="matching"><name><text>ZZ Zuordnen</text></name>
     <questiontext format="html"><text><![CDATA[<p>Ordne zu.</p>]]></text></questiontext>
     <defaultgrade>2.0000000</defaultgrade><idnumber>LS2-A1</idnumber><hidden>0</hidden></question>
-<!-- question: 13881  -->
+<!-- question: 5012  -->
   <question type="multichoice"><name><text>ZZ Wahl</text></name>
     <questiontext format="html"><text>Welche?</text></questiontext><defaultgrade>1</defaultgrade>
     <answer fraction="100"><text>a</text></answer><answer fraction="0"><text>b</text></answer></question>
 </quiz>''');
     expect(fragen.map((f) => '${f.id} ${f.typ} ${f.idnummer} ${f.antworten}/${f.richtig}').toList(),
-        ['13880 match LS2-A1 0/0', '13881 multichoice null 2/1']);
+        ['5011 match LS2-A1 0/0', '5012 multichoice null 2/1']);
   });
 
   test('Test auswerten: Seiten, Plätze, Summe, Beste Bewertung, Befunde', () {
@@ -285,7 +285,7 @@ void main() {
 <div data-quizid="9"><script>var x = {"quizid":"77"};</script>
 <ul><li class="pagenumber" id="page-1">Seite 1</li>
 <li class="activity slot qtype_multichoice" id="slot-501"><span class="activityname">ZZ Wahl</span>
-<a href="/question/bank/editquestion/question.php?cmid=2384&id=13881">bearbeiten</a><span class="instancemaxmark">1,00</span></li>
+<a href="/question/bank/editquestion/question.php?cmid=5002&id=5012">bearbeiten</a><span class="instancemaxmark">1,00</span></li>
 <li class="activity slot qtype_truefalse" id="slot-502"><span class="activityname">ZZ Ja/Nein</span><span class="instancemaxmark">0,00</span></li>
 <li class="pagenumber" id="page-2">Seite 2</li>
 <li class="activity slot qtype_description" id="slot-503"><span class="activityname">ZZ Hinweis</span><span class="instancemaxmark">0,00</span></li>
@@ -295,7 +295,7 @@ void main() {
     expect(t.kurs, 43);
     expect(t.seiten, 2);
     expect([for (final x in t.plaetze) '${x.slotid}:${x.seite}:${x.punkte}:${x.frage}'],
-        ['501:1:1.0:13881', '502:1:0.0:null', '503:2:0.0:null']);
+        ['501:1:1.0:5012', '502:1:0.0:null', '503:2:0.0:null']);
     expect(t.proSeite, 2);
     expect(t.befunde().join('\n'), allOf(contains('weicht'), contains('1 Frage(n) mit 0 Punkten')));
   });

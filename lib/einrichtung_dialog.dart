@@ -33,6 +33,8 @@ class EinrichtungDialog extends StatefulWidget {
     required this.pruefen,
     required this.einstellungen,
     required this.protokoll,
+    required this.port,
+    this.servername = mcpName,
     super.key,
   });
 
@@ -45,6 +47,10 @@ class EinrichtungDialog extends StatefulWidget {
 
   final Einstellungen einstellungen;
   final Protokoll protokoll;
+
+  /// Port und Servername des Profils, für das die Einrichtung gilt (E31).
+  final int port;
+  final String servername;
 
   @override
   State<EinrichtungDialog> createState() => _EinrichtungDialogState();
@@ -134,7 +140,9 @@ class _EinrichtungDialogState extends State<EinrichtungDialog> {
       // nur, wenn das Werkzeug es zulässt (Claude Code ohne claude.exe nicht).
       if (soll ? w.bedienbar && !ws.verbunden : ws.austragbar && ws.verbindung != Verbindung.fehlt) {
         try {
-          final f = soll ? await w.eintragen(e.port, e.schluessel) : await w.austragen();
+          final f = soll
+              ? await w.eintragen(widget.port, e.schluessel, name: widget.servername)
+              : await w.austragen(name: widget.servername);
           if (f != null) fehler['${w.id}/verbindung'] = f;
         } catch (x, st) {
           fehler['${w.id}/verbindung'] = 'Fehler (${x.runtimeType})';

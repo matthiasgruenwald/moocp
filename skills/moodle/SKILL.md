@@ -12,7 +12,9 @@ dich, keinen Browser-Umweg und keinen Webservice-Token — und du fragst nie
 danach.
 
 Dein KI-Werkzeug setzt vor die Namen ein Präfix (in Claude Code
-`mcp__moodle__<name>`, in anderen ähnlich); hier steht nur der Name.
+`mcp__moodle__<name>`, in anderen ähnlich); hier steht nur der Name. Jede
+Moodle-Instanz hat einen eigenen Server mit eigenem Präfix (etwa
+`mcp__moodle-test__<name>`). `status` nennt, zu welchem Profil der Server gehört.
 
 | Wofür | Werkzeuge |
 |---|---|
@@ -21,8 +23,45 @@ Dein KI-Werkzeug setzt vor die Namen ein Präfix (in Claude Code
 | Anlegen | `aktivitaet_anlegen`, `abschnitt_anlegen`, `buchkapitel_anlegen`, `wikiseite_schreiben` |
 | Ändern | `aendern`, `aendern_mehrere`, `links_setzen`, `claude_schreiben`, `fortschrittsliste_aendern`, `board_aendern`, `kanban_aendern`, `bewertungsschema_setzen`, `buch_ordnen`, `buchkapitel_verschieben` |
 | Kursrahmen | `sichtbarkeit_setzen`, `verschieben`, `duplizieren`, `loeschen`, `buchkapitel_loeschen`, `wikiseite_loeschen` |
+| Sichern | `sichern_aktivitaet`, `sichern_auswahl`, `sicherung_status` |
+| Wiederherstellen | `wiederherstellen_datei`, `wiederherstellung_status` |
+| Übertragung | `uebertragen` (Rollen und Kontext: `uebertragung_rolle_setzen`, `uebertragung_kontext`, `uebertragung_kontext_setzen`) |
 | Ansehen | `bildschirmfoto` |
 | Tests und Fragen | im Skill `moodle-fragen` |
+
+Eine Sicherung (`sichern_aktivitaet`) ist eine einzelne Aktivität, ohne Nutzerdaten,
+als Datei im Sicherungsordner der App. Sie ändert im Kurs nichts. Die Lehrkraft
+gibt sie vorher frei; nenne ihr Name und Nummer genau wie in `aktivitaet_lesen`.
+Läuft sie länger als der Aufruf, rufe `sicherung_status` mit der Nummer auf,
+statt sie neu zu starten.
+
+Mehrere Teile in einer Datei sichert `sichern_auswahl`: ausgewählte Aktivitäten,
+ganze Abschnitte oder den ganzen Kurs, auch nur mit den genannten Teilen. Auch
+hier ohne Nutzerdaten. Anregungen, wofür sich das eignet: einen Abschnitt als
+Vorlage an Kolleginnen und Kollegen weitergeben, einen Kurs als Grundlage für
+das nächste Schuljahr sichern. Ein anderer Einsatz mit Grund ist willkommen.
+Die Freigabe zeigt, was genau mitgeht; die Lehrkraft sieht dort auch, welche
+Inhalte fehlen, weil Lernende sie füllen (etwa Glossareinträge oder Forenbeiträge).
+Das sag ihr auch selbst, bevor sie zustimmt. Eine Aktivität kommt nur mit, wenn
+ihr Abschnitt mitgeht; dieser Abschnitt ist dann ein Rahmen, und die Freigabe
+nennt ihn. Ob Moodle den Rahmen ohne seine übrigen Aktivitäten hält und wie
+Moodle den Kurs bei einer Auswahl benennt, prüft die Lehrkraft vor dem Einsatz.
+
+Eine Sicherungsdatei zurückspielen kann `wiederherstellen_datei` mit dem Parameter `weg`:
+`neuer_kurs` (neuer Kurs, braucht `neuer_kurs_name` und `kurzname`, optional `kategorie_id`),
+`aktueller_kurs_verschmelzen` oder `anderer_kurs_verschmelzen` (fügt ein, ersetzt nichts)
+und `aktueller_kurs_ersetzen` oder `anderer_kurs_ersetzen` (löscht vorhandene Inhalte;
+nur mit `loeschend: true`). `weg` ist Pflicht; ohne ihn fragt die KI nach, statt einen Weg zu wählen.
+Wenn der Auftrag den Zielweg nicht eindeutig nennt, frage nach, statt zu raten. Die
+Lehrkraft nennt Kurs, Nummer und Datei genau; bei löschenden Wegen erklärst du vorher,
+dass vorhandene Inhalte gelöscht werden. Nenne nur die Wege, die Moodle auf der Seite
+anbietet (Fehlermeldung nennt sie). Die Freigabe zeigt, was neu entsteht. Moodle stellt die neuen
+Aktivitäten sichtbar her; die App verbirgt sie danach, kurzzeitig können sie also
+sichtbar sein. Verbergen schützt nicht vor Einsicht oder Änderungen durch andere. Die Datei wird vor dem
+Hochladen geprüft; eine Datei mit Nutzerdaten wird abgelehnt. Läuft die
+Wiederherstellung länger, rufe `wiederherstellung_status` mit der Nummer auf.
+Startet es nie neu: Steht „fehlgeschlagen" da, sag das so, und frag die
+Lehrkraft, bevor du etwas erneut versuchst.
 
 **Fehlen die Werkzeuge**, oder meldet `status` „nicht angemeldet", dann bitte
 die Lehrkraft, die App zu starten bzw. sich darin anzumelden, und warte. Weich
@@ -169,6 +208,79 @@ Was sich gegenüber dem Original geändert hat, gehört in die Meldung am Ende, 
 
 Entsteht das Neue zuerst als Entwurf (Skill `lernsituation`), gilt „Das Neue steht allein" schon für den Entwurf, und die Frage direkt oder Kopie beantwortet der Plan für den Schritt nach Moodle.
 <!-- >>> gemeinsam/ueberarbeiten.md -->
+
+## Übertragung: Rollen, Projektkontext und Rückfragen
+
+Eine Übertragung kopiert Kurse von einer Instanz in eine andere. Die App braucht
+dafür zwei Angaben, die du nicht aus Kursnamen erraten darfst: welches Profil die
+**Quelle** ist und welche Kurse die **Ziele** sind. Beides steht in der App, nicht
+in deinem Kopf.
+
+- **Rollen** setzt `uebertragung_rolle_setzen` je Profil auf Quelle, Ziel oder
+  keine. Das ist eine lokale Einstellung der App: Moodle wird weder angefragt
+  noch geändert, deshalb gibt es dafür keine Freigabe. Setze eine Rolle nur, wenn
+  die Lehrkraft sie im Auftrag nennt. Gespeichert bleibt sie über Neustarts.
+- **Projektkontext** sind der Quellkurs und die Durchführungskurse. `uebertragung_kontext`
+  zeigt sie zusammen mit den Rollen und der Richtung, oder die Rückfrage, die noch
+  offen ist. `uebertragung_kontext_setzen` setzt sie, auch einzeln, und
+  `zuruecksetzen` leert sie. Auch das fragt Moodle nicht an.
+- **Die Richtung ist fest:** Ohne ausdrückliche Angabe gilt Quelle → Ziel. Die
+  Gegenrichtung, bei der ein Durchführungskurs zur Quelle und der Quellkurs zum Ziel
+  wird, gilt nur, wenn der Auftrag sie ausdrücklich verlangt; dann
+  `gegenrichtung: true`. Die Gegenrichtung leitest du nie aus dem Kontext ab.
+- **Rückfragen statt Annahmen.** Fehlt etwas oder widerspricht es sich, gibt die
+  Richtungsbestimmung eine Rückfrage zurück und keinen Plan. Das ist der Fall bei
+  keinem oder mehreren Profilen mit Rolle Quelle, bei einem Quellkurs außerhalb
+  des Quellprofils, bei einem Durchführungskurs ohne bekanntes Profil, ohne Rolle
+  Ziel und nicht als Quelle, bei einem Durchführungskurs, der derselbe Kurs wie der
+  Quellkurs ist, und bei einem doppelt gelisteten Kurs. Die Rückfrage geht an die
+  Lehrkraft, konkret genug, dass sie direkt antworten kann. Du entscheidest das nicht
+  an ihrer Stelle.
+- **Vor dem ersten Schreibschritt** nennt der Plan die Richtung, Quellinstanz und
+  Quellkurs mit Namen und Nummer, die Inhaltsauswahl, jeden Zielkurs mit Namen,
+  Nummer und Instanz, und den Wiederherstellungsweg (A5). Fehlt ein Kursname, ist
+  der Plan nicht vollständig: Dann frag nach, statt eine Lücke zu zeigen.
+- **Ablauf eines Auftrags (`uebertragen`).** Ein Auftrag mit mehreren Zielkursen
+  und derselben Auswahl. Das Werkzeug arbeitet nur auf dieser Instanz: Ohne
+  `datei` sichert es die Auswahl zuerst im Quellkurs, mit `datei` nimmt es die
+  vorhandene Sicherungsdatei. Danach stellt es die Datei für jedes Ziel wieder
+  her. Jedes Ziel hat seinen eigenen Vorgang und sein eigenes Ergebnis: fertig,
+  fehlgeschlagen, unklar oder abgelehnt. Ein Fehler bei einem Ziel hält die
+  übrigen nicht an, weil sie unabhängig sind; eine Ablehnung in der App hält sie
+  an, weil die Lehrkraft den Auftrag damit gestoppt hat.
+- **Ziele auf einer anderen Instanz** bedienst du mit zwei Aufrufen, nicht mit
+  `uebertragen`: auf der Quellinstanz `sichern_auswahl` (die Datei liegt dann im
+  Sicherungsordner der App), auf der Zielinstanz `wiederherstellen_datei` je Ziel
+  mit seinem Weg. Ob beide Instanzen denselben Sicherungsordner nutzen, ist nicht
+  gemessen; sag das der Lehrkraft, bevor du es ihr als Weg anbietest.
+- **Rollen:** Die Quelle ist die Instanz des Quellkurses, die Ziele liegen auf der
+  Instanz, auf der das Werkzeug läuft. Welche Instanz Quelle ist, entscheidet der
+  Projektkontext oder die Lehrkraft; bei Zweifel fragst du, statt zu raten.
+- **Zusammenfassung vor dem ersten Schreiben:** Der Plan nennt Quelle, Inhalt, jeden
+  Zielkurs mit Name, Nummer und Weg (A5). Die App zeigt dieselbe Zusammenfassung
+  in der Freigabe, einmal für den ganzen Auftrag. Jeder Schreibschritt (das Sichern
+  und je Ziel das Wiederherstellen) fragt danach erneut in der App; wie oft, legt
+  die Lehrkraft mit der Freigabestufe fest (E20). Sag ihr das vorher.
+- **Rückfragen, bevor etwas geschieht:** Fehlt ein Weg oder ein Kursname, ist ein
+  Kurs doppelt genannt oder ist ein Ziel der Quellkurs, fragt das Werkzeug zurück
+  und schreibt nichts. Ein löschender Weg (`aktueller_kurs_ersetzen`,
+  `anderer_kurs_ersetzen`) braucht `loeschend: true` im Ziel; fehlt es, fragt das
+  Werkzeug ebenfalls zurück, bevor etwas geschieht. Der Weg `neuer_kurs` gehört nicht zu `uebertragen`; einen
+  neuen Kurs legt `wiederherstellen_datei` an. Ist dieselbe Datei für ein Ziel schon
+  übertragen worden, kommt eine Rückfrage mit der Nummer. Erst klärst du den Stand
+  (`wiederherstellung_status`). Ein erneuter Import mit `erneut: true` ist nur nach
+  ausdrücklichem Wunsch der Lehrkraft zulässig.
+- **Im Ergebnis sagen, was nicht zugesagt ist:** Eine Einfüge-Wiederherstellung kann
+  Inhalte doppelt anlegen, und ein Aktualisieren bestehender Inhalte gibt es nicht.
+  Das nennst du im Bericht, auch wenn die Lehrkraft eine Aktualisierung erwartet.
+  Bei fehlgeschlagenen oder unklaren Zielen nennst du die Nummer und sendest nicht
+  erneut.
+- **Protokoll und Planung:** Jedes Ziel steht mit Stand und Zeit in
+  `uebertragungen.json` im Einstellungsordner. Die Planung des Auftrags und die
+  Buchführung darüber, welche Übertragung wann lief, liegen bei Coursepilot; die
+  App führt nur dieses Protokoll.
+- **Stand:** Der Ablauf ist umgesetzt, nicht geprüft. Auf einer Instanz ist er
+  noch nicht durchgespielt.
 
 <!-- <<< gemeinsam/luecken.md - von build.py erzeugt, hier nicht bearbeiten -->
 ## Was der Skill nicht kann: fragen, nicht improvisieren

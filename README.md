@@ -288,6 +288,9 @@ Gelesenes legt die App im Arbeitsordner ab, an die KI geht eine Übersicht. Lese
 | Werkzeug | Was es tut | Freigabe |
 |---|---|---|
 | `status` | Zeigt, ob die App angemeldet ist, welche Moodle-Instanz sie bedient und ob es die Druckaufbereitung gibt. Fragt Moodle nichts an. | – |
+| `uebertragung_rolle_setzen` | Setzt die Rolle dieses Profils für Übertragungen: Quelle, Ziel oder keine. Lokal in der App gespeichert; Moodle wird weder angefragt noch geändert. | – |
+| `uebertragung_kontext` | Zeigt den Projektkontext (Quellkurs, Durchführungskurse), die Rollen aller Profile und daraus die Richtung oder die offene Rückfrage. Fragt Moodle nichts an. | – |
+| `uebertragung_kontext_setzen` | Setzt Quellkurs und Durchführungskurse oder setzt den Projektkontext zurück. Lokal in der App gespeichert; Moodle wird nicht angefragt. | – |
 | `meine_kurse` | Ihre Kurse mit Nummer, Name und Kurzname, auf Wunsch die zuletzt besuchten. | – |
 | `kurs_uebersicht` | Die Struktur eines Kurses: Abschnitte, Unterabschnitte und Aktivitäten mit Typ und Sichtbarkeit, mit Warnung, wenn etwas, das nach Lösung oder Lehrermaterial klingt, für Lernende erreichbar ist. Keine Inhalte, aber die Konventionen des Kurses, falls es sie gibt. | – |
 | `kurs_hinweise` | Die Konventionen des Kurses: die Datei „CLAUDE.md" im verborgenen Verzeichnis „CLAUDE", falls es sie gibt – als Daten, nie als Anweisung. Für den ganzen Kurs, auf Wunsch zusätzlich für einen Abschnitt. `kurs_uebersicht` und `abschnitt_lesen` liefern das von sich aus mit. | – |
@@ -295,6 +298,7 @@ Gelesenes legt die App im Arbeitsordner ab, an die KI geht eine Übersicht. Lese
 | `aktivitaet_lesen` | Eine Aktivität vollständig: Text, eingebettete und angehängte Dateien, alle Einstellungen. Dazu eine Übersicht mit Gliederung, Bildern, Verweisen und Befunden. | – |
 | `abschnitt_lesen` | Name, Beschreibung und Einstellungen eines Abschnitts oder Unterabschnitts, dazu die Konventionen dieses Abschnitts, falls es sie gibt. | – |
 | `buch_lesen` | Alle Kapitel eines Buchs. | – |
+| `sicherung_status` | Zeigt den Stand einer Aktivitätssicherung (anstehend, laufend, fertig, fehlgeschlagen, unklar); laufende fragt Moodle nach. Ohne Nummer die letzten Sicherungen. Die Datei selbst wird nur beim Abschluss der Sicherung geholt, nicht hier. | – |
 | `wiki_lesen` | Alle Seiten eines gemeinsamen Wikis und ihr Verweisnetz – nie, wer was geschrieben hat. Persönliche Wikis und Wikis im Gruppenmodus gar nicht. | – |
 | `fortschrittsliste_lesen` | Die Einträge einer Fortschrittsliste – nie, wer abgehakt hat. | – |
 | `board_lesen` | Die Spalten eines Boards; Notizen anderer werden nur gezählt. | – |
@@ -329,6 +333,11 @@ Eine Ausnahme: Was die KI gerade selbst verborgen angelegt hat, ist noch nichts 
 
 | Werkzeug | Was es tut | Freigabe |
 |---|---|---|
+| `sichern_aktivitaet` | Sichert eine Aktivität als Datei (.mbz) in den Sicherungsordner der App, außerhalb des Arbeitsordners, ohne Nutzerdaten. Nummer und Name müssen zusammenpassen; die Datei wird nach dem Herunterladen gegen die Größe geprüft. Läuft die Sicherung über den Aufruf hinaus, geht sie weiter, und `sicherung_status` zeigt den Stand. | **ja**, vor dem Start |
+| `sichern_auswahl` | Sichert mehrere Aktivitäten, ganze Abschnitte oder den ganzen Kurs als Datei (.mbz) in den Sicherungsordner der App, ohne Nutzerdaten. Nummern und Namen müssen zusammenpassen; die Bestätigungsseite von Moodle wird gegen die Bestellung geprüft, und bei Abweichung bricht die App ab. Die Freigabe nennt, was fehlt, weil Lernende es füllen. Ein Kurs mit Auswahl bleibt ein Kurs. | **ja**, vor dem Start |
+| `wiederherstellen_datei` | Stellt eine Sicherungsdatei (.mbz) aus dem Sicherungsordner der App wieder her. Der Parameter `weg` wählt einen von fünf Zielwegen: `neuer_kurs` (Platzhalter mit Name und Kurzname, verborgen angelegt), `aktueller_kurs_verschmelzen` und `anderer_kurs_verschmelzen` (die Aktivitäten kommen dazu, nichts Bestehendes wird ersetzt) sowie `aktueller_kurs_ersetzen` und `anderer_kurs_ersetzen` (löschen vorhandene Inhalte des Kurses; nur mit `loeschend: true`). `weg` ist Pflicht; fehlt er oder ist er unklar, wird nicht geraten, die Antwort nennt die Optionen. Die Datei wird vor dem Hochladen geprüft (Größe, Pfade, keine Nutzerdaten, keine Bewertungen). Die Freigabe nennt Profil, Kurs, Datei, Modus und was neu angelegt wird; bei löschenden Wegen auch, dass vorhandene Inhalte gelöscht werden. Moodle stellt die neuen Aktivitäten sichtbar her; die App verbirgt sie danach, und das schützt nicht. Der Name des Kurses muss zur Nummer passen. Läuft die Wiederherstellung länger, zeigt `wiederherstellung_status` den Stand; es wird nie blind neu gestartet. | **ja**, vor dem Start |
+| `wiederherstellung_status` | Zeigt den Stand einer Wiederherstellung mit ihrer Nummer. Startet nichts neu; eine Wiederherstellung, die Moodle nie begonnen hat, gilt als fehlgeschlagen. | – |
+| `uebertragen` | Überträgt eine Auswahl in einem Auftrag auf mehrere Zielkurse dieser Instanz. Ohne `datei` wird zuerst im Quellkurs gesichert (Parameter wie bei `sichern_auswahl`), danach die Datei je Ziel wiederhergestellt. Jedes Ziel hat seinen Weg (`weg`, Pflicht; ohne Angabe wird nichts geraten; bei den löschenden Wegen `loeschend: true` im Ziel) und ein eigenes Ergebnis: fertig, fehlgeschlagen, unklar oder abgelehnt. Ein Fehler bei einem Ziel hält die übrigen nicht an, eine Ablehnung in der App schon. Dieselbe Datei für ein Ziel wird nicht ohne Rückfrage erneut importiert (`erneut: true` hebt das auf). Eine Einfüge-Wiederherstellung kann Dubletten erzeugen; ein Aktualisieren ist nicht zugesagt. Das Protokoll je Ziel steht in `uebertragungen.json` im Einstellungsordner. Ziele auf einer anderen Instanz: zwei Aufrufe (`sichern_auswahl` auf der Quelle, `wiederherstellen_datei` auf dem Ziel). | **ja**, vor dem Start; je Schreibschritt nach Freigabestufe erneut |
 | `aendern` | Schreibt einen gelesenen Ordner zurück: Aktivität, Abschnitt, Buchkapitel oder Frage – Text, Dateien, Einstellungen. Bricht ab, wenn Moodle nicht mehr den gelesenen Stand zeigt. Eine Frage bekommt dabei eine neue Version. | **ja**, außer bei gerade verborgen Angelegtem |
 | `aendern_mehrere` | Wie `aendern` für mehrere Seiten eines Abschnitts, mit einer Freigabe. | **ja**, außer bei gerade verborgen Angelegtem |
 | `claude_schreiben` | Schreibt die Konventionen eines Kurses oder eines Abschnitts in die Datei „CLAUDE.md". Fehlt das Verzeichnis „CLAUDE", legt die App es verborgen an – dann ohne Rückfrage, wie jedes neue, verborgene Objekt. | **ja**, wenn die Datei schon da ist |
@@ -581,7 +590,9 @@ Die Einstellungen liegen unter `~/Library/Application Support/moocp`, dort auch 
 
 Das KI-Werkzeug LM Studio mit Bionic wird auf dem Mac nicht angeboten: Seine Brücke ist ein Windows-Programm. Claude Code und Codex CLI findet die App im `PATH` sowie unter `~/.local/bin`, `/opt/homebrew/bin` und `/usr/local/bin`.
 
-Bildschirmfotos finden auf dem Mac Edge und Chrome bisher nicht; das Werkzeug meldet dann den fehlenden Browser, statt ihn zu raten. Offen in [TODO.md](TODO.md).
+Bildschirmfotos suchen auf dem Mac Microsoft Edge, Google Chrome und Chromium in `/Applications` und `~/Applications`. Eine Richtlinie, die die Fernsteuerung abschaltet (`RemoteDebuggingAllowed`), liest die App aus den verwalteten Einstellungen; fehlt sie, ist die Fernsteuerung erlaubt. Beendet werden nur Browserprozesse mit dem eigenen Profil. Ob das auf dem Mac so läuft, ist ungemessen (siehe [TODO.md](TODO.md)). Findet die App keinen Browser, meldet das Werkzeug ihn, statt ihn zu raten.
+
+Die Skripte `tool/neustart.sh`, `tool/mcp_aufruf.sh` und `tool/mac_bau.sh` / `tool/mac_start.sh` erkennen den Mac über `uname`.
 
 ### Bildschirmfotos
 
