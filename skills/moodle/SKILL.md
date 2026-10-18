@@ -33,7 +33,10 @@ Eine Sicherung (`sichern_aktivitaet`) ist eine einzelne Aktivität, ohne Nutzerd
 als Datei im Sicherungsordner der App. Sie ändert im Kurs nichts. Die Lehrkraft
 gibt sie vorher frei; nenne ihr Name und Nummer genau wie in `aktivitaet_lesen`.
 Läuft sie länger als der Aufruf, rufe `sicherung_status` mit der Nummer auf,
-statt sie neu zu starten.
+statt sie neu zu starten. Meldet `sicherung_status` einen Stillstand, ist das
+weder Fehler noch Erfolg: Moodle hat keinen Fortschritt mehr gemeldet, und ob
+die Sicherung hängt, ist nicht belegt. Sag das so und nenne die letzte
+Beobachtung; starte nichts neu.
 
 Mehrere Teile in einer Datei sichert `sichern_auswahl`: ausgewählte Aktivitäten,
 ganze Abschnitte oder den ganzen Kurs, auch nur mit den genannten Teilen. Auch
@@ -60,6 +63,9 @@ Aktivitäten sichtbar her; die App verbirgt sie danach, kurzzeitig können sie a
 sichtbar sein. Verbergen schützt nicht vor Einsicht oder Änderungen durch andere. Die Datei wird vor dem
 Hochladen geprüft; eine Datei mit Nutzerdaten wird abgelehnt. Läuft die
 Wiederherstellung länger, rufe `wiederherstellung_status` mit der Nummer auf.
+Bei einem Stillstand (kein Fortschritt seit 15 Minuten) gilt dasselbe wie bei der
+Sicherung: nicht belegt, nicht neu starten; die Administration prüft Cron und
+Ad-hoc-Aufgaben.
 Startet es nie neu: Steht „fehlgeschlagen" da, sag das so, und frag die
 Lehrkraft, bevor du etwas erneut versuchst.
 

@@ -345,6 +345,51 @@ enum SicherungStand {
   }
 }
 
+/// Frist für den Stillstandshinweis (Ticket #18, Spec #17): so lange ohne neuen
+/// Fortschrittswert gilt ein laufender Vorgang als möglicherweise hängend. Die
+/// Lehrkraft hat 15 Minuten bestätigt. Ungemessen ist, wie lange Moodle für eine
+/// Sicherung oder Wiederherstellung braucht; 15 Minuten sind ein Vielfaches des
+/// 60-Sekunden-Zeitlimits des Werkzeugs und geben Cron oder einer Ad-hoc-Aufgabe
+/// Zeit, weiterzulaufen, bevor die Lehrkraft die Administration bittet zu prüfen.
+const Duration stillstandsFrist = Duration(minutes: 15);
+
+/// Gilt ein laufender Vorgang als Stillstand: seit [seit] kein neuer Fortschritt,
+/// mindestens [stillstandsFrist] lang. Ohne bekannten Zeitpunkt nie.
+bool istStillstand(DateTime jetzt, DateTime? seit) =>
+    seit != null && jetzt.difference(seit) >= stillstandsFrist;
+
+/// Der Hinweistext bei Stillstand (Ticket #18). Feste Worte und Kennzahlen, keine
+/// Moodle-Inhalte. Stillstand ist keine Aussage über Erfolg oder Fehler: Moodle
+/// meldet nichts, und ob der Vorgang hängt, ist nicht belegt.
+String stillstandText({
+  required String nummer,
+  required String werkzeug,
+  required double? fortschritt,
+  required Duration seit,
+  required String ursachen,
+}) {
+  final prozent = fortschritt == null ? 'unbekannt' : '${(fortschritt * 100).round()} %';
+  return 'Stillstand (Nummer $nummer): Seit ${seit.inMinutes} Minuten kein neuer Fortschritt, '
+      'letzte Beobachtung $prozent. Moodle meldet weder Ende noch Fehler; ob der Vorgang hängt, '
+      'ist nicht belegt. Mögliche Ursachen: $ursachen '
+      'Mit $werkzeug später erneut prüfen.';
+}
+
+/// Der Fortschrittswert (0 bis 1) des Vorgangs [backupid] aus der Antwort, oder null.
+double? fortschrittswert(Object? antwort, String backupid) {
+  final p = _eintrag(antwort, backupid)?['progress'];
+  return p is num ? p.toDouble() : null;
+}
+
+Map? _eintrag(Object? antwort, String backupid) {
+  Map? eintrag;
+  final kandidaten = antwort is List ? antwort : [antwort];
+  for (final x in kandidaten) {
+    if (x is Map && '${x['backupid']}' == backupid) eintrag = x;
+  }
+  return eintrag;
+}
+
 /// Liest den Eintrag der Sicherung [backupid] aus der Antwort von
 /// core_backup_get_async_backup_progress.
 ///
@@ -354,11 +399,7 @@ enum SicherungStand {
 /// fehlgeschlagen. Alles andere, das nicht eindeutig läuft oder endet, ist
 /// unklar.
 SicherungStand bewerteFortschritt(Object? antwort, String backupid) {
-  Map? eintrag;
-  final kandidaten = antwort is List ? antwort : [antwort];
-  for (final x in kandidaten) {
-    if (x is Map && '${x['backupid']}' == backupid) eintrag = x;
-  }
+  final eintrag = _eintrag(antwort, backupid);
   if (eintrag == null) return SicherungStand.unklar;
   if (eintrag['error'] != null || eintrag['errorcode'] != null) return SicherungStand.fehlgeschlagen;
   final p = eintrag['progress'];

@@ -36,6 +36,11 @@ import 'wiederherstellung_regeln.dart';
 /// Vorgänge, die gerade laufen (Freigabe oder Abfrage) in dieser Sitzung der App.
 final Set<String> _laufend = {};
 
+/// Uhr und Wartezeit. Nur Testnähte (Ticket #18, Spec #17): Tests setzen sie auf
+/// einen Zeitverlauf, damit Zeitlimit und Stillstand ohne echtes Warten laufen.
+DateTime Function() jetzt = DateTime.now;
+Future<void> Function(Duration d) schlafe = (d) => Future<void>.delayed(d);
+
 /// Ein Sicherungsvorgang. Nur Kennzahlen und feste Texte: keine Namen, keine
 /// Antworten aus Moodle.
 class Vorgang {
@@ -49,6 +54,8 @@ class Vorgang {
     DateTime? aktualisiert,
     this.backupid,
     this.kontext,
+    this.fortschritt,
+    this.fortschrittSeit,
     this.dateiname,
     this.text = '',
     this.bytes,
@@ -73,6 +80,11 @@ class Vorgang {
   /// Moodle-Nummer der Sicherung und Kontext-Nummer, für die Abfrage.
   String? backupid;
   int? kontext;
+
+  /// Letzter Fortschrittswert (0 bis 1) und der Zeitpunkt, seit dem er unverändert
+  /// ist. Daraus entsteht der Stillstandshinweis (Ticket #18).
+  double? fortschritt;
+  DateTime? fortschrittSeit;
 
   /// Dateiname, den Moodle für die Sicherung führt (setting_root_filename).
   String? dateiname;
@@ -103,6 +115,8 @@ class Vorgang {
         'aktualisiert': aktualisiert.toIso8601String(),
         'backupid': backupid,
         'kontext': kontext,
+        'fortschritt': fortschritt,
+        'fortschritt_seit': fortschrittSeit?.toIso8601String(),
         'dateiname': dateiname,
         'text': text,
         'bytes': bytes,
@@ -129,6 +143,8 @@ class Vorgang {
       aktualisiert: DateTime.tryParse('${o['aktualisiert']}'),
       backupid: o['backupid'] as String?,
       kontext: o['kontext'] as int?,
+      fortschritt: (o['fortschritt'] as num?)?.toDouble(),
+      fortschrittSeit: DateTime.tryParse('${o['fortschritt_seit']}'),
       dateiname: o['dateiname'] as String?,
       text: o['text'] as String? ?? '',
       bytes: o['bytes'] as int?,
@@ -216,6 +232,8 @@ class Vorgaenge {
     String? text,
     String? backupid,
     int? kontext,
+    double? fortschritt,
+    DateTime? fortschrittSeit,
     String? dateiname,
     int? bytes,
     bool? verified,
@@ -232,6 +250,8 @@ class Vorgaenge {
     if (text != null) v.text = text;
     if (backupid != null) v.backupid = backupid;
     if (kontext != null) v.kontext = kontext;
+    if (fortschritt != null) v.fortschritt = fortschritt;
+    if (fortschrittSeit != null) v.fortschrittSeit = fortschrittSeit;
     if (dateiname != null) v.dateiname = dateiname;
     if (bytes != null) v.bytes = bytes;
     if (verified != null) v.verified = verified;
@@ -529,7 +549,9 @@ Future<String> auswahlSichern(
 }
 
 /// Fragt den Fortschritt ab, bis Moodle Ende oder Fehler meldet, und holt die
-/// Datei. Nach [gesamt] ohne Ende bleibt der Vorgang „laufend".
+/// Datei. Nach [gesamt] ohne Ende bleibt der Vorgang „laufend" und die letzte
+/// Beobachtung steht im Text. Stillstand (Ticket #18) wird am Anfang des Aufrufs
+/// geprüft: seit der Frist ohne neuen Fortschritt, dann kein weiteres Warten.
 Future<String> _warten(
   MoodleZugang moodle,
   Vorgaenge vorgaenge,
@@ -538,7 +560,8 @@ Future<String> _warten(
   Duration takt = const Duration(seconds: 3),
 }) async {
   final id = vg.backupid!;
-  final ende = DateTime.now().add(gesamt);
+  final ende = jetzt().add(gesamt);
+  var erster = true;
   try {
     while (true) {
       final antwort = await moodle.dienst('core_backup_get_async_backup_progress', {
@@ -558,10 +581,28 @@ Future<String> _warten(
         return 'Unklar (Nummer ${vg.id}): Die Antwort von Moodle passt auf kein bekanntes Muster. '
             'sicherung_status prüft erneut.';
       }
-      if (DateTime.now().isAfter(ende)) {
-        return 'Die Sicherung läuft noch (Nummer ${vg.id}). Mit sicherung_status später prüfen.';
+      final fortschritt = fortschrittswert(antwort, id);
+      final jetzige = jetzt();
+      if (fortschritt != vg.fortschritt) {
+        await vorgaenge.aktualisieren(vg, fortschritt: fortschritt, fortschrittSeit: jetzige);
       }
-      await Future<void>.delayed(takt);
+      if (erster && istStillstand(jetzige, vg.fortschrittSeit)) {
+        return stillstandText(
+          nummer: vg.id,
+          werkzeug: 'sicherung_status',
+          fortschritt: fortschritt,
+          seit: jetzige.difference(vg.fortschrittSeit!),
+          ursachen: 'Der Cron von Moodle läuft nicht oder zu selten; nach einem Upgrade ist die '
+              'Sicherung eventuell nicht mehr freigegeben. Die Administration prüft das.',
+        );
+      }
+      erster = false;
+      if (jetzt().isAfter(ende)) {
+        return 'Die Sicherung läuft noch (Nummer ${vg.id}), letzte Beobachtung '
+            '${fortschritt == null ? 'unbekannt' : '${(fortschritt * 100).round()} %'}. '
+            'Mit sicherung_status später prüfen.';
+      }
+      await schlafe(takt);
     }
 
     final dateiname = vg.dateiname;

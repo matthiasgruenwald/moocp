@@ -415,6 +415,7 @@ List<({String aktion, Felder felder})> restoreFormulare(Antwort r) {
 
 /// Fragt den Hintergrundauftrag ab. Dann liest sie den Kurs zurück. Bei neuer_kurs
 /// ist die Kursnummer unbekannt (UNGEMESSEN): dann wird nicht gegengelesen.
+/// Stillstand (Ticket #18) wird am Anfang des Aufrufs geprüft, wie bei der Sicherung.
 Future<String> _warten(
   MoodleZugang moodle,
   Vorgaenge vorgaenge,
@@ -428,7 +429,8 @@ Future<String> _warten(
   Duration gesamt = const Duration(minutes: 10),
   Duration takt = const Duration(seconds: 3),
 }) async {
-  final ende = DateTime.now().add(gesamt);
+  final ende = jetzt().add(gesamt);
+  var erster = true;
   try {
     while (true) {
       // Operation „restore" und die Restore-ID als backupids: ungemessen, siehe TODO.md.
@@ -449,10 +451,28 @@ Future<String> _warten(
         return 'Unklar (Nummer ${vg.id}): Die Antwort passt auf kein bekanntes Muster. '
             'wiederherstellung_status prüft erneut.';
       }
-      if (DateTime.now().isAfter(ende)) {
-        return 'Die Wiederherstellung läuft noch (Nummer ${vg.id}). Mit wiederherstellung_status später prüfen.';
+      final fortschritt = fortschrittswert(antwort, restoreid);
+      final jetzige = jetzt();
+      if (fortschritt != vg.fortschritt) {
+        await vorgaenge.aktualisieren(vg, fortschritt: fortschritt, fortschrittSeit: jetzige);
       }
-      await Future<void>.delayed(takt);
+      if (erster && istStillstand(jetzige, vg.fortschrittSeit)) {
+        return stillstandText(
+          nummer: vg.id,
+          werkzeug: 'wiederherstellung_status',
+          fortschritt: fortschritt,
+          seit: jetzige.difference(vg.fortschrittSeit!),
+          ursachen: 'Die Ad-hoc-Aufgaben oder der Cron von Moodle laufen nicht weiter; '
+              'die Administration prüft das. Die Wiederherstellung ist nicht als gescheitert gemeldet.',
+        );
+      }
+      erster = false;
+      if (jetzt().isAfter(ende)) {
+        return 'Die Wiederherstellung läuft noch (Nummer ${vg.id}), letzte Beobachtung '
+            '${fortschritt == null ? 'unbekannt' : '${(fortschritt * 100).round()} %'}. '
+            'Mit wiederherstellung_status später prüfen.';
+      }
+      await schlafe(takt);
     }
     if (kurs == null) {
       await _uebergang(vorgaenge, vg, WiederherstellungStand.fertig,
