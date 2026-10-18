@@ -7,6 +7,7 @@
 - Moodle-Profile: Mehrere Instanzen lassen sich in einem Fenster verwalten; Anmeldung, Freigabestufe und KI-Werkzeug-Einrichtung gelten je Profil.
 - Moodle-Profile: Freigaben bleiben dem richtigen Profil zugeordnet; eine aktive Moodle-Adresse lässt sich erst nach der Abmeldung ändern.
 - Testmodus: Automatische Freigaben gelten nur für ausdrücklich zugeordnete Testprofile und deren Moodle-Adresse.
+- Wiederherstellung: Bilder und Anhänge der neuen Aktivitäten werden nach dem Wiederherstellen gegen die Sicherung geprüft; ein Unterschied oder eine fehlende Datei steht im Bericht als „nicht vollständig verifiziert", nichts wird stillschweigend repariert.
 - Wiederherstellung: Nur eindeutig zugeordnete Aktivitäten aus der Sicherung werden verborgen; parallele oder mehrdeutige Neuanlagen bleiben unberührt und werden zur Prüfung gemeldet.
 - Wiederherstellung: Dieselbe Datei für denselben Zielweg startet nicht zweimal, solange ein Vorgang offen ist, auch nach dem Zeitlimit oder einem Neustart.
 - MCP-Aufrufe: Ungültige Antworten und Transportfehler melden einen Fehlerstatus statt Erfolg.

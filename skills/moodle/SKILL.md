@@ -66,6 +66,9 @@ Aktivitäten sichtbar her; die App verbirgt sie danach, kurzzeitig können sie a
 sichtbar sein. Verbergen schützt nicht vor Einsicht oder Änderungen durch andere. Die Datei wird vor dem
 Hochladen geprüft; eine Datei mit Nutzerdaten wird abgelehnt. Läuft die
 Wiederherstellung länger, rufe `wiederherstellung_status` mit der Nummer auf.
+Der Bericht prüft danach Bilder und Anhänge der neuen Aktivitäten gegen die Sicherungsdatei
+(Inhalt, nicht Adresse). Steht dort „nicht vollständig verifiziert", sag das so; repariert wird
+nichts von allein.
 Bei einem Stillstand (kein Fortschritt seit 15 Minuten) gilt dasselbe wie bei der
 Sicherung: nicht belegt, nicht neu starten; die Administration prüft Cron und
 Ad-hoc-Aufgaben.
