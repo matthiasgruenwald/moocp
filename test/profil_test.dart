@@ -5,6 +5,7 @@ import 'dart:math';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moocp/einstellungen.dart';
 import 'package:moocp/einstellungen_ort.dart';
+import 'package:moocp/freigabe.dart';
 import 'package:moocp/moodle/instanzen.dart';
 import 'package:moocp/profil.dart';
 import 'package:moocp/protokoll.dart';
@@ -79,6 +80,48 @@ void main() {
         Profil(kennung: 'k2', name: 'Zwei', adresse: 'https://z.schule.example', port: 47900, mcpName: 'zwei'),
       ], schluessel: 'x');
       expect(e.profile.map((p) => p.port), [47900, 47811]);
+    });
+
+    test('Bestätigungsstufen bleiben je Profil getrennt gespeichert', () {
+      final e = Einstellungen(profile: [
+        Profil(
+          kennung: 'k1',
+          name: 'Moodle',
+          adresse: 'https://moodle.schule.example',
+          port: 47811,
+          mcpName: 'moodle',
+          bestaetigungen: Bestaetigungen.alle,
+        ),
+        Profil(
+          kennung: 'k2',
+          name: 'Moodle Test',
+          adresse: 'https://test.schule.example',
+          port: 47812,
+          mcpName: 'moodle-test',
+          bestaetigungen: Bestaetigungen.keine,
+        ),
+      ], schluessel: 'x');
+
+      final geladen = Einstellungen.aus(e.zuJson(), _standard());
+
+      expect(geladen.profile.map((p) => p.bestaetigungen), [
+        Bestaetigungen.alle,
+        Bestaetigungen.keine,
+      ]);
+    });
+
+    test('alte globale Bestätigungsstufe wird in alle alten Profile übernommen', () {
+      final erstes = _a.toJson()..remove('bestaetigungen');
+      final zweites = _b.toJson()..remove('bestaetigungen');
+      final e = Einstellungen.aus({
+        'bestaetigungen': 'keine',
+        'profile': [erstes, zweites],
+      }, _standard());
+
+      expect(e.profile.map((p) => p.bestaetigungen), [
+        Bestaetigungen.keine,
+        Bestaetigungen.keine,
+      ]);
     });
 
     test('speichern schreibt Profile und moodleAdresse, Rückführung ist verlustfrei', () {

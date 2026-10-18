@@ -174,6 +174,7 @@ Begründung, Messungen und Verworfenes stehen je Entscheidung in `docs/adr/`; vo
 | E29 | Sicherungen außerhalb des Arbeitsordners; Rückfragen unabhängig von der Freigabestufe; Plattformverzweigung am Rand | [0029](docs/adr/0029-sicherungen-und-verzweigung.md) |
 | E30 | Skills in einer Quelle `~/.agents/skills`, Claude per Verlinkung statt Kopien je Werkzeug | [0030](docs/adr/0030-skills-eine-quelle.md) |
 | E31 | Ein MCP-Server je Moodle-Instanz; Namen Moodle (Produktiv) und Moodle Test (Testinstanz) | [0031](docs/adr/0031-mcp-server-je-instanz.md) |
+| E32 | Ein Fenster für mehrere Instanzprofile; Anmeldung und Freigabestufe je Profil | [0032](docs/adr/0032-ein-fenster-fuer-instanzprofile.md) |
 
 ## Arbeitsregeln für die KI
 

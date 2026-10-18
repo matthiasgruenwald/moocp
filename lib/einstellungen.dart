@@ -1,6 +1,7 @@
 // Einstellungen, die einen Neustart überleben: Moodle-Adresse, Port,
-// Zugangsschlüssel für Claude, die gewählten Skills, die Update-Prüfung und
-// die Stufe der Bestätigungen.
+// Zugangsschlüssel für Claude, die gewählten Skills und die Update-Prüfung.
+// Die Freigabestufe liegt je Moodle-Instanz im Profil; `bestaetigungen` bleibt
+// für ältere Einstellungsdateien erhalten.
 //
 // Bewusst NICHT hier: Benutzername und Passwort. Die leben im Arbeitsspeicher,
 // solange die App läuft -- und nur mit Haken „Anmeldedaten speichern" auch
@@ -88,6 +89,7 @@ class Einstellungen {
         adresse: p.adresse,
         port: port,
         mcpName: mcp,
+        bestaetigungen: p.bestaetigungen,
         rolle: p.rolle,
       ));
     }
@@ -108,10 +110,7 @@ class Einstellungen {
 
   String schluessel;
 
-  /// Wie viele Bestätigungen die Lehrkraft vor Änderungen in Moodle will
-  /// (freigabe.dart). Die Einstellung gilt über einen Neustart hinweg; dass
-  /// sie auf „keine" steht, zeigt die Titelzeile rot und das Protokoll beim
-  /// Start -- eine Stufe, die sich von selbst zurückstellte, überraschte.
+  /// Alte globale Freigabestufe, nur zur Migration und für ältere Versionen.
   Bestaetigungen bestaetigungen;
 
   /// Die gewählten unter den wählbaren Skills (einrichtung.dart,
@@ -172,12 +171,24 @@ class Einstellungen {
     final liste = (j['profile'] as List?)?.map(Profil.ausJson).whereType<Profil>().toList();
     final altAdresse = j['moodleAdresse'] as String? ?? standard.moodleAdresse;
     final altPort = j['port'] as int?;
+    final alteStufe = Bestaetigungen.ausText(j['bestaetigungen'] as String?);
+    final profile = liste ??
+        (altAdresse.isEmpty ? <Profil>[] : [Profil.migriert(altAdresse, port: altPort ?? standardPort)]);
+    final gespeicherteProfile = j['profile'] as List?;
+    for (var i = 0; i < profile.length; i++) {
+      final gespeichertesProfil = gespeicherteProfile != null && i < gespeicherteProfile.length
+          ? gespeicherteProfile[i]
+          : null;
+      if ((gespeichertesProfil is! Map || !gespeichertesProfil.containsKey('bestaetigungen')) &&
+          alteStufe != Bestaetigungen.vorgabe) {
+        profile[i] = profile[i].mitBestaetigungen(alteStufe);
+      }
+    }
     return Einstellungen(
       moodleAdresse: altAdresse,
-      profile: liste ??
-          (altAdresse.isEmpty ? [] : [Profil.migriert(altAdresse, port: altPort ?? standardPort)]),
+      profile: profile,
       schluessel: j['schluessel'] as String? ?? standard.schluessel,
-      bestaetigungen: Bestaetigungen.ausText(j['bestaetigungen'] as String?),
+      bestaetigungen: alteStufe,
       wahlSkills: (j['wahlSkills'] as List?)?.whereType<String>().toSet(),
       werkzeugeAbgewaehlt: (j['werkzeugeAbgewaehlt'] as List?)?.whereType<String>().toSet() ?? const {},
       updatePruefen: j['updatePruefen'] as bool?,
