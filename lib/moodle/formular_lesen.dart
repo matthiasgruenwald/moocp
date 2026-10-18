@@ -426,7 +426,11 @@ String? _nameIn(dom.Element form) {
 /// global: verschiedene Fragen lesen weiter parallel.
 final _ordnerSperren = <String, Future<void>>{};
 
-Future<T> _ordnerSperre<T>(String pfad, Future<T> Function() tu) {
+/// Der Schlüssel der Sperre: der absolute Ordner des Ziels im Arbeitsordner.
+String ordnerSchluessel(Formularziel ziel, String arbeitsordner) =>
+    p.normalize(p.absolute(p.join(arbeitsordner, ziel.ordnerName)));
+
+Future<T> ordnerSperre<T>(String pfad, Future<T> Function() tu) {
   final vorher = _ordnerSperren[pfad] ?? Future<void>.value();
   final fertig = Completer<void>();
   final ende = fertig.future;
@@ -438,11 +442,12 @@ Future<T> _ordnerSperre<T>(String pfad, Future<T> Function() tu) {
 }
 
 Future<FormularGelesen> formularLesen(MoodleZugang moodle, Formularziel ziel, String arbeitsordner) {
-  final pfad = p.normalize(p.absolute(p.join(arbeitsordner, ziel.ordnerName)));
-  return _ordnerSperre(pfad, () => _formularLesenOhneSperre(moodle, ziel, arbeitsordner));
+  return ordnerSperre(ordnerSchluessel(ziel, arbeitsordner),
+      () => formularLesenOhneSperre(moodle, ziel, arbeitsordner));
 }
 
-Future<FormularGelesen> _formularLesenOhneSperre(
+/// Nur innerhalb einer [ordnerSperre] aufrufen, sonst wartet der Aufruf auf sich selbst.
+Future<FormularGelesen> formularLesenOhneSperre(
     MoodleZugang moodle, Formularziel ziel, String arbeitsordner) async {
   final r = await moodle.lesen(ziel.adresse);
   if (r.status != 200) {

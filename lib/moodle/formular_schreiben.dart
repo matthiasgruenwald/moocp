@@ -1047,7 +1047,24 @@ Future<(String, bool)> _schreiben(MoodleZugang moodle, _Aenderung a, String arbe
 /// Schreibt einen gelesenen und bearbeiteten Ordner zurück. [neuSpeichern]:
 /// auch ohne Änderung einmal über das Formular speichern (CodeRunner prüft
 /// seine Musterlösung nur dort).
+/// Die Sperre des Ordners umfasst das Prüfen des Stands (.stand) bis zum Schreiben
+/// (Befund 6): Parallel gelesen oder geschrieben wird dieser Ordner dann nicht.
+/// Sie gilt auch während der Freigabe; das wartet auf die Lehrkraft (höchstens die Frist).
 Future<String> aendern(
+  MoodleZugang moodle,
+  Freigaben freigaben, {
+  required String ordner,
+  required String arbeitsordner,
+  Map<String, Object?> einstellungen = const {},
+  bool neuSpeichern = false,
+}) {
+  final quelle = imArbeitsordner(ordner, arbeitsordner);
+  return ordnerSperre(ordnerSchluessel(Formularziel.ausOrdner(quelle), arbeitsordner), () => _aendernOhneSperre(
+      moodle, freigaben,
+      ordner: ordner, arbeitsordner: arbeitsordner, einstellungen: einstellungen, neuSpeichern: neuSpeichern));
+}
+
+Future<String> _aendernOhneSperre(
   MoodleZugang moodle,
   Freigaben freigaben, {
   required String ordner,
