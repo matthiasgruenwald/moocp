@@ -270,7 +270,6 @@ class McpDienst {
           loeschend: m['loeschend'] == true));
     }
     final angegeben = a['datei'] as String?;
-    final erneut = a['erneut'] == true;
     final quellkurs = angegeben == null ? _zahlOder(a, 'kurs') : null;
     if (angegeben == null && (quellkurs == null || a['name_des_kurses'] == null)) {
       return 'Ohne datei braucht es kurs (Quellkurs) und name_des_kurses. Nichts geschehen.';
@@ -284,7 +283,7 @@ class McpDienst {
     final rueckfragen = <String>[];
     for (final z in geprueft) {
       final r = wiederholungsRueckfrage(protokoll.eintraege,
-          profil: profil.kennung, kurs: z.kurs, datei: angegeben, quellkurs: quellkurs, erneut: erneut);
+          profil: profil.kennung, kurs: z.kurs, datei: angegeben, quellkurs: quellkurs);
       if (r != null) rueckfragen.add('Kurs ${z.kurs} („${z.name}"): $r');
     }
     if (rueckfragen.isNotEmpty) return rueckfragen.join('\n\n');
@@ -983,7 +982,7 @@ class McpDienst {
             'es hier nicht: dafür auf der Quellinstanz sichern_auswahl und auf der Zielinstanz wiederherstellen_datei '
             '(zwei Aufrufe). Vor dem ersten Schreiben zeigt die App eine Zusammenfassung; jeder Schritt fragt danach '
             'noch einmal. Ist dieselbe Datei für ein Ziel schon übertragen worden, kommt eine Rückfrage statt eines '
-            'erneuten Imports; erneut: true hebt das für diesen Aufruf auf. Eine Einfüge-Wiederherstellung kann Dubletten '
+            'erneuten Imports; eine bewusste Wiederholung geht über wiederherstellen_datei mit wiederholung_von. Eine Einfüge-Wiederherstellung kann Dubletten '
             'erzeugen. Das Protokoll je Ziel steht in uebertragungen.json im Einstellungsordner.',
         zerstoerend: true,
         parameter: {
@@ -1004,8 +1003,6 @@ class McpDienst {
               description: 'Die Zielkurse in dieser Instanz, je {kurs, name, weg}.'),
           'datei': JsonSchema.string(
               description: 'Optional: eine vorhandene .mbz im Sicherungsordner, relativ. Ohne Angabe wird zuerst gesichert.'),
-          'erneut': JsonSchema.boolean(
-              description: 'true hebt den Wiederholungsschutz für diesen Aufruf auf. Nur nach ausdrücklichem Wunsch der Lehrkraft.'),
           'kurs': JsonSchema.integer(description: 'Quellkurs (Kurs-ID), nur ohne datei.'),
           'name_des_kurses': JsonSchema.string(
               description: 'Der Name des Quellkurses, wie er jetzt in Moodle steht. Nur ohne datei.'),

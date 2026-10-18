@@ -280,8 +280,9 @@ in deinem Kopf.
   Werkzeug ebenfalls zurück, bevor etwas geschieht. Der Weg `neuer_kurs` gehört nicht zu `uebertragen`; einen
   neuen Kurs legt `wiederherstellen_datei` an. Ist dieselbe Datei für ein Ziel schon
   übertragen worden, kommt eine Rückfrage mit der Nummer. Erst klärst du den Stand
-  (`wiederherstellung_status`). Ein erneuter Import mit `erneut: true` ist nur nach
-  ausdrücklichem Wunsch der Lehrkraft zulässig.
+  (`wiederherstellung_status`). Eine Wiederholung ist nur nach ausdrücklichem Wunsch der
+  Lehrkraft zulässig: `wiederherstellen_datei` für diesen Kurs mit `wiederholung_von` und
+  der Nummer aus der Rückfrage, nicht `uebertragen`.
 - **Im Ergebnis sagen, was nicht zugesagt ist:** Eine Einfüge-Wiederherstellung kann
   Inhalte doppelt anlegen, und ein Aktualisieren bestehender Inhalte gibt es nicht.
   Das nennst du im Bericht, auch wenn die Lehrkraft eine Aktualisierung erwartet.
