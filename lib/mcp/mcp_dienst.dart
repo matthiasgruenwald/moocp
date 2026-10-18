@@ -60,8 +60,8 @@ const _stufenText = {
 
 /// Wartet höchstens [z] auf [f]. Danach kommt [weiter] als Text zurück, und
 /// [f] läuft im Hintergrund weiter: Eine Sicherung verliert sich nicht, nur weil
-/// der Client nicht mehr wartet. Ein Fehler von [f] geht an den Aufrufer, auch
-/// wenn er nach dem Zeitlimit kommt.
+/// der Client nicht mehr wartet. Nach dem Zeitlimit liefern die Statuswerkzeuge
+/// den vom Hintergrundvorgang gespeicherten Stand und mögliche Fehler.
 Future<String> _zeitlimit(Future<String> f, Duration z, String Function() weiter) {
   final c = Completer<String>();
   f.then(
@@ -80,7 +80,7 @@ Future<String> _zeitlimit(Future<String> f, Duration z, String Function() weiter
 
 class McpDienst {
   McpDienst(this.einstellungen, this.moodle, this.protokoll, this.freigaben, this.arbeitsordner,
-      {required this.profil});
+      {required this.profil, this.sicherungsordner, this.antwortfrist = const Duration(minutes: 1)});
 
   final Einstellungen einstellungen;
 
@@ -92,6 +92,10 @@ class McpDienst {
 
   /// Pfad des Arbeitsordners (arbeitsordner.dart).
   final String arbeitsordner;
+
+  /// Speicherort und Antwortfrist des Servers; Hintergrundvorgänge laufen danach weiter.
+  final String? sicherungsordner;
+  final Duration antwortfrist;
 
   StreamableMcpServer? _server;
   bool get laeuft => _server != null;
@@ -369,6 +373,7 @@ class McpDienst {
         text = await wiederherstellen(moodle, freigaben, vorgaenge,
             datei: datei,
             instanz: profil.name,
+            profilKennung: profil.kennung,
             weg: z.weg.nennung,
             kurs: z.kurs,
             name: z.name,
@@ -462,7 +467,7 @@ class McpDienst {
       server.server.oninitialized = () => protokoll.eintrag(Art.info, 'KI-Werkzeug verbunden: ${_client(server)}');
     }
     final ao = arbeitsordner;
-    final vorgaenge = Vorgaenge(sicherungenOrdner);
+    final vorgaenge = Vorgaenge(sicherungsordner ?? sicherungenOrdner, profilKennung: profil.kennung);
 
     _werkzeug(server, 'status',
         titel: 'Status',
@@ -830,7 +835,7 @@ class McpDienst {
                 name: _text(a, 'name'),
                 zielOrdner: a['ziel_ordner'] as String?,
                 beiVorgang: (id) => vid = id),
-            const Duration(minutes: 1),
+            antwortfrist,
             () => laufText('Die Sicherung', vid, 'sicherung_status'),
           );
         });
@@ -839,17 +844,19 @@ class McpDienst {
         titel: 'Sicherung prüfen',
         beschreibung: 'Zeigt den Stand einer Sicherung (anstehend, laufend, fertig, fehlgeschlagen, unklar) und '
             'fragt laufende bei Moodle nach. Ohne Nummer: die letzten Sicherungen. Nur lesen, außer wenn eine '
-            'Sicherung noch bei Moodle läuft.',
+            'Sicherung noch bei Moodle läuft. Nur Vorgänge dieses Profils; ungebundene Altvorgänge '
+            'werden nicht bei Moodle fortgesetzt.',
         parameter: {'id': JsonSchema.string(description: 'Nummer der Sicherung, wie sichern_aktivitaet sie nennt')},
         nurLesen: true,
         ausfuehren: (a) => _zeitlimit(
               sicherungStatus(moodle, vorgaenge, id: a['id'] as String?),
-              const Duration(minutes: 1),
-              () => 'Die Sicherung läuft noch. Bitte später erneut prüfen.',
+              antwortfrist,
+              () => laufText('Die Sicherung', a['id'] as String?, 'sicherung_status'),
             ));
 
     // ---- Wiederherstellen einer Sicherungsdatei in einen bestehenden Kurs (E29, moodle/wiederherstellung.dart)
     _werkzeug(server, 'wiederherstellen_datei',
+        zerstoerend: true,
         titel: 'Datei in Kurs wiederherstellen',
         beschreibung: 'Stellt eine Sicherungsdatei (.mbz) aus dem Sicherungsordner wieder her. Der Zielweg steht im '
             'Parameter weg: neuer_kurs (neuer Kurs, braucht neuer_kurs_name und kurzname, optional kategorie_id), '
@@ -864,7 +871,9 @@ class McpDienst {
             'Dauert es länger als eine Minute, läuft es weiter: dann wiederherstellung_status mit der Nummer aufrufen. '
             'Nach dem Start wird nie neu gesendet. Dieselbe Datei für denselben Zielweg wird nicht ein zweites Mal '
             'gestartet, solange ein Vorgang offen ist (auch nach dem Zeitlimit oder einem Neustart); die Antwort nennt '
-            'dann seine Nummer. Eine bewusste Wiederholung nur mit wiederholung_von und dieser Nummer, nach Freigabe.',
+            'dann seine Nummer, auch wenn das Profil umbenannt wurde. Eine bewusste Wiederholung nur mit wiederholung_von '
+            'und dieser Nummer: Der aktuelle Hintergrundstand wird vor der Freigabe gelesen und mit Unsicherheiten '
+            'und Dublettenrisiko angezeigt.',
         parameter: {
           'datei': JsonSchema.string(
               description: 'Dateiname der .mbz relativ zum Sicherungsordner, wie sichern_aktivitaet ihn nennt.'),
@@ -886,8 +895,8 @@ class McpDienst {
           'kategorie_id': JsonSchema.integer(
               description: 'Nur bei neuer_kurs, optional: Kategorie-Nummer. Ohne Angabe die Vorgabe des Kursformulars.'),
           'sammlung': JsonSchema.integer(
-              description: 'Optional: cmid der eigenen Fragensammlung (fragensammlungen). Nur mit ihr prüft die App, '
-                  'ob die Fragen eines Quiz aus der eigenen Sammlung stammen; ohne Angabe bleibt das eine Prüflücke.'),
+              description: 'Optional: cmid einer Zielsammlung für den Sachnummernvergleich (fragensammlungen). '
+                  'Gleiche Nummern belegen keine eigene Quellherkunft; diese bleibt eine Prüflücke.'),
         },
         pflicht: ['datei', 'weg'],
         ausfuehren: (a) {
@@ -905,8 +914,9 @@ class McpDienst {
                 sammlung: _zahlOder(a, 'sammlung'),
                 wiederholungVon: a['wiederholung_von'] as String?,
                 instanz: profil.name,
+                profilKennung: profil.kennung,
                 beiVorgang: (id) => vid = id),
-            const Duration(minutes: 1),
+            antwortfrist,
             () => laufText('Die Wiederherstellung', vid, 'wiederherstellung_status'),
           );
         });
@@ -915,13 +925,14 @@ class McpDienst {
         titel: 'Wiederherstellung prüfen',
         beschreibung: 'Zeigt den Stand einer Wiederherstellung (anstehend, hochgeladen, laufend, fertig, '
             'fehlgeschlagen, unklar) und fragt eine laufende bei Moodle nach. Startet nie neu. Ein Vorgang, der nie bei '
-            'Moodle begonnen hat, wird als fehlgeschlagen vermerkt.',
+            'Moodle begonnen hat, wird als fehlgeschlagen vermerkt. Nur Vorgänge dieses Profils; ungebundene Altvorgänge '
+            'werden nicht bei Moodle fortgesetzt.',
         parameter: {'id': JsonSchema.string(description: 'Nummer der Wiederherstellung, wie wiederherstellen_datei sie nennt')},
         pflicht: ['id'],
         ausfuehren: (a) => _zeitlimit(
               wiederherstellungStatus(moodle, vorgaenge, id: _text(a, 'id')),
-              const Duration(minutes: 1),
-              () => 'Die Wiederherstellung läuft noch. Bitte später erneut prüfen.',
+              antwortfrist,
+              () => laufText('Die Wiederherstellung', _text(a, 'id'), 'wiederherstellung_status'),
             ));
 
     _werkzeug(server, 'sichern_auswahl',
@@ -974,7 +985,7 @@ class McpDienst {
                 ganzerKurs: a['ganzer_kurs'] == true,
                 zielOrdner: a['ziel_ordner'] as String?,
                 beiVorgang: (id) => vid = id),
-            const Duration(minutes: 1),
+            antwortfrist,
             () => laufText('Die Sicherung', vid, 'sicherung_status'),
           );
         });

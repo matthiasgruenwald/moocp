@@ -70,15 +70,15 @@ const _questionsXml = '''
   <question_bank_entries>
     <question_bank_entry id="11">
       <idnumber>ZZ-0001</idnumber>
-      <question_version><question><name>ZZ Frage Eins</name></question></question_version>
+      <question_version><version>1</version><question><name>ZZ Frage Eins</name></question></question_version>
     </question_bank_entry>
     <question_bank_entry id="12">
       <idnumber>ZZ-0002</idnumber>
-      <question_version><question><name>ZZ Frage Zwei</name></question></question_version>
+      <question_version><version>1</version><question><name>ZZ Frage Zwei</name></question></question_version>
     </question_bank_entry>
     <question_bank_entry id="13">
       <idnumber></idnumber>
-      <question_version><question><name>ZZ Frage Fremd</name></question></question_version>
+      <question_version><version>1</version><question><name>ZZ Frage Fremd</name></question></question_version>
     </question_bank_entry>
   </question_bank_entries>
 </question_categories>
@@ -120,6 +120,25 @@ void main() {
       expect(f[2].sachnummer, isNull, reason: 'leere Sachnummer zählt als fehlend');
       expect(f[3].zufall, isTrue);
       expect(f[0].zufall, isFalse);
+    });
+
+    test('referenzierte Version statt des ersten Namens; fehlende Version bleibt Prüflücke', () {
+      const bank = '<question_bank_entry id="11"><idnumber>ZZ-1</idnumber>'
+          '<question_version><version>1</version><question><name>Alt</name></question></question_version>'
+          '<question_version><version>2</version><question><name>Neu</name></question></question_version>'
+          '</question_bank_entry>';
+      String quiz(String version) => '<question_instance><question_reference>'
+          '<questionbankentryid>11</questionbankentryid><version>$version</version>'
+          '</question_reference></question_instance>';
+      expect(quizFragenAusXml(quiz('2'), bank).single.name, 'Neu');
+      for (final version in ['3', '', '0']) {
+        final quelle = quizFragenAusXml(quiz(version), bank);
+        expect(quelle.single.sachnummer, isNull);
+        expect(herkunftPruefen(verwendet: quelle, eigeneSachnummern: {'ZZ-1'}, eigeneAnzahl: 1).art,
+            HerkunftArt.pruefluecke);
+        expect(quizVerifiziert(fragenVergleichen(quelle: quelle,
+            ziel: [(name: quelle.single.name, zufall: false)])), isFalse);
+      }
     });
 
     test('Eintrag ohne Fragenbank: Sachnummer fehlt, Name nennt die Nummer', () {

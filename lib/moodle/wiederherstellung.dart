@@ -80,13 +80,15 @@ Future<void> _uebergang(
 /// Stellt eine Sicherungsdatei aus dem Sicherungsordner wieder her. [datei] liegt
 /// relativ zum Sicherungsordner. [weg] ist einer der fünf Zielwege (Zielweg) und
 /// Pflicht; fehlt er, kommt eine Rückfrage statt eines Standardwegs. [instanz] ist
-/// der Name des Profils, nur für die Freigabe. Löschende Wege brauchen [loeschend].
+/// der Anzeigename des Profils, nur für die Freigabe; [profilKennung] bindet den
+/// Auftrag an die stabile Zielidentität. Löschende Wege brauchen [loeschend].
 Future<String> wiederherstellen(
   MoodleZugang moodle,
   Freigaben freigaben,
   Vorgaenge vorgaenge, {
   required String datei,
   required String instanz,
+  String? profilKennung,
   required String? weg,
   int? kurs,
   String? name,
@@ -131,7 +133,7 @@ Future<String> wiederherstellen(
   // 4a. Der Zielweg steht fest: Der Fingerabdruck reserviert die Datei, bevor
   // die erste Moodle-Anfrage wartet. Zwei Aufrufe mit derselben Datei können so
   // nicht beide durch die Prüfung (Befund 1, Befund 2).
-  final fp = fingerabdruck(bytes, instanz: instanz, kurs: kurs ?? 0, weg: zielweg);
+  final fp = fingerabdruck(bytes, instanz: profilKennung == null ? instanz : 'profil:$profilKennung', kurs: kurs ?? 0, weg: zielweg);
   return _reservieren(fp, () async {
     // 4. Zielkurs (bestehend) bzw. Kategorie (neuer Kurs) und Kontext des Hochladens.
     var kursName = '';
@@ -162,8 +164,20 @@ Future<String> wiederherstellen(
 
     // 4b. Doppelstart-Schutz (Ticket #19, Spec #17): Vor der Freigabe prüfen, damit ein
     // abgewiesener Aufruf nichts fragt. Der Inhalt zählt, nicht der Dateiname.
+    final bisher = await vorgaenge.alleFuerDoppelstart();
+    final eintraege = doppelstartEintraege(bisher).map((e) {
+      final v = bisher.firstWhere((v) => v.id == e.id);
+      final teile = e.fingerabdruck?.split('|');
+      final neu = fp.split('|');
+      // Altvorgänge tragen nur den veränderlichen Anzeigenamen. Ihre Quelle und
+      // ihr Zielweg sperren konservativ auch nach einer Profilumbenennung.
+      final altPasst = v.profilKennung == null && teile?.length == 4 &&
+          teile![0] == neu[0] && teile[2] == neu[2] && teile[3] == neu[3];
+      return (id: e.id, fingerabdruck: altPasst ? fp : e.fingerabdruck,
+          wiederholungVon: e.wiederholungVon, stand: e.stand, kurs: e.kurs);
+    }).toList();
     final sperre = doppelstartSperre(
-      doppelstartEintraege(await vorgaenge.alle()),
+      eintraege,
       fingerabdruck: fp,
       wiederholungVon: wiederholungVon,
       kurs: kurs ?? 0,
@@ -171,6 +185,21 @@ Future<String> wiederherstellen(
     if (sperre != null) {
       throw MoodleFehler('Dieselbe Datei für diesen Zielweg ist schon im Vorgang Nummer $sperre offen. '
           'Mit wiederherstellung_status prüfen. Eine erneute Wiederherstellung nur mit wiederholung_von=$sperre. Nichts geändert.');
+    }
+
+    String? wiederholungsBefund;
+    if (wiederholungVon != null) {
+      // Nur der aktuelle Kopf desselben Auftrags darf bewusst wiederholt werden.
+      final kopf = doppelstartSperre(eintraege, fingerabdruck: fp, wiederholungVon: null, kurs: kurs ?? 0);
+      if (kopf != wiederholungVon) {
+        throw MoodleFehler('wiederholung_von muss den offenen Vorgang dieses Auftrags nennen. Nichts geändert.');
+      }
+      final alt = await vorgaenge.finde(kopf!);
+      if (alt == null) {
+        throw MoodleFehler('Der Altvorgang $kopf hat keine sichere Profilbindung. '
+            'Den Kurs in Moodle prüfen; keine Wiederholung über die App gestartet.');
+      }
+      wiederholungsBefund = await _wiederholungsStand(moodle, alt);
     }
 
     // 5. Freigabe in der App, vor jedem Schreiben (beim neuen Kurs vor dem Platzhalter).
@@ -205,7 +234,8 @@ Future<String> wiederherstellen(
             'kurzzeitig für Lernende sichtbar sein. Verborgen ist kein Schutz: Wer im Kurs Rechte hat, sieht sie und kann sie sichtbar machen.',
         'Nutzerdaten sind im Archiv nicht enthalten (geprüft). Rechte und Einschreibungen bleiben unverändert.',
         if (wiederholungVon != null)
-          'Wiederholung des Vorgangs $wiederholungVon, der nicht abgeschlossen ist. Moodle kann ihn schon ausgeführt haben.',
+          'Wiederholung des Vorgangs $wiederholungVon: $wiederholungsBefund '
+              'Eine Wiederholung kann Dubletten erzeugen. Ungeprüfte Ergebnisse bleiben unsicher.',
       ],
       vergleich: const [],
       knopf: zielweg.loescht ? 'Löschen und wiederherstellen' : 'Wiederherstellen',
@@ -218,7 +248,9 @@ Future<String> wiederherstellen(
 
     // 6. Vorgang anlegen und Datei hochladen (jedes Mal neu, nie eine alte Kennung).
     final vg = await vorgaenge.neuWiederherstellung(
-        kurs: kurs ?? 0, datei: datei, fingerabdruck: fp, wiederholungVon: wiederholungVon);
+        kurs: kurs ?? 0, datei: datei, fingerabdruck: fp, wiederholungVon: wiederholungVon,
+        profilKennung: profilKennung,
+        quizQuelle: befund.quizFragen.length == 1 ? befund.quizFragen.values.first : null);
     _laufendeWiederherstellungen.add(vg.id);
     // Die Nummer geht nur an den Aufrufer, damit er das Ergebnis je Ziel
     // zuordnen kann (uebertragen, Issue #10). Ohne Rückruf unverändert.
@@ -242,6 +274,32 @@ Future<String> wiederherstellen(
       _laufendeWiederherstellungen.remove(vg.id);
     }
   });
+}
+
+/// Frischer Stand vor einer bewussten Wiederholung. Keine Rückleseprobe und kein
+/// Verbergen: Die Prüfung vor der Freigabe darf selbst nichts in Moodle schreiben.
+Future<String> _wiederholungsStand(MoodleZugang moodle, Vorgang v) async {
+  if (v.backupid == null || v.kontext == null) {
+    return 'Gespeicherter Stand: ${v.wiederherstellung?.text}. Kein abfragbarer Hintergrundauftrag; '
+        'der tatsächliche Kurszustand ist unklar. ${v.text}';
+  }
+  try {
+    final antwort = await moodle.dienst('core_backup_get_async_backup_progress', {
+      'backupids': [v.backupid!], 'contextid': v.kontext!,
+    });
+    final aktuell = switch (bewerteFortschritt(antwort, v.backupid!)) {
+      SicherungStand.fertig => 'Moodle meldet den Hintergrundauftrag als beendet. '
+          'Das bestätigt weder die Vollständigkeit noch die Fragenherkunft.',
+      SicherungStand.laufend => 'Moodle meldet den Hintergrundauftrag weiterhin laufend. '
+          'Beide Vorgänge können Inhalte anlegen.',
+      SicherungStand.fehlgeschlagen => 'Moodle meldet einen Fehler. Bereits angelegte Inhalte sind nicht ausgeschlossen.',
+      _ => 'Die aktuelle Antwort von Moodle ist unklar. Bereits angelegte Inhalte sind nicht ausgeschlossen.',
+    };
+    return '$aktuell Gespeicherte Prüfung: ${v.text.isEmpty ? 'noch nicht erfolgt.' : v.text} verified: ${v.verified}.';
+  } on MoodleFehler {
+    return 'Der aktuelle Stand konnte nicht gelesen werden (Prüflücke). '
+        'Moodle kann den Vorgang bereits ausgeführt haben.';
+  }
 }
 
 /// Hält [fp] für die Dauer von [lauf] belegt. Die Belegung geschieht synchron beim
@@ -411,6 +469,9 @@ Future<String> _ausfuehren(
               ? 'Der Platzhalterkurs ist möglicherweise angelegt; in Moodle prüfen. Nichts weiter gestartet '
                   '(nativer Abbruch der Angaben: UNGEMESSEN).'
               : 'Vor dem Start abgebrochen; im Kurs ist nichts geändert.');
+    } else if (vg.wiederherstellung != WiederherstellungStand.fertig) {
+      await _uebergang(vorgaenge, vg, WiederherstellungStand.unklar,
+          text: 'Der Lauf konnte nicht abschließend geprüft werden. Mit wiederherstellung_status und der Nummer erneut prüfen.');
     }
     rethrow;
   }
@@ -703,7 +764,7 @@ Future<String> wiederherstellungStatus(MoodleZugang moodle, Vorgaenge vorgaenge,
     throw MoodleFehler('Keine Wiederherstellung mit der Nummer $id.');
   }
   if (_laufendeWiederherstellungen.contains(v.id)) {
-    return 'Läuft noch (Nummer ${v.id}). Bitte später erneut prüfen.';
+    return laufText('Die Wiederherstellung', v.id, 'wiederherstellung_status');
   }
   final stand = v.wiederherstellung!;
   if (stand == WiederherstellungStand.anstehend || stand == WiederherstellungStand.hochgeladen) {
@@ -723,7 +784,8 @@ Future<String> wiederherstellungStatus(MoodleZugang moodle, Vorgaenge vorgaenge,
           kontext: kontext,
           kurs: v.kurs == 0 ? null : v.kurs,
           vorherCmids: v.vorherCmids ?? const [],
-          wiederherstellungAktivitaeten: v.wiederherstellungAktivitaeten ?? const []);
+          wiederherstellungAktivitaeten: v.wiederherstellungAktivitaeten ?? const [],
+          quizQuelle: v.quizQuelle);
     } finally {
       _laufendeWiederherstellungen.remove(v.id);
     }

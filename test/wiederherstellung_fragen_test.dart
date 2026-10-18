@@ -7,7 +7,7 @@ import 'package:moocp/moodle/wiederherstellung_fragen.dart';
 
 void main() {
   group('Herkunft vor dem Start', () {
-    test('alle verwendeten Fragen in der eigenen Sammlung: eigene Herkunft', () {
+    test('gleiche Sachnummern belegen ohne Quellkontext keine eigene Herkunft', () {
       final b = herkunftPruefen(
         verwendet: [
           (name: 'Frage A', sachnummer: 'ZZ-A', zufall: false),
@@ -16,7 +16,7 @@ void main() {
         eigeneSachnummern: {'ZZ-A', 'ZZ-B', 'ZZ-C'},
         eigeneAnzahl: 3,
       );
-      expect(b.art, HerkunftArt.eigene);
+      expect(b.art, HerkunftArt.pruefluecke);
       expect(b.nichtEigene, isEmpty);
     });
 

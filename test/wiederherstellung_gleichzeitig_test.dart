@@ -96,17 +96,17 @@ void main() {
           name: 'Testkurs',
         );
 
-    final erster = aufruf();
+    final erster = aufruf().then<Object>((v) => v, onError: (Object e) => e);
     final zweiter = aufruf().then<Object>((v) => v, onError: (Object e) => e);
 
-    // Beide Aufrufe laufen bis zur Freigabe; der erste wartet dort auf die Entscheidung.
+    // Genau einer erreicht die Freigabe; welcher zuerst das Archiv liest, ist offen.
     await Future<void>.delayed(const Duration(milliseconds: 200));
     expect(freigaben.gezaehlt, 1, reason: 'Der zweite Aufruf darf keinen zweiten Dialog erzeugen.');
 
-    final abgewiesen = await zweiter;
-    expect(abgewiesen, isA<MoodleFehler>());
-
     freigaben.entscheiden(false);
-    expect(await erster, contains('Nicht wiederhergestellt'));
+    final ergebnisse = await Future.wait([erster, zweiter]);
+    expect(ergebnisse.whereType<MoodleFehler>(), hasLength(1));
+    expect(ergebnisse.whereType<String>().single, contains('Nicht wiederhergestellt'));
+
   });
 }

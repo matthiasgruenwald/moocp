@@ -32,6 +32,7 @@ import 'kurs.dart';
 import 'moodle_zugang.dart';
 import 'sicherung_regeln.dart';
 import 'wiederherstellung_regeln.dart';
+import 'wiederherstellung_fragen.dart';
 
 /// Vorgänge, die gerade laufen (Freigabe oder Abfrage) in dieser Sitzung der App.
 final Set<String> _laufend = {};
@@ -41,8 +42,8 @@ final Set<String> _laufend = {};
 DateTime Function() jetzt = DateTime.now;
 Future<void> Function(Duration d) schlafe = (d) => Future<void>.delayed(d);
 
-/// Ein Sicherungsvorgang. Nur Kennzahlen und feste Texte: keine Namen, keine
-/// Antworten aus Moodle.
+/// Ein Sicherungsvorgang mit Kennzahlen und Prüfbefunden. Wiederherstellungen
+/// behalten zusätzlich ihre Quellaufnahme für eine spätere Rückleseprobe.
 class Vorgang {
   Vorgang({
     required this.id,
@@ -67,6 +68,8 @@ class Vorgang {
     this.wiederherstellungAktivitaeten,
     this.fingerabdruck,
     this.wiederholungVon,
+    this.profilKennung,
+    this.quizQuelle,
   }) : aktualisiert = aktualisiert ?? begonnen;
 
   final String id;
@@ -112,6 +115,12 @@ class Vorgang {
   String? fingerabdruck;
   String? wiederholungVon;
 
+  /// Stabile Zielidentität; null bei Altvorgängen mit Anzeigenamen im Fingerabdruck.
+  String? profilKennung;
+
+  /// Quellfragen bleiben auch ohne laufende Sitzung für den Vergleich verfügbar.
+  List<QuizFrage>? quizQuelle;
+
   Map<String, Object?> zuJson() => {
         'id': id,
         'kurs': kurs,
@@ -135,6 +144,8 @@ class Vorgang {
         'wiederherstellung_aktivitaeten': wiederherstellungAktivitaeten?.map((a) => {'modul': a.modul, 'titel': a.titel}).toList(),
         'fingerabdruck': fingerabdruck,
         'wiederholung_von': wiederholungVon,
+        'profil_kennung': profilKennung,
+        'quiz_quelle': quizQuelle?.map((f) => {'name': f.name, 'sachnummer': f.sachnummer, 'zufall': f.zufall}).toList(),
       };
 
   static Vorgang? ausJson(Object? o) {
@@ -169,6 +180,10 @@ class Vorgang {
           .toList(),
       fingerabdruck: o['fingerabdruck'] as String?,
       wiederholungVon: o['wiederholung_von'] as String?,
+      profilKennung: o['profil_kennung'] as String?,
+      quizQuelle: (o['quiz_quelle'] as List?)?.whereType<Map>()
+          .where((f) => f['name'] is String && f['zufall'] is bool)
+          .map((f) => (name: f['name'] as String, sachnummer: f['sachnummer'] as String?, zufall: f['zufall'] as bool)).toList(),
     );
   }
 }
@@ -177,33 +192,56 @@ class Vorgang {
 /// eine Datei .tmp, die dann umbenannt wird; ein Absturz hinterlässt also
 /// entweder den alten oder den neuen Stand.
 class Vorgaenge {
-  Vorgaenge(this.ordner);
+  Vorgaenge(this.ordner, {this.profilKennung});
 
   final String ordner;
-  List<Vorgang>? _liste;
+  final String? profilKennung;
 
+  // Alle MCP-Sitzungen und Profile teilen dieselbe Datei. Eine Änderung liest
+  // unter dieser Sperre frisch und ersetzt nur ihren eigenen Vorgang, damit
+  // ein alter Sitzungsstand keine neueren Vorgänge überschreibt.
+  static final Map<String, Future<void>> _schreibend = {};
+  String get _schluessel => p.normalize(p.absolute(ordner));
   File get _datei => File(p.join(ordner, 'vorgaenge.json'));
 
-  Future<List<Vorgang>> alle() async {
-    final bisher = _liste;
-    if (bisher != null) return bisher;
-    final l = <Vorgang>[];
-    if (await _datei.exists()) {
-      final Object? roh;
+  Future<List<Vorgang>> _lesen() async {
+    if (!await _datei.exists()) return [];
+    final Object? roh;
+    try {
+      roh = jsonDecode(await _datei.readAsString());
+    } catch (_) {
+      throw MoodleFehler('vorgaenge.json im Sicherungsordner ist beschädigt. Nichts geändert.');
+    }
+    if (roh is! List) {
+      throw MoodleFehler('vorgaenge.json im Sicherungsordner ist beschädigt. Nichts geändert.');
+    }
+    return [for (final x in roh) if (Vorgang.ausJson(x) case final Vorgang v) v];
+  }
+
+  Future<List<Vorgang>> _alle() async {
+    final vorher = _schreibend[_schluessel];
+    if (vorher != null) {
       try {
-        roh = jsonDecode(await _datei.readAsString());
+        await vorher;
       } catch (_) {
-        throw MoodleFehler('vorgaenge.json im Sicherungsordner ist beschädigt. Nichts geändert.');
-      }
-      if (roh is List) {
-        for (final x in roh) {
-          final v = Vorgang.ausJson(x);
-          if (v != null) l.add(v);
-        }
+        // Der Schreibaufruf hat den Fehler bereits gemeldet. Frisch lesen
+        // entscheidet, ob die Datei inzwischen wieder nutzbar ist.
       }
     }
-    return _liste = l;
+    return _lesen();
   }
+
+  Future<List<Vorgang>> alle() async => [
+    for (final v in await _alle())
+      if (profilKennung == null || v.profilKennung == profilKennung) v,
+  ];
+
+  /// Alte Vorgänge ohne Profilbindung dürfen sperren, aber keine Statusabfrage
+  /// auf einer möglicherweise falschen Instanz auslösen.
+  Future<List<Vorgang>> alleFuerDoppelstart() async => [
+    for (final v in await _alle())
+      if (profilKennung == null || v.profilKennung == null || v.profilKennung == profilKennung) v,
+  ];
 
   Future<Vorgang?> finde(String id) async {
     for (final v in await alle()) {
@@ -222,9 +260,9 @@ class Vorgaenge {
       stand: SicherungStand.anstehend,
       begonnen: DateTime.now(),
       auswahl: auswahl,
+      profilKennung: profilKennung,
     );
-    (await alle()).add(v);
-    await _speichern();
+    await _speichern(v);
     return v;
   }
 
@@ -235,12 +273,16 @@ class Vorgaenge {
     required String datei,
     String? fingerabdruck,
     String? wiederholungVon,
+    String? profilKennung,
+    List<QuizFrage>? quizQuelle,
   }) async {
     final v = await neu(kurs: kurs, cmid: 0, datei: datei);
     v.wiederherstellung = WiederherstellungStand.anstehend;
     v.fingerabdruck = fingerabdruck;
     v.wiederholungVon = wiederholungVon;
-    await _speichern();
+    v.profilKennung = profilKennung ?? this.profilKennung;
+    v.quizQuelle = quizQuelle;
+    await _speichern(v);
     return v;
   }
 
@@ -274,14 +316,29 @@ class Vorgaenge {
     if (bytes != null) v.bytes = bytes;
     if (verified != null) v.verified = verified;
     v.aktualisiert = DateTime.now();
-    await _speichern();
+    await _speichern(v);
   }
 
-  Future<void> _speichern() async {
-    await Directory(ordner).create(recursive: true);
-    final tmp = File('${_datei.path}.tmp');
-    await tmp.writeAsString(jsonEncode([for (final v in _liste ?? const <Vorgang>[]) v.zuJson()]), flush: true);
-    await tmp.rename(_datei.path);
+  Future<void> _speichern(Vorgang v) {
+    final vorher = _schreibend[_schluessel] ?? Future<void>.value();
+    final schreiben = vorher.catchError((Object _) {
+      // Ein früher fehlgeschlagener Auftrag meldet seinen Fehler selbst; ein
+      // späterer Auftrag darf nach Behebung der Datei wieder speichern.
+    }).then((_) async {
+      final liste = await _lesen();
+      final i = liste.indexWhere((x) => x.id == v.id);
+      if (i < 0) {
+        liste.add(v);
+      } else {
+        liste[i] = v;
+      }
+      await Directory(ordner).create(recursive: true);
+      final tmp = File('${_datei.path}.tmp');
+      await tmp.writeAsString(jsonEncode([for (final x in liste) x.zuJson()]), flush: true);
+      await tmp.rename(_datei.path);
+    });
+    _schreibend[_schluessel] = schreiben;
+    return schreiben;
   }
 }
 

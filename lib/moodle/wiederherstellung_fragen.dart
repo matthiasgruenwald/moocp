@@ -4,9 +4,9 @@
 // (test_lesen). Was nicht sicher auflösbar ist, wird Prüflücke, nie Gleichheit.
 //
 // Regeln:
-//   - Eigene Herkunft nur, wenn alle tatsächlich verwendeten Fragen über ihre
-//     Sachnummer in der eigenen Sammlung liegen UND die eigene Sammlung nicht leer
-//     ist. Eine leere eigene Sammlung ist kein Nachweis.
+//   - Sachnummern werden mit der angegebenen Zielsammlung verglichen. Selbst
+//     gleiche Nummern belegen ohne Quellprofil, Quellsammlung und Kontext keine
+//     eigene Quellherkunft. Eine leere Sammlung ist ebenfalls kein Nachweis.
 //   - Fremde oder unbekannte Herkunft wird mit den Namen der Fragen benannt, vor dem
 //     Start. Der XML-Import in eine neue Testzusammenstellung ist nur ein Vorschlag.
 //   - Zufallsfragen und Fragen ohne Sachnummer: Prüflücke, kein Gleichheitsvergleich.
@@ -40,8 +40,9 @@ class HerkunftBefund {
   final List<String> nichtEigene;
 }
 
-/// Herkunft aus den tatsächlich verwendeten Fragen. [verwendet] null heißt: die
-/// Quelle wurde nicht gelesen.
+/// Vergleich der verwendeten Quellfragen mit Sachnummern der angegebenen
+/// Zielsammlung. Ohne belegte Quellidentität bleibt Gleichheit eine Prüflücke.
+/// [verwendet] null heißt: die Quelle wurde nicht gelesen.
 /// Befund 7: Herkunft darf nur in verified einfließen, wenn jedes Quiz eigene
 /// Fragen nachweist. Eine Prüflücke oder eine fremde Herkunft genügt zum Nein.
 bool herkunftVerifiziert(List<HerkunftBefund> befunde) =>
@@ -76,7 +77,9 @@ HerkunftBefund herkunftPruefen({
       if (!eigeneSachnummern.contains(f.sachnummer)) f.name,
   ];
   if (fremd.isEmpty) {
-    return HerkunftBefund(HerkunftArt.eigene, 'Alle verwendeten Fragen stammen aus der eigenen Sammlung.');
+    return HerkunftBefund(HerkunftArt.pruefluecke,
+        'Die Sachnummern kommen auch in der angegebenen Zielsammlung vor. Das belegt keine eigene Quellherkunft: '
+        'Quellprofil, Quellsammlung und Kontext sind nicht nachgewiesen (Prüflücke).');
   }
   return HerkunftBefund(HerkunftArt.fremdOderUnbekannt,
       'Geteilte oder unbekannte Herkunft, nicht in der eigenen Sammlung: ${fremd.join(', ')}. '
@@ -105,7 +108,7 @@ FragenVergleich fragenVergleichen({
   required List<QuizFrage>? quelle,
   required List<ZielFrage>? ziel,
 }) {
-  if (quelle == null || quelle.isEmpty) {
+  if (quelle == null || quelle.isEmpty || quelle.any((f) => f.sachnummer == null)) {
     return FragenVergleich(VergleichArt.pruefluecke,
         'Vergleich nicht möglich: keine belastbare Aufnahme der Quellfragen.');
   }
@@ -159,16 +162,21 @@ List<String> _rest(List<String> a, List<String> b) {
 /// [questionsXml] null: keine Fragenbank, dann hat keine Frage eine Sachnummer. UNGEMESSEN:
 /// das ist die festgelegte Lesart, nicht die gemessene Moodle-Ausgabe.
 List<QuizFrage> quizFragenAusXml(String quizXml, String? questionsXml) {
-  final bank = <String, ({String? idnummer, String name})>{};
+  final bank = <String, ({String? idnummer, Map<String, String> versionen})>{};
   if (questionsXml != null) {
     for (final e in XmlDocument.parse(questionsXml).findAllElements('question_bank_entry')) {
       final id = e.getAttribute('id') ?? '';
       final idnummer = e.getElement('idnumber')?.innerText.trim();
-      final namen = [for (final n in e.findAllElements('name')) n.innerText.trim()];
-      bank[id] = (
-        idnummer: idnummer == null || idnummer.isEmpty ? null : idnummer,
-        name: namen.isEmpty || namen.first.isEmpty ? 'Frage Nr. $id' : namen.first,
-      );
+      final versionen = <String, String>{};
+      for (final v in e.findAllElements('question_version')) {
+        final nummer = v.getElement('version')?.innerText.trim();
+        final name = v.getElement('question')?.getElement('name')?.innerText.trim();
+        if (nummer != null && nummer.isNotEmpty && name != null && name.isNotEmpty) {
+          // Doppelte Versionsnummern sind keine eindeutige Quelle.
+          versionen[nummer] = versionen.containsKey(nummer) ? '' : name;
+        }
+      }
+      bank[id] = (idnummer: idnummer == null || idnummer.isEmpty ? null : idnummer, versionen: versionen);
     }
   }
   final fragen = <QuizFrage>[];
@@ -180,10 +188,14 @@ List<QuizFrage> quizFragenAusXml(String quizXml, String? questionsXml) {
     final ref = qi.findAllElements('questionbankentryid').map((n) => n.innerText.trim()).toList();
     final id = ref.isEmpty ? '' : ref.first;
     final eintrag = bank[id];
+    final version = qi.findAllElements('version').map((n) => n.innerText.trim()).firstOrNull;
+    final name = version == null || version == '0' ? null : eintrag?.versionen[version];
     if (eintrag == null) {
       fragen.add((name: 'Frage Nr. $id (nicht in questions.xml)', sachnummer: null, zufall: false));
+    } else if (name == null || name.isEmpty) {
+      fragen.add((name: 'Frage Nr. $id (Version nicht auflösbar, Prüflücke)', sachnummer: null, zufall: false));
     } else {
-      fragen.add((name: eintrag.name, sachnummer: eintrag.idnummer, zufall: false));
+      fragen.add((name: name, sachnummer: eintrag.idnummer, zufall: false));
     }
   }
   return fragen;
