@@ -10,6 +10,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:crypto/crypto.dart';
 import 'package:xml/xml.dart';
 
 import 'sicherung_regeln.dart' show nutzerdatenOptionen;
@@ -394,3 +395,54 @@ enum Zielweg {
   }
   return (weg: gewaehlt, rueckfrage: null);
 }
+
+/// Doppelstart-Schutz (Ticket #19, Spec #17). Der Fingerabdruck hängt am Inhalt der
+/// Datei, nie am Namen: umbenannt bleibt es dieselbe Wiederherstellung. Kurs (0 bei
+/// neuem Kurs) und Zielweg gehören dazu, damit ein anderer Ziel-Lauf nicht gesperrt wird.
+String fingerabdruck(List<int> bytes, {required int kurs, required Zielweg weg}) =>
+    '${sha256.convert(bytes)}|$kurs|${weg.name}';
+
+/// Was die Doppelstart-Prüfung von einem Vorgang braucht. Ohne Dateien und Texte.
+typedef DoppelstartEintrag = ({
+  String id,
+  String? fingerabdruck,
+  String? wiederholungVon,
+  WiederherstellungStand? stand,
+  int kurs,
+});
+
+/// Die Nummer des offenen Vorgangs, der die neue Wiederherstellung sperrt, sonst null.
+///
+/// Offen heißt: anstehend, hochgeladen, laufend, unklar oder fertig (Moodle kann die
+/// Wiederherstellung schon ausgeführt haben, oder sie ist noch nicht gegengelesen).
+/// Fehlgeschlagen sperrt nur bei neuem Kurs (kurs 0), weil dort ein Platzhalterkurs
+/// bleiben kann. Nur der Kopf zählt: Ein Vorgang, auf den ein anderer mit
+/// wiederholungVon zeigt, ist überholt. Eine Wiederholung ist nur zulässig, wenn sie
+/// genau den sperrenden Kopf nennt.
+String? doppelstartSperre(
+  Iterable<DoppelstartEintrag> alle, {
+  required String fingerabdruck,
+  required String? wiederholungVon,
+  required int kurs,
+}) {
+  final gleiche = [for (final e in alle) if (e.fingerabdruck == fingerabdruck) e];
+  final ueberholt = {for (final e in gleiche) if (e.wiederholungVon != null) e.wiederholungVon!};
+  final sperrend = [
+    for (final e in gleiche)
+      if (!ueberholt.contains(e.id) && _sperrt(e, kurs)) e.id,
+  ];
+  if (sperrend.isEmpty) return null;
+  if (wiederholungVon != null && sperrend.contains(wiederholungVon)) return null;
+  return sperrend.first;
+}
+
+bool _sperrt(DoppelstartEintrag e, int kurs) => switch (e.stand) {
+      WiederherstellungStand.anstehend ||
+      WiederherstellungStand.hochgeladen ||
+      WiederherstellungStand.laufend ||
+      WiederherstellungStand.unklar ||
+      WiederherstellungStand.fertig =>
+        true,
+      WiederherstellungStand.fehlgeschlagen => e.kurs == 0 && kurs == 0,
+      null => false,
+    };
