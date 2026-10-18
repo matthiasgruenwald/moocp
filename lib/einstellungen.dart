@@ -14,10 +14,14 @@ import 'dart:math';
 
 import 'einstellungen_ort.dart';
 import 'freigabe.dart';
+import 'profil.dart';
 
 class Einstellungen {
+  /// [moodleAdresse] ist der Altbestand eines einzelnen Moodle und wird zum
+  /// ersten Profil ([profile]). Mit [profile] gewinnt die Liste.
   Einstellungen({
-    required this.moodleAdresse,
+    String moodleAdresse = '',
+    List<Profil>? profile,
     required this.port,
     required this.schluessel,
     this.bestaetigungen = Bestaetigungen.vorgabe,
@@ -26,9 +30,25 @@ class Einstellungen {
     this.updatePruefen,
     this.updateZuletzt,
     this.updateErwartet,
-  });
+  }) : profile = profile ?? (moodleAdresse.isEmpty ? [] : [Profil.migriert(moodleAdresse)]);
 
-  String moodleAdresse;
+  /// Die Moodle-Instanzen, mit denen die App angemeldet sein kann. Das erste
+  /// Profil hat die Kennung `standard` (profil.dart), wenn es aus dem
+  /// Altbestand stammt oder als erstes angelegt wurde.
+  List<Profil> profile;
+
+  /// Die Adresse des ersten Profils. Der Dialog und die Titelzeile arbeiten
+  /// noch mit einer Adresse; ein zweites Profil kommt über [profile].
+  String get moodleAdresse => profile.isEmpty ? '' : profile.first.adresse;
+
+  set moodleAdresse(String a) {
+    if (profile.isEmpty) {
+      if (a.isNotEmpty) profile = [Profil.migriert(a)];
+      return;
+    }
+    profile[0] = profile[0].copyWith(adresse: a);
+  }
+
   int port;
   String schluessel;
 
@@ -80,17 +100,7 @@ class Einstellungen {
     try {
       if (await _datei.exists()) {
         final j = jsonDecode(await _datei.readAsString()) as Map<String, dynamic>;
-        return Einstellungen(
-          moodleAdresse: j['moodleAdresse'] as String? ?? standard.moodleAdresse,
-          port: j['port'] as int? ?? standard.port,
-          schluessel: j['schluessel'] as String? ?? standard.schluessel,
-          bestaetigungen: Bestaetigungen.ausText(j['bestaetigungen'] as String?),
-          wahlSkills: (j['wahlSkills'] as List?)?.whereType<String>().toSet(),
-          werkzeugeAbgewaehlt: (j['werkzeugeAbgewaehlt'] as List?)?.whereType<String>().toSet() ?? const {},
-          updatePruefen: j['updatePruefen'] as bool?,
-          updateZuletzt: j['updateZuletzt'] as String?,
-          updateErwartet: j['updateErwartet'] as String?,
-        );
+        return Einstellungen.aus(j, standard);
       }
     } catch (_) {
       // Kaputte Datei: mit den Standardwerten weiter und beim Speichern ersetzen.
@@ -99,18 +109,42 @@ class Einstellungen {
     return standard;
   }
 
+  /// Liest den Inhalt der Datei. Ohne `profile` (Stand bis Issue #4) wird die
+  /// Adresse `moodleAdresse` zum ersten Profil; beim nächsten Speichern kommt
+  /// `profile` dazu, `moodleAdresse` bleibt für ältere Versionen stehen.
+  static Einstellungen aus(Map<String, dynamic> j, Einstellungen standard) {
+    final liste = (j['profile'] as List?)?.map(Profil.ausJson).whereType<Profil>().toList();
+    final altAdresse = j['moodleAdresse'] as String? ?? standard.moodleAdresse;
+    return Einstellungen(
+      moodleAdresse: altAdresse,
+      profile: liste ?? (altAdresse.isEmpty ? [] : [Profil.migriert(altAdresse)]),
+      port: j['port'] as int? ?? standard.port,
+      schluessel: j['schluessel'] as String? ?? standard.schluessel,
+      bestaetigungen: Bestaetigungen.ausText(j['bestaetigungen'] as String?),
+      wahlSkills: (j['wahlSkills'] as List?)?.whereType<String>().toSet(),
+      werkzeugeAbgewaehlt: (j['werkzeugeAbgewaehlt'] as List?)?.whereType<String>().toSet() ?? const {},
+      updatePruefen: j['updatePruefen'] as bool?,
+      updateZuletzt: j['updateZuletzt'] as String?,
+      updateErwartet: j['updateErwartet'] as String?,
+    );
+  }
+
+  /// Der Inhalt der Datei, wie ihn [speichern] schreibt.
+  Map<String, Object?> zuJson() => {
+        'moodleAdresse': moodleAdresse,
+        'profile': [for (final p in profile) p.toJson()],
+        'port': port,
+        'schluessel': schluessel,
+        'bestaetigungen': bestaetigungen.text,
+        if (wahlSkills != null) 'wahlSkills': (wahlSkills!.toList()..sort()),
+        if (werkzeugeAbgewaehlt.isNotEmpty) 'werkzeugeAbgewaehlt': (werkzeugeAbgewaehlt.toList()..sort()),
+        if (updatePruefen != null) 'updatePruefen': updatePruefen,
+        if (updateZuletzt != null) 'updateZuletzt': updateZuletzt,
+        if (updateErwartet != null) 'updateErwartet': updateErwartet,
+      };
+
   Future<void> speichern() async {
     await Directory(einstellungenOrdner).create(recursive: true);
-    await _datei.writeAsString(const JsonEncoder.withIndent('  ').convert({
-      'moodleAdresse': moodleAdresse,
-      'port': port,
-      'schluessel': schluessel,
-      'bestaetigungen': bestaetigungen.text,
-      if (wahlSkills != null) 'wahlSkills': (wahlSkills!.toList()..sort()),
-      if (werkzeugeAbgewaehlt.isNotEmpty) 'werkzeugeAbgewaehlt': (werkzeugeAbgewaehlt.toList()..sort()),
-      if (updatePruefen != null) 'updatePruefen': updatePruefen,
-      if (updateZuletzt != null) 'updateZuletzt': updateZuletzt,
-      if (updateErwartet != null) 'updateErwartet': updateErwartet,
-    }));
+    await _datei.writeAsString(const JsonEncoder.withIndent('  ').convert(zuJson()));
   }
 }

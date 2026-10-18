@@ -107,3 +107,11 @@ Offen benannt, nicht still aufgelöst. Entscheidung jeweils durch die Lehrkraft 
 - ~~**Datenschutz und Sicherungsdatei:**~~ Entschieden in [E29](docs/adr/0029-sicherungen-und-verzweigung.md): A1 bleibt unverändert. Selbst erzeugte Sicherungen gehen direkt; bei fremden Dateien fragt die App deutlich, dass Nutzerdaten enthalten sein können, ohne sie zu lesen. Die Lehrkraft entscheidet.
 - ~~**Abnahme von #11 gegen die Schnittstelle:**~~ Entschieden in [E29](docs/adr/0029-sicherungen-und-verzweigung.md): Verzweigung am Rand, nicht im Moodle-Kern. Die Schnittstelle wird vor #11 festgelegt.
 - **Codex und Browser:** Codex kann über `mcp__cua_repl` selbst einen Browser öffnen und steuern. Die Lehrkraft hat das Risiko bewusst akzeptiert; in der Dokumentation für Lehrkräfte nennen ([E29](docs/adr/0029-sicherungen-und-verzweigung.md)).
+
+## Instanzprofile (Issue #4): offene Teile
+
+- Konflikt mit E31 offen: Issue #4 verlangt den Parameter `instanz` an allen Moodle-Werkzeugen, E31 verwirft genau das („Ein Server mit der Instanz als Werkzeugparameter wird nicht gebaut"). Entscheidung der Lehrkraft, bevor der MCP-Teil gebaut wird; danach E31 oder Issue anpassen.
+- MCP-Teil nicht umgesetzt: `instanz` in `mcp_dienst.dart` (rund 60 Werkzeuge), `status` und `meine_kurse` mit Profilliste, Arbeitsordner-Dateinamen mit Kennung bei mehreren Profilen, Protokoll mit Profilname. Die Auflösung liegt fertig in `lib/profil.dart` (`profilAufloesen`).
+- Oberfläche für ein zweites Profil fehlt (Titelzeile und Dialog kennen nur die eine Adresse).
+- Zwei-Instanz-Test mit lokalen Gegenstellen fehlt. Die Positivliste verlangt https, daher braucht der Test entweder ein Testzertifikat für `127.0.0.1` oder einen Seam für die Gegenstelle. Entscheidung offen; die Produktivprüfung darf dabei nicht schwächer werden.
+- Protokolleinträge der Moodle-Anfragen nennen noch kein Profil.

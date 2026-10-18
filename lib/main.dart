@@ -27,8 +27,10 @@ import 'einzelstart.dart';
 import 'freigabe.dart';
 import 'log.dart';
 import 'mcp/mcp_dienst.dart';
+import 'moodle/instanzen.dart';
 import 'moodle/moodle_zugang.dart';
 import 'moodle/zeilenvergleich.dart';
+import 'profil.dart';
 import 'protokoll.dart';
 import 'ueber.dart';
 import 'update/update.dart';
@@ -84,7 +86,9 @@ Future<void> main(List<String> argumente) async {
   );
   // Schließen läuft über _beenden, damit der Arbeitsordner geleert wird.
   await windowManager.setPreventClose(true);
-  final moodle = MoodleZugang(protokoll);
+  // Je Instanzprofil ein Zugang (moodle/instanzen.dart). Solange die Werkzeuge
+  // noch nicht nach `instanz` wählen, arbeitet die App mit dem ersten Profil.
+  final moodle = MoodleInstanzen(protokoll).zugang(Profil.standardKennung);
   final freigaben = Freigaben(protokoll,
       stufe: einstellungen.bestaetigungen, testmodus: Anmeldedaten.testzugangAktiv);
   // Reste früherer Updates im Temp-Verzeichnis; der Installer, der die App
