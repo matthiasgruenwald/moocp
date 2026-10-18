@@ -210,8 +210,8 @@ Future<String> _ausfuehren(
     // Die Kennung für den Fortschritt ist die Restore-ID aus dem Prüfformular
     // (Feld restoreid), nicht der Dateinamen-Hash der Laufzeit (gemessen: Moodle
     // lehnt den Hash mit „Ungültiger Parameterwert" ab). Fehlt sie, startet nichts.
-    final restoreid = wertIn(s16.felder, 'restoreid');
-    if (restoreid == null || !RegExp(r'^[0-9]{1,18}$').hasMatch(restoreid)) {
+    final restoreid = wertIn(s16.felder, 'restore');
+    if (restoreid == null || !RegExp(r'^[0-9a-f]{32}$').hasMatch(restoreid)) {
       throw MoodleFehler('Das Prüfformular nennt keine Kennung der Wiederherstellung (restoreid). Nichts geändert.');
     }
 
@@ -272,7 +272,6 @@ Future<String> _warten(
       final antwort = await moodle.dienst('core_backup_get_async_backup_progress', {
         'backupids': [restoreid],
         'contextid': kontext,
-        'operation': 'restore',
       });
       final stand = bewerteFortschritt(antwort, restoreid);
       if (stand == SicherungStand.fertig) break;
