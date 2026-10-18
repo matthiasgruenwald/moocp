@@ -9,7 +9,7 @@ void main() {
       const zuordnung = <String, ({String datei, String adresse})>{
         'testprofil': (
           datei: 'testzugang.env',
-          adresse: 'https://moodle.schule.example/',
+          adresse: 'HTTPS://MOODLE.SCHULE.EXAMPLE/',
         ),
       };
       final testprofil = Profil(
@@ -21,6 +21,9 @@ void main() {
       );
       final produktivprofil = testprofil.copyWith(
         adresse: 'https://produktiv.schule.example',
+      );
+      final anderesMoodleUnterverzeichnis = testprofil.copyWith(
+        adresse: 'https://moodle.schule.example/Moodle',
       );
       final anderesProfil = Profil(
         kennung: 'anderes-profil',
@@ -36,6 +39,13 @@ void main() {
       );
       expect(
         Anmeldedaten.testzugangZuordnungPasst(produktivprofil, zuordnung),
+        isFalse,
+      );
+      expect(
+        Anmeldedaten.testzugangZuordnungPasst(
+          anderesMoodleUnterverzeichnis,
+          zuordnung,
+        ),
         isFalse,
       );
       expect(

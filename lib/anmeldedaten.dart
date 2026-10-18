@@ -74,10 +74,15 @@ class Anmeldedaten {
       if (json is! Map) throw const FormatException('MOOCP_TESTZUGANG_PROFILE muss ein JSON-Objekt sein.');
       for (final entry in json.entries) {
         final wert = entry.value;
-        if (entry.key is! String || wert is! Map || wert['file'] is! String || wert['address'] is! String) {
+        if (entry.key is! String || (entry.key as String).isEmpty || wert is! Map ||
+            wert['file'] is! String || (wert['file'] as String).trim().isEmpty || wert['address'] is! String) {
           throw const FormatException('MOOCP_TESTZUGANG_PROFILE enthält einen ungültigen Eintrag.');
         }
-        result[entry.key as String] = (datei: wert['file'] as String, adresse: wert['address'] as String);
+        final uri = Uri.tryParse(wert['address'] as String);
+        if (uri == null || !{'http', 'https'}.contains(uri.scheme) || uri.host.isEmpty) {
+          throw const FormatException('MOOCP_TESTZUGANG_PROFILE enthält eine ungültige Moodle-Adresse.');
+        }
+        result[entry.key as String] = (datei: wert['file'] as String, adresse: uri.toString());
       }
     }
     final datei = Platform.environment['MOOCP_TESTZUGANG'];
@@ -88,7 +93,12 @@ class Anmeldedaten {
     return result;
   }
 
-  static String _adresseSchluessel(String adresse) => adresse.trim().replaceFirst(RegExp(r'/+$'), '').toLowerCase();
+  static String _adresseSchluessel(String adresse) {
+    final uri = Uri.tryParse(adresse.trim());
+    if (uri == null) return '';
+    return uri.replace(scheme: uri.scheme.toLowerCase(), host: uri.host.toLowerCase(),
+        path: uri.path.replaceFirst(RegExp(r'/+$'), '')).toString();
+  }
 
   static bool testzugangZuordnungPasst(Profil profil, Map<String, ({String datei, String adresse})> testprofile) =>
       _testprofilPasst(profil.kennung, profil.adresse, testprofile);
