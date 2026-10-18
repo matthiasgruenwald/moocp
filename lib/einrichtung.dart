@@ -242,7 +242,7 @@ class ClaudeCode extends KiWerkzeug {
   @override
   String get datenziel => 'Inhalte gehen an das eingestellte Modell, in der Regel bei Anthropic';
 
-  /// Pfad der claude.exe; null, wenn sie nicht gefunden wurde.
+  /// Pfad der claude-Programmdatei (unter Windows claude.exe); null, wenn sie nicht gefunden wurde.
   String? get exe => _exe ??= claudeFinden(umgebung);
   String? _exe;
 
@@ -292,7 +292,7 @@ class ClaudeCode extends KiWerkzeug {
 
   @override
   Future<String?> eintragen(int port, String schluessel, {String name = mcpName}) async {
-    if (exe == null) return 'claude.exe nicht gefunden';
+    if (exe == null) return '${_programm('claude')} nicht gefunden';
     // Fehlt der Eintrag, endet remove mit Fehler; das ist hier der Normalfall.
     await ausfuehren(exe!, ['mcp', 'remove', name, '--scope', 'user']);
     final code = await ausfuehren(exe!, addArgumente(port, schluessel, name));
@@ -302,7 +302,7 @@ class ClaudeCode extends KiWerkzeug {
   @override
   Future<String?> austragen({String name = mcpName}) async {
     if (verbindung(0, '', name: name) == Verbindung.fehlt) return null;
-    if (exe == null) return 'claude.exe nicht gefunden';
+    if (exe == null) return '${_programm('claude')} nicht gefunden';
     final code = await ausfuehren(exe!, ['mcp', 'remove', name, '--scope', 'user']);
     return code == 0 ? null : 'claude mcp remove endete mit Code $code';
   }
@@ -344,7 +344,12 @@ class CodexCli extends KiWerkzeug {
   @override
   String get name => 'Codex CLI';
   @override
-  String get datenziel => 'Inhalte gehen an das eingestellte Modell, in der Regel bei OpenAI';
+  // Der Schlüssel für Moodle steht bei Codex im Klartext in der Datei
+  // (ADR 0021, 0013): Das muss die Anzeige sagen, bevor die Lehrkraft
+  // „Installieren" klickt.
+  String get datenziel =>
+      'Inhalte gehen an das eingestellte Modell, in der Regel bei OpenAI. Der Moodle-Schlüssel steht im '
+      'Klartext in config.toml im Codex-Ordner (in der Regel ~/.codex)';
 
   /// CODEX_HOME verlegt Konfiguration und Skills; sonst `~/.codex`.
   Directory get heim => Directory(_v(umgebung, 'CODEX_HOME') ?? p.join(_heimOrdner(umgebung) ?? '', '.codex'));
@@ -955,11 +960,16 @@ Future<bool> _eintragDa(KiWerkzeug w) async {
 /// Platzhalter „python.exe" aus dem Microsoft Store endet ohne Python mit
 /// einem Fehlercode und zählt deshalb richtig als „fehlt".
 Future<bool> pythonVorhanden() async {
-  try {
-    return await _ausfuehren('python', ['--version']) == 0;
-  } catch (_) {
-    return false;
+  // Auf dem Mac heißt Python oft nur python3; der Skill ruft im Text `python`
+  // auf, das ist dort eine offene Lücke (TODO.md).
+  for (final name in Platform.isWindows ? const ['python'] : const ['python3', 'python']) {
+    try {
+      if (await _ausfuehren(name, ['--version']) == 0) return true;
+    } catch (_) {
+      // Den nächsten Namen probieren.
+    }
   }
+  return false;
 }
 
 // ---------------------------------------------------------------------------
