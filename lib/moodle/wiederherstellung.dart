@@ -496,9 +496,14 @@ Future<String> _warten(
       final stand = bewerteFortschritt(antwort, restoreid);
       if (stand == SicherungStand.fertig) break;
       if (stand == SicherungStand.fehlgeschlagen) {
-        await _uebergang(vorgaenge, vg, WiederherstellungStand.fehlgeschlagen,
-            text: 'Moodle meldet einen Fehler bei der Wiederherstellung. Kurs bitte prüfen.');
-        return 'Wiederherstellung fehlgeschlagen (Nummer ${vg.id}): Moodle meldet einen Fehler. Kurs prüfen.';
+        // Moodle hat den Fehler gemeldet: Der Kurs bleibt gesperrt (unklar), nur das
+        // Gegenlesen löst ihn auf. Freigegeben wird nur, was nachweislich vor dem
+        // Schreiben abbrach (AC #19).
+        await _uebergang(vorgaenge, vg, WiederherstellungStand.unklar,
+            text: 'Moodle meldet einen Fehler bei der Wiederherstellung. Kurs bitte prüfen; '
+                'nicht neu starten, sondern mit wiederherstellung_status prüfen.');
+        return 'Moodle meldet einen Fehler (Nummer ${vg.id}). Der Kurs bleibt gesperrt; '
+            'wiederherstellung_status prüft den Stand. Eine Wiederholung nur mit wiederholung_von.';
       }
       if (stand == SicherungStand.unklar) {
         await _uebergang(vorgaenge, vg, WiederherstellungStand.unklar,
