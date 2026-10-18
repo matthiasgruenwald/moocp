@@ -1,6 +1,7 @@
 # Changelog
 
 ## 0.9.23
+- Sicherung und Wiederherstellung: Bleibt der Fortschritt 15 Minuten stehen, meldet die App einen Stillstand mit der letzten Beobachtung, nicht einen Fehler und nicht einen Erfolg.
 - Moodle-Profile: Mehrere Instanzen lassen sich in einem Fenster verwalten; Anmeldung, Freigabestufe und KI-Werkzeug-Einrichtung gelten je Profil.
 - Moodle-Profile: Freigaben bleiben dem richtigen Profil zugeordnet; eine aktive Moodle-Adresse lässt sich erst nach der Abmeldung ändern.
 - Testmodus: Automatische Freigaben gelten nur für ausdrücklich zugeordnete Testprofile und deren Moodle-Adresse.
