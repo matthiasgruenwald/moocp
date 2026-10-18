@@ -34,6 +34,7 @@ import 'package:html/parser.dart' as html_parser;
 
 import '../protokoll.dart';
 import 'browserliste.dart';
+import 'sicherung_regeln.dart';
 import 'sperrliste.dart';
 
 class MoodleFehler implements Exception {
@@ -250,6 +251,11 @@ class MoodleZugang {
           'mod_kanban_$k': (a) => _nur(a, {'cmid', 'boardid', 'data'}),
         // Dynamische Formulare, nur die gemessenen Klassen.
         'core_form_dynamic_form': (a) => _nur(a, {'form', 'formdata'}) && dynamischeFormulare.contains(a['form']),
+        // Sicherung: Fortschritt lesen, und den Downloadlink einer fertigen Sicherung.
+        'core_backup_get_async_backup_progress': (a) =>
+            _nur(a, {'backupids', 'contextid'}) && a['backupids'] is List && a['contextid'] is num,
+        'core_backup_get_async_backup_links_backup': (a) =>
+            _nur(a, {'filename', 'contextid', 'backupid'}) && a['filename'] is String && a['backupid'] != null,
       };
 
   /// Formularklassen für core_form_dynamic_form.
@@ -333,6 +339,12 @@ class MoodleZugang {
                 _nurSchluessel(q, {'cmid', 'id', 'pagenum', 'subchapter'}) &&
                 _zahl(q['cmid']) &&
                 (_zahl(q['id']) || _zahl(q['pagenum']))),
+        // Sicherung einer Aktivität (sicherung.dart). Nur die gemessenen Schritte
+        // der Assistenten; Nutzerdaten bleiben aus (sicherung_regeln.dart).
+        Erlaubt('GET', r'^/backup/backup\.php$', 'Sicherung: Einstiegsseite einer Aktivität',
+            parameter: (q) => _nurSchluessel(q, {'id', 'cm'}) && _zahl(q['id']) && (q['cm'] == null || _zahl(q['cm']))),
+        Erlaubt('GET', r'^/pluginfile\.php/\d+/user/backup/\d+/[^/?#]+\.mbz$', 'Sicherungsdatei',
+            parameter: (q) => q.length == 1 && q['forcedownload'] == '1'),
         Erlaubt('GET', r'^/draftfile\.php/\d+/user/draft/\d+/.+', 'Datei im Entwurfsbereich'),
         Erlaubt('GET', r'^/pluginfile\.php/\d+/.+', 'Datei im Kurs'),
         Erlaubt('POST', r'^/lib/ajax/service\.php$', 'Moodle-Dienst (nur lesend, siehe dienste)',
@@ -355,6 +367,17 @@ class MoodleZugang {
               return _zahl(wertIn(f, 'course')) &&
                   schreibbareModule.contains(modul) &&
                   wertIn(f, '_qf__mod_${modul}_mod_form') != null;
+            }),
+        // Sicherung: die Schritte 1, 2 und 4 des Assistenten, nur ohne
+        // Nutzerdaten. Schritt 4 startet die Sicherung (sicherung.dart).
+        Erlaubt('POST', r'^/backup/backup\.php$', 'Sicherung: Schritte 1, 2 und 4 (ohne Nutzerdaten)',
+            parameter: (q) => q.isEmpty,
+            formular: (f) {
+              final schritt = wertIn(f, 'stage');
+              return const {'1', '2', '4'}.contains(schritt) &&
+                  (_marke(f, RegExp(r'^_qf__backup_(initial|schema|confirmation)_form$'))) &&
+                  _gesetzt(wertIn(f, 'sesskey')) &&
+                  ohneNutzerdaten(f);
             }),
         Erlaubt('POST', r'^/course/editsection\.php$', 'Abschnitt speichern',
             parameter: (q) => q.isEmpty,
@@ -856,6 +879,70 @@ class MoodleZugang {
     final r = await _roh('POST', _adresse(pfadMitQuery), formular: felder, anhang: datei);
     await _pruefeSitzungNachSchreiben(r);
     return r;
+  }
+
+  /// Lädt eine Sicherungsdatei (Pfad mit `?forcedownload=1`) als Stream nach
+  /// [ziel]. Geschrieben wird zuerst nach `<ziel>.teil`; erst wenn die Größe
+  /// mit der angekündigten übereinstimmt, wird umbenannt. Bei jedem Fehler
+  /// verschwindet der Teil. Eine vorhandene Datei wird nie überschrieben.
+  /// Gibt die Zahl der Bytes zurück.
+  Future<int> herunterladen(String pfadMitQuery, File ziel) async {
+    _pruefeAngemeldet();
+    final uri = _adresse(pfadMitQuery);
+    _pruefePositivliste('GET', uri, null, null);
+    if (await ziel.exists()) throw MoodleFehler('Zieldatei existiert schon; nichts überschrieben.');
+    final teil = File('${ziel.path}.teil');
+    final client = HttpClient()
+      ..userAgent = 'moocp (lokal)'
+      ..connectionTimeout = verbindungsgrenze;
+    IOSink? senke;
+    var fertig = false;
+    try {
+      final req = await client.getUrl(uri);
+      req.followRedirects = false;
+      _cookies.forEach((k, v) => req.cookies.add(Cookie(k, v)));
+      final res = await req.close().timeout(antwortgrenze);
+      protokoll.eintrag(Art.moodle, 'GET ${uri.path}${_querySicher(uri)} → ${res.statusCode}');
+      if (res.statusCode != 200) throw MoodleFehler('Download abgelehnt (HTTP ${res.statusCode}).');
+      if (res.headers.contentType?.mimeType == 'text/html') {
+        throw MoodleFehler('Download liefert eine Seite statt einer Datei (Anmeldung abgelaufen?).');
+      }
+      final erwartet = res.contentLength;
+      if (erwartet < 0) {
+        // Ohne angekündigte Größe gibt es keine Prüfung; dann wird nichts übernommen.
+        throw MoodleFehler('Moodle nennt die Größe der Datei nicht; nicht übernommen.');
+      }
+      senke = teil.openWrite();
+      var gelesen = 0;
+      await for (final d in res.timeout(antwortgrenze)) {
+        gelesen += d.length;
+        senke.add(d);
+      }
+      final s = senke;
+      senke = null;
+      await s.close();
+      if (gelesen != erwartet) {
+        throw MoodleFehler('Die Datei ist unvollständig ($gelesen von $erwartet Bytes).');
+      }
+      await teil.rename(ziel.path);
+      fertig = true;
+      return gelesen;
+    } on SocketException catch (e) {
+      protokoll.eintrag(Art.fehler, 'GET ${uri.path}: nicht erreichbar');
+      throw MoodleNichtErreichbar('Moodle nicht erreichbar: ${e.message}');
+    } on TimeoutException {
+      protokoll.eintrag(Art.fehler, 'GET ${uri.path}: keine Antwort innerhalb der Zeitgrenze');
+      throw MoodleNichtErreichbar('Moodle antwortet nicht (${uri.path}). Später noch einmal versuchen.');
+    } on IOException catch (e) {
+      protokoll.eintrag(Art.fehler, 'GET ${uri.path}: Verbindung abgebrochen (${e.runtimeType})');
+      throw MoodleNichtErreichbar('Verbindung zu Moodle abgebrochen (${e.runtimeType}). Später noch einmal versuchen.');
+    } finally {
+      client.close(force: true);
+      try {
+        await senke?.close();
+      } catch (_) {}
+      if (!fertig && await teil.exists()) await teil.delete();
+    }
   }
 
   Future<void> _pruefeSitzungNachSchreiben(Antwort r) async {

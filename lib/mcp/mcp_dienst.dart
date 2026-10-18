@@ -17,6 +17,7 @@ import 'package:mcp_dart/mcp_dart.dart';
 import 'package:path/path.dart' as p;
 
 import '../einstellungen.dart';
+import '../einstellungen_ort.dart';
 import '../freigabe.dart';
 import '../profil.dart';
 import '../log.dart';
@@ -35,6 +36,7 @@ import '../moodle/kursfilter.dart';
 import '../moodle/kurshinweise.dart';
 import '../moodle/links.dart';
 import '../moodle/moodle_zugang.dart';
+import '../moodle/sicherung.dart';
 import '../moodle/stack.dart';
 import '../moodle/test.dart';
 import '../moodle/wiki.dart';
@@ -51,6 +53,26 @@ const _stufenText = {
       'Anlegen und das Füllen des gerade Angelegten, Duplizieren, Kategorie anlegen und Fragen importieren. Sag im Plan, wie viele '
       'Freigaben kommen (eine je Aufruf; Mehreres in einem Aufruf bündelt die App).',
 };
+
+/// Wartet höchstens [z] auf [f]. Danach kommt [weiter] als Text zurück, und
+/// [f] läuft im Hintergrund weiter: Eine Sicherung verliert sich nicht, nur weil
+/// der Client nicht mehr wartet. Ein Fehler von [f] geht an den Aufrufer, auch
+/// wenn er nach dem Zeitlimit kommt.
+Future<String> _zeitlimit(Future<String> f, Duration z, String Function() weiter) {
+  final c = Completer<String>();
+  f.then(
+    (t) {
+      if (!c.isCompleted) c.complete(t);
+    },
+    onError: (Object e, StackTrace st) {
+      if (!c.isCompleted) c.completeError(e, st);
+    },
+  );
+  Timer(z, () {
+    if (!c.isCompleted) c.complete(weiter());
+  });
+  return c.future;
+}
 
 class McpDienst {
   McpDienst(this.einstellungen, this.moodle, this.protokoll, this.freigaben, this.arbeitsordner,
@@ -297,6 +319,7 @@ class McpDienst {
       server.server.oninitialized = () => protokoll.eintrag(Art.info, 'KI-Werkzeug verbunden: ${_client(server)}');
     }
     final ao = arbeitsordner;
+    final vorgaenge = Vorgaenge(sicherungenOrdner);
 
     _werkzeug(server, 'status',
         titel: 'Status',
@@ -639,8 +662,48 @@ class McpDienst {
             abschnittId: _zahlOder(a, 'abschnitt_id'),
             name: _text(a, 'name')));
 
+    // ---- Sicherung einer Aktivität (E29, moodle/sicherung.dart)
+    _werkzeug(server, 'sichern_aktivitaet',
+        titel: 'Aktivität sichern',
+        beschreibung: 'Sichert eine Aktivität als Datei (.mbz) in den Sicherungsordner der App, außerhalb des '
+            'Arbeitsordners, ohne Nutzerdaten. Nummer und Name müssen zusammenpassen. Vor dem Start fragt die App '
+            'nach einer Freigabe, die Kurs, Namen und Datei zeigt. Dauert die Sicherung länger als eine Minute, '
+            'läuft sie weiter: dann sicherung_status mit der Nummer aufrufen.',
+        parameter: {
+          'kurs': _kurs,
+          'cmid': _cmid,
+          'name': _name,
+          'ziel_ordner': JsonSchema.string(
+              description: 'Optional: Unterordner im Sicherungsordner, nur einfache Ordnernamen (kein „..", '
+                  'kein Laufwerk).'),
+        },
+        pflicht: ['kurs', 'cmid', 'name'],
+        ausfuehren: (a) => _zeitlimit(
+              aktivitaetSichern(moodle, freigaben, vorgaenge,
+                  kurs: _zahl(a, 'kurs'),
+                  cmid: _zahl(a, 'cmid'),
+                  name: _text(a, 'name'),
+                  zielOrdner: a['ziel_ordner'] as String?),
+              const Duration(minutes: 1),
+              () => 'Die Sicherung läuft weiter. Mit sicherung_status und der Nummer später prüfen, '
+                  'ob sie fertig ist.',
+            ));
+
+    _werkzeug(server, 'sicherung_status',
+        titel: 'Sicherung prüfen',
+        beschreibung: 'Zeigt den Stand einer Sicherung (anstehend, laufend, fertig, fehlgeschlagen, unklar) und '
+            'fragt laufende bei Moodle nach. Ohne Nummer: die letzten Sicherungen. Nur lesen, außer wenn eine '
+            'Sicherung noch bei Moodle läuft.',
+        parameter: {'id': JsonSchema.string(description: 'Nummer der Sicherung, wie sichern_aktivitaet sie nennt')},
+        nurLesen: true,
+        ausfuehren: (a) => _zeitlimit(
+              sicherungStatus(moodle, vorgaenge, id: a['id'] as String?),
+              const Duration(minutes: 1),
+              () => 'Die Sicherung läuft noch. Bitte später erneut prüfen.',
+            ));
+
     // ---- Bücher
-    final buchCmid = JsonSchema.integer(description: 'cmid des Buchs, die Zahl hinter mod/book/view.php?id=');
+    final buchCmid =JsonSchema.integer(description: 'cmid des Buchs, die Zahl hinter mod/book/view.php?id=');
     final kapitelId = JsonSchema.integer(description: 'id des Kapitels (aus buch_lesen, „[id …]")');
     final kapitelTitel = JsonSchema.string(
         description: 'Der Titel des Kapitels, wie er jetzt dasteht (aus buch_lesen). Passt er nicht zur id, '

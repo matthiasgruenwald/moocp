@@ -28,3 +28,11 @@ String einstellungenOrdnerFuer(
 }
 
 File get einstellungenDatei => File(p.join(einstellungenOrdner, 'einstellungen.json'));
+
+/// Der Ordner für Sicherungen einer Aktivität (E29): außerhalb des Arbeitsordners,
+/// der beim Start und Beenden geleert wird. Unter Windows `%APPDATA%\moocp\sicherungen`,
+/// auf dem Mac `~/Library/Application Support/moocp/sicherungen`.
+String get sicherungenOrdner => sicherungenOrdnerFuer(Platform.environment, macos: Platform.isMacOS);
+
+String sicherungenOrdnerFuer(Map<String, String> umgebung, {required bool macos}) =>
+    p.join(einstellungenOrdnerFuer(umgebung, macos: macos), 'sicherungen');

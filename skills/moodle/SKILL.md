@@ -23,8 +23,15 @@ Moodle-Instanz hat einen eigenen Server mit eigenem Präfix (etwa
 | Anlegen | `aktivitaet_anlegen`, `abschnitt_anlegen`, `buchkapitel_anlegen`, `wikiseite_schreiben` |
 | Ändern | `aendern`, `aendern_mehrere`, `links_setzen`, `claude_schreiben`, `fortschrittsliste_aendern`, `board_aendern`, `kanban_aendern`, `bewertungsschema_setzen`, `buch_ordnen`, `buchkapitel_verschieben` |
 | Kursrahmen | `sichtbarkeit_setzen`, `verschieben`, `duplizieren`, `loeschen`, `buchkapitel_loeschen`, `wikiseite_loeschen` |
+| Sichern | `sichern_aktivitaet`, `sicherung_status` |
 | Ansehen | `bildschirmfoto` |
 | Tests und Fragen | im Skill `moodle-fragen` |
+
+Eine Sicherung (`sichern_aktivitaet`) ist eine einzelne Aktivität, ohne Nutzerdaten,
+als Datei im Sicherungsordner der App. Sie ändert im Kurs nichts. Die Lehrkraft
+gibt sie vorher frei; nenne ihr Name und Nummer genau wie in `aktivitaet_lesen`.
+Läuft sie länger als der Aufruf, rufe `sicherung_status` mit der Nummer auf,
+statt sie neu zu starten.
 
 **Fehlen die Werkzeuge**, oder meldet `status` „nicht angemeldet", dann bitte
 die Lehrkraft, die App zu starten bzw. sich darin anzumelden, und warte. Weich

@@ -108,6 +108,19 @@ Offen benannt, nicht still aufgelöst. Entscheidung jeweils durch die Lehrkraft 
 - ~~**Abnahme von #11 gegen die Schnittstelle:**~~ Entschieden in [E29](docs/adr/0029-sicherungen-und-verzweigung.md): Verzweigung am Rand, nicht im Moodle-Kern. Die Schnittstelle wird vor #11 festgelegt.
 - **Codex und Browser:** Codex kann über `mcp__cua_repl` selbst einen Browser öffnen und steuern. Die Lehrkraft hat das Risiko bewusst akzeptiert; in der Dokumentation für Lehrkräfte nennen ([E29](docs/adr/0029-sicherungen-und-verzweigung.md)).
 
+## Aktivität sichern (Issue #6): UNGEMESSEN
+
+Umgesetzt, nicht auf einer Instanz durchgespielt (A10: kein Testkurs genannt). Die folgenden Punkte sind im Code als UNGEMESSEN markiert; sie werden im Testkurs mit `ZZ`-Proben gemessen, bevor die Sicherung als geprüft gilt.
+
+- Form der Antwort von `core_backup_get_async_backup_progress`: angenommen eine Liste mit `backupid`, `progress`, `status`; ein Fehlerfeld (`error`/`errorcode`) gilt als fehlgeschlagen, alles Unbekannte als `unklar` (`bewerteFortschritt`, `lib/moodle/sicherung_regeln.dart`).
+- Form der Antwort von `core_backup_get_async_backup_links_backup`: die App sucht den Downloadpfad im Text der Antwort (`sicherungsLink`); nötig ist die echte Form.
+- Teil des Downloadpfads: die Zahl nach `user/backup/` (itemid) ist nur als Muster erfasst (`\d+`), nicht gemessen.
+- Antwort mit `contentLength < 0` beim Herunterladen: die App lehnt ab (fail-closed, `herunterladen` in `lib/moodle/moodle_zugang.dart`); wie Moodle die Länge bei großen Dateien meldet, ist nicht gemessen.
+- Feldnamen der Schema-Seite (Schritt 2): `setting_activity_<art>_<cmid>_included` und `_userinfo` sind angenommen; nur Schritt 4 ist gemessen.
+- Nutzerdaten-Optionen: gemessen sind `users` und `enrolments`; `groups`, `userscompletion`, `logs`, `grade_histories`, `badges` stehen auf der Liste, damit sie nicht still eingeschaltet bleiben, sind aber ungemessen.
+- Test für den Download fehlt: `herunterladen` hat keinen HTTP-Test. Der Weg braucht `fuerTest` (nur Debug-Bau, `http://127.0.0.1`, Anmeldung) und ein Fake-Moodle wie in `test/instanzen_test.dart`. Nachrüsten, dann mit Messung im Testkurs.
+- Die Sperrliste lässt genau `/pluginfile.php/<ctx>/user/backup/<item>/<datei>.mbz?forcedownload=1` durch; andere Nutzerdateien bleiben gesperrt (Test in `test/sicherung_regeln_test.dart`).
+
 ## Instanzprofile (Issue #4): offene Teile
 
 - Oberfläche für ein zweites Profil fehlt: Anmeldung, Titelzeile und Dialoge zeigen nur das Hauptprofil (erstes Profil). Weitere Profile kommen über die Einstellungsdatei, ein Anmeldefeld je Profil fehlt.

@@ -298,6 +298,7 @@ Gelesenes legt die App im Arbeitsordner ab, an die KI geht eine Übersicht. Lese
 | `aktivitaet_lesen` | Eine Aktivität vollständig: Text, eingebettete und angehängte Dateien, alle Einstellungen. Dazu eine Übersicht mit Gliederung, Bildern, Verweisen und Befunden. | – |
 | `abschnitt_lesen` | Name, Beschreibung und Einstellungen eines Abschnitts oder Unterabschnitts, dazu die Konventionen dieses Abschnitts, falls es sie gibt. | – |
 | `buch_lesen` | Alle Kapitel eines Buchs. | – |
+| `sicherung_status` | Zeigt den Stand einer Aktivitätssicherung (anstehend, laufend, fertig, fehlgeschlagen, unklar); laufende fragt Moodle nach. Ohne Nummer die letzten Sicherungen. Die Datei selbst wird nur beim Abschluss der Sicherung geholt, nicht hier. | – |
 | `wiki_lesen` | Alle Seiten eines gemeinsamen Wikis und ihr Verweisnetz – nie, wer was geschrieben hat. Persönliche Wikis und Wikis im Gruppenmodus gar nicht. | – |
 | `fortschrittsliste_lesen` | Die Einträge einer Fortschrittsliste – nie, wer abgehakt hat. | – |
 | `board_lesen` | Die Spalten eines Boards; Notizen anderer werden nur gezählt. | – |
@@ -332,6 +333,7 @@ Eine Ausnahme: Was die KI gerade selbst verborgen angelegt hat, ist noch nichts 
 
 | Werkzeug | Was es tut | Freigabe |
 |---|---|---|
+| `sichern_aktivitaet` | Sichert eine Aktivität als Datei (.mbz) in den Sicherungsordner der App, außerhalb des Arbeitsordners, ohne Nutzerdaten. Nummer und Name müssen zusammenpassen; die Datei wird nach dem Herunterladen gegen die Größe geprüft. Läuft die Sicherung über den Aufruf hinaus, geht sie weiter, und `sicherung_status` zeigt den Stand. | **ja**, vor dem Start |
 | `aendern` | Schreibt einen gelesenen Ordner zurück: Aktivität, Abschnitt, Buchkapitel oder Frage – Text, Dateien, Einstellungen. Bricht ab, wenn Moodle nicht mehr den gelesenen Stand zeigt. Eine Frage bekommt dabei eine neue Version. | **ja**, außer bei gerade verborgen Angelegtem |
 | `aendern_mehrere` | Wie `aendern` für mehrere Seiten eines Abschnitts, mit einer Freigabe. | **ja**, außer bei gerade verborgen Angelegtem |
 | `claude_schreiben` | Schreibt die Konventionen eines Kurses oder eines Abschnitts in die Datei „CLAUDE.md". Fehlt das Verzeichnis „CLAUDE", legt die App es verborgen an – dann ohne Rückfrage, wie jedes neue, verborgene Objekt. | **ja**, wenn die Datei schon da ist |
