@@ -392,7 +392,7 @@ Future<String> auswahlSichern(
   // Erwartete Auswahl: bei „nur Genannte" die Angaben plus alle Aktivitäten der
   // genannten Abschnitte. Bei „ganzer Kurs" die Seite selbst, die mit der
   // Kursübersicht verglichen wird.
-  final genannteAbschnitte = {for (final s in abschnitte) s.id};
+  final angegebeneAbschnitte = {for (final s in abschnitte) s.id};
   final genannteCmids = {
     for (final a in aktivitaeten) a.cmid,
     for (final s in abschnitte) ...?k.nachId[s.id]?.aktivitaeten.map((x) => x.cmid),
@@ -415,7 +415,7 @@ Future<String> auswahlSichern(
   final Set<int> wahlAbschnitte;
   if (nurGenannte) {
     wahlCmids = genannteCmids;
-    wahlAbschnitte = genannteAbschnitte;
+    wahlAbschnitte = angegebeneAbschnitte;
   } else {
     if (seiteCmids.length != k.nachCmid.length || !seiteCmids.containsAll(k.nachCmid.keys)) {
       throw MoodleFehler('Die Auswahlseite nennt andere Aktivitäten als die Kursübersicht. Nichts gestartet.');
@@ -451,12 +451,18 @@ Future<String> auswahlSichern(
     for (final id in wahlAbschnitte.toList()..sort())
       if (k.nachId[id] != null) '„${k.nachId[id]!.titel}"',
   ];
+  // Abschnitte, die nur als Rahmen mitgehen, weil eine ihrer Aktivitäten gewählt
+  // ist (Moodle nimmt sonst die Aktivität nicht mit). Ihre übrigen Aktivitäten
+  // bleiben aus, das sagt die Freigabe.
+  final rahmen = (genannteAbschnitte(s2.felder, cmids: wahlCmids, abschnitte: wahlAbschnitte)
+      .difference(wahlAbschnitte)).toList()
+    ..sort();
   final luecken = inhaltsLuecken(ausgewaehlt.map((a) => a.modul));
   final kursName = await kursname(moodle, kurs) ?? '';
   final ordner = p.join(vorgaenge.ordner, ziel);
   await Directory(ordner).create(recursive: true);
   final dateiName = await freierName(ordner, kursSicherungsName(kurs, DateTime.now()));
-  final anzahl = '${ausgewaehlt.length} Aktivitäten, ${wahlAbschnitte.length} Abschnitte';
+  final anzahl = '${ausgewaehlt.length} Aktivitäten, ${wahlAbschnitte.length + rahmen.length} Abschnitte';
   final vg = await vorgaenge.neu(
       kurs: kurs, cmid: 0, datei: p.join(ziel, dateiName), auswahl: '${art.text}: $anzahl');
 
@@ -468,6 +474,8 @@ Future<String> auswahlSichern(
       punkte: [
         'Sicherung (${art.text}) von Kurs $kurs „$kursName"',
         if (abschnittNamen.isNotEmpty) 'Abschnitte: ${abschnittNamen.join(', ')}',
+        for (final id in rahmen)
+          'Abschnitt ${k.nachId[id]?.nummer ?? id} wird als Rahmen mitgesichert, ohne seine übrigen Aktivitäten',
         'Aktivitäten ($anzahl): ${ausgewaehlt.map((a) => '„${a.name}"').join(', ')}',
         if (art != AuswahlArt.ganzerKurs) 'Nicht enthalten: alle übrigen Abschnitte und Aktivitäten des Kurses',
         'Ohne Nutzerdaten: keine Teilnehmenden, Abgaben, Bewertungen. Im Kurs ändert sich nichts.',

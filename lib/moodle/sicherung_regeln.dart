@@ -16,7 +16,8 @@ const Set<String> nutzerdatenOptionen = {
   'users', 'enrolments', 'groups', 'userscompletion', 'logs', 'grade_histories', 'badges',
 };
 
-final RegExp _nutzerdatenUserinfo = RegExp(r'^setting_activity_[a-z0-9_]+_\d+_userinfo$');
+/// Das `_userinfo`-Feld je Aktivität und je Abschnitt (gemessen: jedes Abschnittsfeld hat eines).
+final RegExp _nutzerdatenUserinfo = RegExp(r'^setting_(activity|section)_[a-z0-9_]+_\d+_userinfo$');
 final RegExp _aktivitaetEingeschaltet = RegExp(r'^setting_activity_[a-z0-9_]+_(\d+)_included$');
 
 /// Der letzte Wert je Feldname. Moodle setzt vor jedes Kontrollkästchen ein
@@ -86,10 +87,55 @@ Map<int, String> eingeschlosseneAbschnitte(List<MapEntry<String, String>> f) {
   return aus;
 }
 
-/// Die Auswahl, wie sie auf der Schema-Seite (Schritt 2) stehen soll: genau
-/// [cmids] und [abschnitte] ein, alle übrigen Aktivitäten und Abschnitte aus,
-/// Nutzerdaten aus. Null, wenn eine der Nummern auf der Seite fehlt. Die Seite
-/// wird nicht erweitert; jedes Feld behält seine Stelle, nur der Wert ändert sich.
+/// Zu welchem Abschnitt jede Aktivität gehört: cmid -> Abschnittsid. Gemessen:
+/// Moodle setzt jede Aktivität hinter das Abschnittsfeld, zu dem sie gehört.
+/// Eine Aktivität vor dem ersten Abschnittsfeld hat keinen Eintrag.
+Map<int, int> abschnittJeAktivitaet(List<MapEntry<String, String>> f) {
+  final aus = <int, int>{};
+  int? abschnitt;
+  for (final e in f) {
+    final s = _abschnittEingeschaltet.firstMatch(e.key);
+    if (s != null) {
+      abschnitt = int.parse(s.group(1)!);
+      continue;
+    }
+    final a = _aktivitaetEingeschaltet.firstMatch(e.key);
+    if (a != null && abschnitt != null) aus.putIfAbsent(int.parse(a.group(1)!), () => abschnitt!);
+  }
+  return aus;
+}
+
+/// Die Aktivitäten, die eine Auswahl nennt: die gewählten und alle Aktivitäten
+/// der gewählten Abschnitte.
+Set<int> genannteAktivitaeten(
+  List<MapEntry<String, String>> f, {
+  required Set<int> cmids,
+  required Set<int> abschnitte,
+}) {
+  final zu = abschnittJeAktivitaet(f);
+  return {...cmids, for (final e in zu.entries) if (abschnitte.contains(e.value)) e.key};
+}
+
+/// Die Abschnitte, die eine Auswahl einschließen muss: die gewählten und der
+/// Abschnitt jeder gewählten Aktivität. Moodle nimmt eine Aktivität nur mit,
+/// wenn ihr Abschnitt eingeschlossen ist (gemessen). Dieser Abschnitt kommt
+/// dann als Rahmen mit, ohne seine übrigen Aktivitäten.
+Set<int> genannteAbschnitte(
+  List<MapEntry<String, String>> f, {
+  required Set<int> cmids,
+  required Set<int> abschnitte,
+}) {
+  final zu = abschnittJeAktivitaet(f);
+  return {...abschnitte, for (final c in cmids) if (zu[c] != null) zu[c]!};
+}
+
+/// Die Auswahl, wie sie auf der Schema-Seite (Schritt 2) stehen soll: ein
+/// [cmids] und ein [abschnitte] nach der Angabe, dazu der Abschnitt jeder
+/// gewählten Aktivität als Rahmen (siehe [genannteAbschnitte]). Alle übrigen
+/// Aktivitäten und Abschnitte aus, `_userinfo` und Nutzerdaten aus. Null, wenn
+/// eine Nummer auf der Seite fehlt oder eine gewählte Aktivität zu keinem
+/// Abschnitt der Seite gehört. Die Seite wird nicht erweitert; jedes Feld behält
+/// seine Stelle, nur der Wert ändert sich.
 List<MapEntry<String, String>>? schemaWahl(
   List<MapEntry<String, String>> f, {
   required Set<int> cmids,
@@ -97,18 +143,22 @@ List<MapEntry<String, String>>? schemaWahl(
 }) {
   final akt = eingeschlosseneAktivitaeten(f).keys.toSet();
   final sek = eingeschlosseneAbschnitte(f).keys.toSet();
+  final zu = abschnittJeAktivitaet(f);
   if (!cmids.every(akt.contains) || !abschnitte.every(sek.contains)) return null;
+  if (!cmids.every(zu.containsKey)) return null;
+  final aktWahl = genannteAktivitaeten(f, cmids: cmids, abschnitte: abschnitte);
+  final sekWahl = genannteAbschnitte(f, cmids: cmids, abschnitte: abschnitte);
   return [
     for (final e in f)
-      MapEntry(e.key, _wahlWert(e.key, e.value, cmids, abschnitte)),
+      MapEntry(e.key, _wahlWert(e.key, e.value, aktWahl, sekWahl)),
   ];
 }
 
-String _wahlWert(String k, String v, Set<int> cmids, Set<int> abschnitte) {
+String _wahlWert(String k, String v, Set<int> aktWahl, Set<int> sekWahl) {
   final a = _aktivitaetEingeschaltet.firstMatch(k);
-  if (a != null) return cmids.contains(int.parse(a.group(1)!)) ? '1' : '0';
+  if (a != null) return aktWahl.contains(int.parse(a.group(1)!)) ? '1' : '0';
   final s = _abschnittEingeschaltet.firstMatch(k);
-  if (s != null) return abschnitte.contains(int.parse(s.group(1)!)) ? '1' : '0';
+  if (s != null) return sekWahl.contains(int.parse(s.group(1)!)) ? '1' : '0';
   if (_nutzerdatenUserinfo.hasMatch(k)) return '0';
   if (k.startsWith('setting_root_') && nutzerdatenOptionen.contains(k.substring('setting_root_'.length))) {
     return '0';
@@ -116,9 +166,11 @@ String _wahlWert(String k, String v, Set<int> cmids, Set<int> abschnitte) {
   return v;
 }
 
-/// Prüft die Bestätigungsseite (Schritt 4) einer Auswahl gegen die Bestellung:
-/// eingeschaltet sind genau [cmids] und [abschnitte], keine Nutzerdaten. Null
-/// heißt in Ordnung, sonst der Grund für den Abbruch vor der Ausführung.
+/// Prüft die Bestätigungsseite (Schritt 4) einer Auswahl gegen die Bestellung.
+/// Erwartet eingeschaltet sind die genannten Aktivitäten ([genannteAktivitaeten])
+/// und die genannten Abschnitte ([genannteAbschnitte]), sonst nichts, und keine
+/// Nutzerdaten. Null heißt in Ordnung, sonst der Grund für den Abbruch vor der
+/// Ausführung.
 String? bestaetigungWahlFehler(
   List<MapEntry<String, String>> f, {
   required Set<int> cmids,
@@ -127,6 +179,8 @@ String? bestaetigungWahlFehler(
   if (schrittVon(f) != '4') {
     return 'Die Seite ist keine Bestätigung (Schritt ${schrittVon(f) ?? 'unbekannt'}).';
   }
+  final erwartetAkt = genannteAktivitaeten(f, cmids: cmids, abschnitte: abschnitte);
+  final erwartetSek = genannteAbschnitte(f, cmids: cmids, abschnitte: abschnitte);
   final akt = {
     for (final e in eingeschlosseneAktivitaeten(f).entries)
       if (e.value == '1') e.key,
@@ -135,14 +189,17 @@ String? bestaetigungWahlFehler(
     for (final e in eingeschlosseneAbschnitte(f).entries)
       if (e.value == '1') e.key,
   };
-  if (akt.length != cmids.length || !akt.containsAll(cmids)) {
-    final mehr = akt.difference(cmids).toList()..sort();
-    final weniger = cmids.difference(akt).toList()..sort();
+  if (akt.length != erwartetAkt.length || !akt.containsAll(erwartetAkt)) {
+    final mehr = akt.difference(erwartetAkt).toList()..sort();
+    final weniger = erwartetAkt.difference(akt).toList()..sort();
     return 'Die Bestätigung weicht bei den Aktivitäten ab (zu viel: ${mehr.join(', ')}; '
         'fehlt: ${weniger.join(', ')}).';
   }
-  if (sek.length != abschnitte.length || !sek.containsAll(abschnitte)) {
-    return 'Die Bestätigung weicht bei den Abschnitten von der Bestellung ab.';
+  if (sek.length != erwartetSek.length || !sek.containsAll(erwartetSek)) {
+    final mehr = sek.difference(erwartetSek).toList()..sort();
+    final weniger = erwartetSek.difference(sek).toList()..sort();
+    return 'Die Bestätigung weicht bei den Abschnitten ab (zu viel: ${mehr.join(', ')}; '
+        'fehlt: ${weniger.join(', ')}).';
   }
   if (!ohneNutzerdaten(f)) return 'Die Bestätigung schaltet Nutzerdaten ein.';
   return null;

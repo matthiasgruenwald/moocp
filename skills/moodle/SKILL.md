@@ -40,9 +40,10 @@ Vorlage an Kolleginnen und Kollegen weitergeben, einen Kurs als Grundlage für
 das nächste Schuljahr sichern. Ein anderer Einsatz mit Grund ist willkommen.
 Die Freigabe zeigt, was genau mitgeht; die Lehrkraft sieht dort auch, welche
 Inhalte fehlen, weil Lernende sie füllen (etwa Glossareinträge oder Forenbeiträge).
-Das sag ihr auch selbst, bevor sie zustimmt. Ob ein Abschnitt seine Aktivitäten
-mitnimmt und wie Moodle den Kurs bei einer Auswahl benennt, prüft die Lehrkraft
-vor dem Einsatz.
+Das sag ihr auch selbst, bevor sie zustimmt. Eine Aktivität kommt nur mit, wenn
+ihr Abschnitt mitgeht; dieser Abschnitt ist dann ein Rahmen, und die Freigabe
+nennt ihn. Ob Moodle den Rahmen ohne seine übrigen Aktivitäten hält und wie
+Moodle den Kurs bei einer Auswahl benennt, prüft die Lehrkraft vor dem Einsatz.
 
 **Fehlen die Werkzeuge**, oder meldet `status` „nicht angemeldet", dann bitte
 die Lehrkraft, die App zu starten bzw. sich darin anzumelden, und warte. Weich
