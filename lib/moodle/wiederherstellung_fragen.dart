@@ -18,6 +18,8 @@
 // und im Ziel (Platzliste) benennt. Die Eingaben kommen daher vom Aufrufer; siehe
 // TODO.md.
 
+import 'package:xml/xml.dart';
+
 /// Eine tatsächlich verwendete Frage aus der Quelle.
 typedef QuizFrage = ({String name, String? sachnummer, bool zufall});
 
@@ -144,4 +146,40 @@ List<String> _rest(List<String> a, List<String> b) {
     if (!frei.remove(x)) rest.add(x);
   }
   return rest;
+}
+
+/// Die Fragen eines Quiz aus dem Archiv: activities/quiz_*/quiz.xml (question_instance
+/// mit question_reference/questionbankentryid, oder question_set_reference für Zufall)
+/// und die Fragenbank questions.xml (question_bank_entry mit idnummer und Name).
+/// [questionsXml] null: keine Fragenbank, dann hat keine Frage eine Sachnummer. UNGEMESSEN:
+/// das ist die festgelegte Lesart, nicht die gemessene Moodle-Ausgabe.
+List<QuizFrage> quizFragenAusXml(String quizXml, String? questionsXml) {
+  final bank = <String, ({String? idnummer, String name})>{};
+  if (questionsXml != null) {
+    for (final e in XmlDocument.parse(questionsXml).findAllElements('question_bank_entry')) {
+      final id = e.getAttribute('id') ?? '';
+      final idnummer = e.getElement('idnumber')?.innerText.trim();
+      final namen = [for (final n in e.findAllElements('name')) n.innerText.trim()];
+      bank[id] = (
+        idnummer: idnummer == null || idnummer.isEmpty ? null : idnummer,
+        name: namen.isEmpty || namen.first.isEmpty ? 'Frage Nr. $id' : namen.first,
+      );
+    }
+  }
+  final fragen = <QuizFrage>[];
+  for (final qi in XmlDocument.parse(quizXml).findAllElements('question_instance')) {
+    if (qi.findAllElements('question_set_reference').isNotEmpty) {
+      fragen.add((name: 'Zufallsfrage', sachnummer: null, zufall: true));
+      continue;
+    }
+    final ref = qi.findAllElements('questionbankentryid').map((n) => n.innerText.trim()).toList();
+    final id = ref.isEmpty ? '' : ref.first;
+    final eintrag = bank[id];
+    if (eintrag == null) {
+      fragen.add((name: 'Frage Nr. $id (nicht in questions.xml)', sachnummer: null, zufall: false));
+    } else {
+      fragen.add((name: eintrag.name, sachnummer: eintrag.idnummer, zufall: false));
+    }
+  }
+  return fragen;
 }

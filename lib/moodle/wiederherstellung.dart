@@ -30,11 +30,14 @@ import 'formular.dart';
 import 'formular_lesen.dart';
 import 'wiederherstellung_fragen.dart';
 import 'formular_schreiben.dart';
+import 'fragen.dart';
+import 'fragen_xml.dart';
 import 'kurs.dart';
 import 'kurs_aendern.dart';
 import 'moodle_zugang.dart';
 import 'sicherung.dart';
 import 'sicherung_regeln.dart';
+import 'test.dart';
 import 'wiederherstellung_regeln.dart';
 
 /// Vorgänge, die gerade laufen (Freigabe, Upload oder Abfrage) in dieser Sitzung.
@@ -86,6 +89,7 @@ Future<String> wiederherstellen(
   String? neuerKursName,
   String? kurzname,
   int? kategorieId,
+  int? sammlung,
   void Function(String vorgangId)? beiVorgang,
 }) async {
   // 1. Datei: nur ein .mbz innerhalb des Sicherungsordners, nicht zu groß.
@@ -160,6 +164,7 @@ Future<String> wiederherstellen(
     _ => 'Modus: ${zielweg.nennung}. Im Kurs gilt: vorhandene Inhalte werden gelöscht, dann wiederhergestellt. '
         'Die Übersicht vor dem Lauf wird im Vorgang festgehalten. Nicht rückgängig zu machen.',
   };
+  final herkunftZeilen = await _herkunftZeilen(moodle, befund, sammlung);
   final ja = await freigaben.anfragen(FreigabeAnfrage(
     titel: zielweg.loescht ? 'Vorhandene Inhalte löschen und wiederherstellen?' : 'Wiederherstellen ausführen?',
     punkte: [
@@ -170,10 +175,8 @@ Future<String> wiederherstellen(
       if (zielweg.loescht && zielweg.brauchtKurs)
         'Im Kurs „$kursName" werden vorhandene Inhalte gelöscht, bevor die Datei wieder hineinkommt.',
       if (aktivitaeten.isNotEmpty) 'Angelegt werden: ${aktivitaeten.join(', ')}',
-      // Fragenherkunft (Issue #20): Die verwendeten Fragen im Archiv werden noch nicht
-      // gelesen (UNGEMESSEN, TODO.md); die Freigabe nennt das ausdrücklich.
-      if (befund.aktivitaeten.any((a) => a.modul == 'quiz'))
-        herkunftPruefen(verwendet: null, eigeneSachnummern: const {}, eigeneAnzahl: 0).text,
+      // Fragenherkunft (Issue #20) vor dem Start; die Lesart ist UNGEMESSEN (TODO.md).
+      ...herkunftZeilen,
       'Moodle stellt die neuen Aktivitäten sichtbar wieder her; die App verbirgt sie danach. Sie können '
           'kurzzeitig für Lernende sichtbar sein. Verborgen ist kein Schutz: Wer im Kurs Rechte hat, sieht sie und kann sie sichtbar machen.',
       'Nutzerdaten sind im Archiv nicht enthalten (geprüft). Rechte und Einschreibungen bleiben unverändert.',
@@ -204,6 +207,7 @@ Future<String> wiederherstellen(
         kurzname: kurzname,
         vorherCmids: vorherCmids,
         wiederherstellungAktivitaeten: befund.aktivitaeten,
+        quizQuelle: befund.quizFragen.length == 1 ? befund.quizFragen.values.first : null,
         vorherText: vorherText,
         name: p.basename(datei));
   } finally {
@@ -245,6 +249,7 @@ Future<String> _ausfuehren(
   required String? kurzname,
   required List<int> vorherCmids,
   required List<ArchivAktivitaet> wiederherstellungAktivitaeten,
+  List<QuizFrage>? quizQuelle,
   required String vorherText,
   required String name,
 }) async {
@@ -350,6 +355,7 @@ Future<String> _ausfuehren(
         kurs: kurs,
         vorherCmids: vorherCmids,
         wiederherstellungAktivitaeten: wiederherstellungAktivitaeten,
+        quizQuelle: quizQuelle,
         sichtbarGesetzt: sichtbarGesetzt);
     return ergebnis;
   } catch (e) {
@@ -430,6 +436,7 @@ Future<String> _warten(
   required int? kurs,
   required List<int> vorherCmids,
   required List<ArchivAktivitaet> wiederherstellungAktivitaeten,
+  List<QuizFrage>? quizQuelle,
   bool sichtbarGesetzt = false,
   Duration gesamt = const Duration(minutes: 10),
   Duration takt = const Duration(seconds: 3),
@@ -488,12 +495,39 @@ Future<String> _warten(
           '(nicht verifiziert).${sichtbarGesetzt ? ' Verborgen gesetzt, sofern das Formular es bot.' : ''}';
     }
     return await _gegenlesen(moodle, vorgaenge, vg, kurs: kurs, vorherCmids: vorherCmids,
-        erwartet: wiederherstellungAktivitaeten);
+        erwartet: wiederherstellungAktivitaeten, quizQuelle: quizQuelle);
   } on MoodleFehler {
     await _uebergang(vorgaenge, vg, WiederherstellungStand.unklar,
         text: 'Abfrage nicht gelungen; wiederherstellung_status prüft erneut.');
     rethrow;
   }
+}
+
+/// Die Zeilen zur Fragenherkunft in der Freigabe (Issue #20), vor dem Start. Ohne eigene
+/// Sammlung ist es eine Prüflücke, nie ein Nachweis. Die Sachnummern liest die App wie
+/// fragen_lesen über Kategorien und Export.
+Future<List<String>> _herkunftZeilen(MoodleZugang moodle, ArchivBefund befund, int? sammlung) async {
+  if (!befund.aktivitaeten.any((a) => a.modul == 'quiz')) return const [];
+  if (sammlung == null) {
+    return const ['Fragenherkunft nicht geprüft: keine eigene Fragensammlung angegeben (Prüflücke).'];
+  }
+  if (befund.quizFragen.isEmpty) {
+    return [herkunftPruefen(verwendet: null, eigeneSachnummern: const {}, eigeneAnzahl: 0).text];
+  }
+  final nummern = <String>{};
+  var anzahl = 0;
+  for (final k in await kategorienLesen(moodle, sammlung)) {
+    if (k.anzahl == 0) continue;
+    for (final f in fragenAusXml(await exportieren(moodle, sammlung, k))) {
+      anzahl++;
+      final nr = f.idnummer;
+      if (nr != null) nummern.add(nr);
+    }
+  }
+  return [
+    for (final e in befund.quizFragen.entries)
+      'Quiz ${e.key}: ${herkunftPruefen(verwendet: e.value, eigeneSachnummern: nummern, eigeneAnzahl: anzahl).text}',
+  ];
 }
 
 /// Verbirgt die neuen Aktivitäten und liest den Kurs zurück. Moodle stellt die
@@ -509,6 +543,7 @@ Future<String> _gegenlesen(
   required int kurs,
   required List<int> vorherCmids,
   required List<ArchivAktivitaet> erwartet,
+  List<QuizFrage>? quizQuelle,
 }) async {
   // Erneut aufrufbar (nach „unklar"): Verborgenes wird nicht noch einmal angefasst.
   final vorVerbergen = await kursLesen(moodle, kurs);
@@ -547,8 +582,24 @@ Future<String> _gegenlesen(
       : alleVerborgen
           ? 'Neu im Kurs: $liste.'
           : 'Neu im Kurs: $liste. Nicht alle sind verborgen; bitte prüfen.';
-  await _uebergang(vorgaenge, vg, WiederherstellungStand.fertig, text: text, verified: alleVerborgen);
-  final befund = alleVerborgen ? 'verborgen: verified' : 'verborgen: nicht bestätigt, siehe Zustand oben';
+  // Fragenvergleich (Issue #20) nach dem Wiederherstellen: nur bei genau einem Quiz im
+  // Archiv und genau einem neuen Quiz im Kurs. Sonst Prüflücke, nie Gleichheit.
+  final quizArchiv = erwartet.where((a) => a.modul == 'quiz').length;
+  final neueQuizze = [for (final a in neue) if (a.modul == 'quiz') a.cmid];
+  FragenVergleich? vergleich;
+  if (quizArchiv > 0) {
+    vergleich = quizQuelle == null || quizArchiv != 1 || neueQuizze.length != 1
+        ? FragenVergleich(VergleichArt.pruefluecke,
+            'Fragenvergleich nicht möglich: Quiz im Archiv oder im Kurs nicht eindeutig zuzuordnen.')
+        : fragenVergleichen(
+            quelle: quizQuelle,
+            ziel: [for (final p in (await testLesen(moodle, neueQuizze.single)).plaetze) (name: p.name, zufall: p.zufall)],
+          );
+  }
+  final verifiziert = alleVerborgen && (vergleich == null || quizVerifiziert(vergleich));
+  final textMitVergleich = vergleich == null ? text : '$text ${vergleich.text}';
+  await _uebergang(vorgaenge, vg, WiederherstellungStand.fertig, text: textMitVergleich, verified: verifiziert);
+  final befund = verifiziert ? 'verborgen: verified' : 'verborgen oder Vergleich nicht bestätigt, siehe Zustand oben';
   return 'Wiederhergestellt (Nummer ${vg.id}): ${neue.isEmpty ? 'keine neuen Aktivitäten' : liste}. $befund';
 }
 

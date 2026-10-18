@@ -13,6 +13,7 @@ import 'dart:typed_data';
 import 'package:xml/xml.dart';
 
 import 'sicherung_regeln.dart' show nutzerdatenOptionen;
+import 'wiederherstellung_fragen.dart' show QuizFrage, quizFragenAusXml;
 
 /// Obergrenze für eine hochgeladene Sicherung. Fest 200 MB; der Wert aus dem
 /// Upload-Formular (maxbytes) wird nicht gelesen (TODO.md).
@@ -102,13 +103,16 @@ List<int>? importierteCmidsEindeutig({required List<ArchivAktivitaet> erwartet, 
 
 /// Ergebnis der Prüfung. [grund] ist null, wenn das Archiv angenommen ist.
 class ArchivBefund {
-  const ArchivBefund({this.grund, this.moodleVersion, this.typ, this.aktivitaeten = const []});
+  const ArchivBefund({this.grund, this.moodleVersion, this.typ, this.aktivitaeten = const [], this.quizFragen = const {}});
   final String? grund;
   final String? moodleVersion;
 
   /// „activity" oder „course", wie Moodle es im Archiv nennt.
   final String? typ;
   final List<ArchivAktivitaet> aktivitaeten;
+
+  /// Fragen je Quiz (Ordnername wie quiz_21), aus quiz.xml und questions.xml (Issue #20).
+  final Map<String, List<QuizFrage>> quizFragen;
 
   bool get ok => grund == null;
 }
@@ -229,10 +233,24 @@ Future<ArchivBefund> archivPruefen(
     for (final a in doc.findAllElements('activity'))
       (modul: a.getElement('modulename')?.innerText.trim() ?? '', titel: a.getElement('title')?.innerText.trim() ?? ''),
   ];
+
+  // Fragen der Quizze (Issue #20). Lesbar nur, wenn beide Dateien es sind.
+  final fragenXml = dateien['questions.xml'] == null ? null : utf8.decode(dateien['questions.xml']!, allowMalformed: true);
+  final quizFragen = <String, List<QuizFrage>>{};
+  for (final e in dateien.entries) {
+    final ordner = _quizOrdner(e.key);
+    if (ordner == null) continue;
+    try {
+      quizFragen[ordner] = quizFragenAusXml(utf8.decode(e.value, allowMalformed: true), fragenXml);
+    } on XmlException {
+      return nein('${e.key} oder questions.xml ist nicht lesbar.');
+    }
+  }
   return ArchivBefund(
     moodleVersion: _text1(doc, 'moodle_version'),
     typ: typ,
     aktivitaeten: aktivitaeten,
+    quizFragen: quizFragen,
   );
 }
 
@@ -260,7 +278,11 @@ bool nutzerdatenPfad(String pfad) =>
 
 /// Nur diese Dateien liest die Prüfung inhaltlich.
 bool _braucht(String pfad) =>
-    pfad == 'moodle_backup.xml' || pfad == 'grades.xml' || pfad == 'grade_history.xml' || pfad == 'roles.xml';
+    pfad == 'moodle_backup.xml' || pfad == 'grades.xml' || pfad == 'grade_history.xml' || pfad == 'roles.xml' ||
+    pfad == 'questions.xml' || _quizOrdner(pfad) != null;
+
+/// Der Ordnername eines Quiz (quiz_21) aus activities/quiz_21/quiz.xml, sonst null.
+String? _quizOrdner(String pfad) => RegExp(r'^activities/(quiz_[^/]+)/quiz\.xml$').firstMatch(pfad)?.group(1);
 
 bool _kopfOk(Uint8List kopf) {
   final soll = _oktal(kopf, 148, 156);
