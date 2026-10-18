@@ -39,6 +39,7 @@
 // Beschriftungen, Verweise mit dem Titel des Ziels, Befunde nach den Regeln
 // der Skills. So muss für einen Auftrag nur geöffnet werden, was er betrifft.
 
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -410,7 +411,30 @@ String? _nameIn(dom.Element form) {
   return null;
 }
 
-Future<FormularGelesen> formularLesen(MoodleZugang moodle, Formularziel ziel, String arbeitsordner) async {
+/// Ticket #22: Je Zielordner läuft im Prozess höchstens ein Lesen gleichzeitig.
+/// Ohne das löscht ein Lesen den Ordner, während ein anderes ihn gerade füllt;
+/// dann schlägt das Löschen oder Schreiben fehl. Die Sperre gilt je Pfad, nicht
+/// global: verschiedene Fragen lesen weiter parallel.
+final _ordnerSperren = <String, Future<void>>{};
+
+Future<T> _ordnerSperre<T>(String pfad, Future<T> Function() tu) {
+  final vorher = _ordnerSperren[pfad] ?? Future<void>.value();
+  final fertig = Completer<void>();
+  final ende = fertig.future;
+  _ordnerSperren[pfad] = ende;
+  return vorher.then((_) => tu()).whenComplete(() {
+    fertig.complete();
+    if (identical(_ordnerSperren[pfad], ende)) _ordnerSperren.remove(pfad);
+  });
+}
+
+Future<FormularGelesen> formularLesen(MoodleZugang moodle, Formularziel ziel, String arbeitsordner) {
+  final pfad = p.normalize(p.absolute(p.join(arbeitsordner, ziel.ordnerName)));
+  return _ordnerSperre(pfad, () => _formularLesenOhneSperre(moodle, ziel, arbeitsordner));
+}
+
+Future<FormularGelesen> _formularLesenOhneSperre(
+    MoodleZugang moodle, Formularziel ziel, String arbeitsordner) async {
   final r = await moodle.lesen(ziel.adresse);
   if (r.status != 200) {
     throw MoodleFehler('Das Bearbeitungsformular von ${ziel.bezeichnung} ist nicht abrufbar (HTTP ${r.status}).');
