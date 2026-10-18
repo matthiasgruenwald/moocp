@@ -124,13 +124,13 @@ class Freigaben extends ChangeNotifier {
   Freigaben(this.protokoll,
       {this.frist = fristVorgabe, this.stufe = Bestaetigungen.vorgabe, this.testmodus = false});
 
-  /// Testmodus (Debug-Bau mit `MOOCP_TESTZUGANG`, [Anmeldedaten.testzugangAktiv]):
+  /// Testmodus (Debug-Bau mit ausdrücklich profil- und adressgebundenem Testzugang):
   /// Jede Anfrage ohne Bilder gilt als erteilt, damit eine KI-Sitzung gegen die
   /// Testinstanz durchspielen kann. Bilder (E18) bleiben Handarbeit: Was aus
   /// dem Kurs an die KI geht, entscheidet immer ein Mensch. Das Protokoll hält
   /// jede übergangene Freigabe fest (A4). Im Release-Bau ist der Testmodus nie
   /// an, weil der Zugang aus der Datei dort nicht gilt.
-  final bool testmodus;
+  bool testmodus;
 
   /// Kürzer als das Zeitlimit, das die App in Bionic einträgt
   /// (`bionicZeitlimit`, einrichtung.dart).

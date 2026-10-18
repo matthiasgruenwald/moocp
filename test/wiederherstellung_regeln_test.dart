@@ -220,6 +220,34 @@ void main() {
 
   });
 
+  group('Archividentität beim Gegenlesen', () {
+    const erwartet = [(modul: 'page', titel: 'Infoblatt')];
+
+    test('ordnet die einzelne passende neue Aktivität zu', () {
+      expect(importierteCmidsEindeutig(erwartet: erwartet, vorher: {4}, aktuell: const [
+        (cmid: 4, modul: 'page', titel: 'Alt'),
+        (cmid: 9, modul: 'page', titel: 'Infoblatt'),
+      ]), [9]);
+    });
+
+    test('lässt parallele und mehrdeutige Neuanlagen unzugeordnet', () {
+      expect(importierteCmidsEindeutig(erwartet: erwartet, vorher: {4}, aktuell: const [
+        (cmid: 9, modul: 'page', titel: 'Infoblatt'),
+        (cmid: 10, modul: 'forum', titel: 'Lehrkraft-Beitrag'),
+      ]), isNull);
+      expect(importierteCmidsEindeutig(erwartet: erwartet, vorher: {}, aktuell: const [
+        (cmid: 9, modul: 'page', titel: 'Infoblatt'),
+        (cmid: 10, modul: 'page', titel: 'Infoblatt'),
+      ]), isNull);
+      expect(importierteCmidsEindeutig(erwartet: const [
+        (modul: 'page', titel: 'Infoblatt'), (modul: 'page', titel: 'Infoblatt')
+      ], vorher: {}, aktuell: const [
+        (cmid: 9, modul: 'page', titel: 'Infoblatt'),
+        (cmid: 10, modul: 'page', titel: 'Infoblatt'),
+      ]), isNull);
+    });
+  });
+
   group('Zustandsfolge', () {
     test('der gemessene Weg ist erlaubt', () {
       const folge = [

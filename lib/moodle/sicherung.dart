@@ -57,6 +57,7 @@ class Vorgang {
     this.wiederherstellung,
     this.wiederherstellungDatei,
     this.vorherCmids,
+    this.wiederherstellungAktivitaeten,
   }) : aktualisiert = aktualisiert ?? begonnen;
 
   final String id;
@@ -90,6 +91,7 @@ class Vorgang {
   WiederherstellungStand? wiederherstellung;
   String? wiederherstellungDatei;
   List<int>? vorherCmids;
+  List<ArchivAktivitaet>? wiederherstellungAktivitaeten;
 
   Map<String, Object?> zuJson() => {
         'id': id,
@@ -109,6 +111,7 @@ class Vorgang {
         'wiederherstellung_status': wiederherstellung?.name,
         'wiederherstellung_laufzeit': wiederherstellungDatei,
         'vorher_cmids': vorherCmids,
+        'wiederherstellung_aktivitaeten': wiederherstellungAktivitaeten?.map((a) => {'modul': a.modul, 'titel': a.titel}).toList(),
       };
 
   static Vorgang? ausJson(Object? o) {
@@ -134,6 +137,11 @@ class Vorgang {
       wiederherstellung: WiederherstellungStand.aus(o['wiederherstellung_status'] as String?),
       wiederherstellungDatei: o['wiederherstellung_laufzeit'] as String?,
       vorherCmids: (o['vorher_cmids'] as List?)?.whereType<int>().toList(),
+      wiederherstellungAktivitaeten: (o['wiederherstellung_aktivitaeten'] as List?)
+          ?.whereType<Map>()
+          .where((a) => a['modul'] is String && a['titel'] is String)
+          .map((a) => (modul: a['modul'] as String, titel: a['titel'] as String))
+          .toList(),
     );
   }
 }
@@ -214,10 +222,12 @@ class Vorgaenge {
     WiederherstellungStand? wiederherstellung,
     String? wiederherstellungDatei,
     List<int>? vorherCmids,
+    List<ArchivAktivitaet>? wiederherstellungAktivitaeten,
   }) async {
     if (wiederherstellung != null) v.wiederherstellung = wiederherstellung;
     if (wiederherstellungDatei != null) v.wiederherstellungDatei = wiederherstellungDatei;
     if (vorherCmids != null) v.vorherCmids = vorherCmids;
+    if (wiederherstellungAktivitaeten != null) v.wiederherstellungAktivitaeten = wiederherstellungAktivitaeten;
     if (stand != null) v.stand = stand;
     if (text != null) v.text = text;
     if (backupid != null) v.backupid = backupid;

@@ -157,7 +157,7 @@ Instanz _instanzFuer(
   final freigaben = Freigaben(
     ansicht,
     stufe: pr.bestaetigungen,
-    testmodus: Anmeldedaten.testzugangAktiv,
+    testmodus: Anmeldedaten.testzugangAktivFuer(pr),
   );
   return Instanz(
     zugang,
@@ -505,7 +505,7 @@ class _HauptseiteState extends State<Hauptseite> with WindowListener {
   Future<void> _gespeichertAnmelden() async {
     final Anmeldedaten d;
     try {
-      d = await Anmeldedaten.laden(kennung: _profil.kennung);
+      d = await Anmeldedaten.laden(kennung: _profil.kennung, adresse: _profil.adresse);
     } catch (e) {
       widget.protokoll.eintrag(
         Art.fehler,
@@ -700,7 +700,7 @@ class _HauptseiteState extends State<Hauptseite> with WindowListener {
   Future<void> _merkenAendern(bool an) async {
     setState(() => _merken = an);
     try {
-      await Anmeldedaten.merkenSetzen(an, kennung: _profil.kennung);
+      await Anmeldedaten.merkenSetzen(an, kennung: _profil.kennung, adresse: _profil.adresse);
       widget.protokoll.eintrag(
         Art.anmeldung,
         an
@@ -727,7 +727,7 @@ class _HauptseiteState extends State<Hauptseite> with WindowListener {
     if (!await _einrichtungPruefen()) return;
     final Anmeldedaten d;
     try {
-      d = await Anmeldedaten.laden(kennung: _profil.kennung);
+      d = await Anmeldedaten.laden(kennung: _profil.kennung, adresse: _profil.adresse);
     } catch (e) {
       if (mounted) {
         widget.protokoll.eintrag(
@@ -752,6 +752,7 @@ class _HauptseiteState extends State<Hauptseite> with WindowListener {
   }
 
   Future<void> _profilBearbeiten({bool neu = false}) async {
+    if (_beschaeftigt) return;
     final aktuell = neu ? null : _profil;
     var port = standardPort;
     while (_instanzen.any((i) => i.dienst.profil.port == port) ||
@@ -787,7 +788,14 @@ class _HauptseiteState extends State<Hauptseite> with WindowListener {
       _profilIndex = _instanzen.length - 1;
       hinzugefuegt = true;
     } else {
+      final laufend = _instanzen.firstWhere((i) => i.dienst.profil.kennung == geaendert.kennung);
+      if (laufend.moodle.angemeldet && laufend.dienst.profil.adresse != geaendert.adresse) {
+        setState(() => _meldung = 'Die Moodle-Adresse kann während einer Anmeldung nicht geändert werden.');
+        return;
+      }
       profile[index] = geaendert;
+      laufend.dienst.profil = geaendert;
+      laufend.freigaben.testmodus = Anmeldedaten.testzugangAktivFuer(geaendert);
     }
     widget.einstellungen.profile = profile;
     try {
@@ -835,37 +843,47 @@ class _HauptseiteState extends State<Hauptseite> with WindowListener {
   }
 
   Future<void> _anmelden() async {
+    if (_beschaeftigt) return;
+    final moodle = _moodle;
+    final dienst = _dienst;
+    final freigaben = _freigaben;
+    final profil = _profil;
+    final adresse = _adresse.text.trim();
+    final merken = _merken;
+    final benutzer = _benutzer.text.trim();
+    final passwort = _passwort.text;
+    freigaben.testmodus = Anmeldedaten.testzugangAktivFuer(profil.copyWith(adresse: adresse));
     setState(() {
       _beschaeftigt = true;
       _meldung = null;
     });
-    final benutzer = _benutzer.text.trim();
-    final passwort = _passwort.text;
     var feldLeeren = true;
     try {
       final profile = widget.einstellungen.profile.isEmpty
-          ? <Profil>[_profil]
+          ? <Profil>[profil]
           : List<Profil>.of(widget.einstellungen.profile);
-      final index = profile.indexWhere((p) => p.kennung == _profil.kennung);
+      final index = profile.indexWhere((p) => p.kennung == profil.kennung);
       if (index < 0) {
-        profile.add(_profil.copyWith(adresse: _adresse.text.trim()));
+        profile.add(profil.copyWith(adresse: adresse));
       } else {
-        profile[index] = profile[index].copyWith(adresse: _adresse.text.trim());
+        profile[index] = profile[index].copyWith(adresse: adresse);
       }
       widget.einstellungen.profile = profile;
       await widget.einstellungen.speichern();
-      await _moodle.anmelden(_adresse.text, benutzer, passwort);
+      dienst.profil = profil.copyWith(adresse: adresse);
+      await moodle.anmelden(adresse, benutzer, passwort);
       _meldung = 'Angemeldet.';
-      if (_merken) {
+      if (merken) {
         try {
           await Anmeldedaten.speichern(
             benutzer,
             passwort,
-            kennung: _profil.kennung,
+            kennung: profil.kennung,
+            adresse: adresse,
           );
           widget.protokoll.eintrag(
             Art.anmeldung,
-            Anmeldedaten.testzugangAktiv
+            Anmeldedaten.testzugangAktivFuer(profil.copyWith(adresse: adresse))
                 // Testzugang aus einer Datei: das Passwort liegt nirgends
                 // gespeichert, der Eintrag soll nicht den Schlüsselbund nennen.
                 ? 'Anmeldedaten gespeichert (Testzugang aus Datei, nicht im Schlüsselbund)'
@@ -906,22 +924,19 @@ class _HauptseiteState extends State<Hauptseite> with WindowListener {
   Widget build(BuildContext context) {
     // Je Profil ein Freigabe-Dialog: Anfragen eines weiteren Profils erscheinen
     // sonst bei niemandem und liefen nur bis zur Frist.
-    Widget seite = _seite(context);
-    for (final i in _instanzen.skip(1)) {
-      seite = FreigabeDialoge(
-        freigaben: i.freigaben,
-        profilname: _profilFuer(i).name,
-        mcpName: _profilFuer(i).mcpName,
-        nachVorn: _nachVorn,
-        child: seite,
-      );
-    }
-    return FreigabeDialoge(
-      freigaben: _freigaben,
-      profilname: _profil.name,
-      mcpName: _profil.mcpName,
-      nachVorn: _nachVorn,
-      child: seite,
+    return Stack(
+      children: [
+        for (final i in _instanzen)
+          FreigabeDialoge(
+            key: ValueKey(i.dienst.profil.kennung),
+            freigaben: i.freigaben,
+            profilname: _profilFuer(i).name,
+            mcpName: _profilFuer(i).mcpName,
+            nachVorn: _nachVorn,
+            child: const SizedBox.shrink(),
+          ),
+        _seite(context),
+      ],
     );
   }
 
@@ -1026,14 +1041,14 @@ class _HauptseiteState extends State<Hauptseite> with WindowListener {
                       spacing: 8,
                       children: [
                         OutlinedButton.icon(
-                          onPressed: widget.instanzErstellen == null
+                          onPressed: _beschaeftigt || widget.instanzErstellen == null
                               ? null
                               : () => _profilBearbeiten(neu: true),
                           icon: const Icon(Icons.add),
                           label: const Text('Profil hinzufügen'),
                         ),
                         OutlinedButton.icon(
-                          onPressed: () => _profilBearbeiten(),
+                          onPressed: _beschaeftigt ? null : () => _profilBearbeiten(),
                           icon: const Icon(Icons.edit_outlined),
                           label: const Text('Profil bearbeiten'),
                         ),
@@ -1043,6 +1058,7 @@ class _HauptseiteState extends State<Hauptseite> with WindowListener {
                 _karte('Moodle-Anmeldung', [
                   TextField(
                     controller: _adresse,
+                    enabled: !_beschaeftigt && !_moodle.angemeldet,
                     decoration: const InputDecoration(
                       labelText: 'Moodle-Adresse',
                       hintText: 'https://…',
@@ -1073,7 +1089,7 @@ class _HauptseiteState extends State<Hauptseite> with WindowListener {
                     crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       InkWell(
-                        onTap: () => _merkenAendern(!_merken),
+                        onTap: _beschaeftigt ? null : () => _merkenAendern(!_merken),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
@@ -1400,6 +1416,26 @@ class _FreigabeDialogeState extends State<FreigabeDialoge> {
   void initState() {
     super.initState();
     widget.freigaben.addListener(_zeigen);
+  }
+
+  @override
+  void didUpdateWidget(covariant FreigabeDialoge oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final freigabenGewechselt = oldWidget.freigaben != widget.freigaben;
+    final profilGewechselt = oldWidget.profilname != widget.profilname || oldWidget.mcpName != widget.mcpName;
+    if (!freigabenGewechselt && !profilGewechselt) return;
+    if (freigabenGewechselt) {
+      oldWidget.freigaben.removeListener(_zeigen);
+      widget.freigaben.addListener(_zeigen);
+    }
+    _gezeigt = null;
+    final alt = _dialog;
+    _dialog = null;
+    if (alt != null && alt.isActive) {
+      alt.navigator!.removeRoute(alt);
+      widget.nachVorn(false);
+    }
+    _zeigen();
   }
 
   @override

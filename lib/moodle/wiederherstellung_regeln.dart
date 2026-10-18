@@ -83,6 +83,23 @@ bool erlaubterUebergang(WiederherstellungStand von, WiederherstellungStand nach)
 /// Eine Aktivität aus dem Archiv, für die Freigabe: Art und Titel.
 typedef ArchivAktivitaet = ({String modul, String titel});
 
+typedef WiederhergestellteAktivitaet = ({int cmid, String modul, String titel});
+
+/// Liefert cmids nur bei einer eindeutigen 1:1-Zuordnung zum geprüften Archiv.
+List<int>? importierteCmidsEindeutig({required List<ArchivAktivitaet> erwartet, required Set<int> vorher,
+  required List<WiederhergestellteAktivitaet> aktuell}) {
+  if (erwartet.isEmpty) return null;
+  final neu = aktuell.where((a) => !vorher.contains(a.cmid)).toList();
+  if (neu.length != erwartet.length) return null;
+  final erwartete = erwartet.map((a) => '${a.modul}\u0000${a.titel}').toSet();
+  final aktuelle = neu.map((a) => '${a.modul}\u0000${a.titel}').toList();
+  if (erwartete.length != erwartet.length || aktuelle.toSet().length != aktuelle.length ||
+      !erwartete.containsAll(aktuelle) || !aktuelle.toSet().containsAll(erwartete)) {
+    return null;
+  }
+  return [for (final a in neu) a.cmid];
+}
+
 /// Ergebnis der Prüfung. [grund] ist null, wenn das Archiv angenommen ist.
 class ArchivBefund {
   const ArchivBefund({this.grund, this.moodleVersion, this.typ, this.aktivitaeten = const []});

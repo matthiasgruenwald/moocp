@@ -50,6 +50,7 @@ Future<void> _uebergang(
   int? kontext,
   bool? verified,
   List<int>? vorherCmids,
+  List<ArchivAktivitaet>? wiederherstellungAktivitaeten,
 }) async {
   final von = vg.wiederherstellung ?? WiederherstellungStand.anstehend;
   if (!erlaubterUebergang(von, nach)) {
@@ -63,7 +64,8 @@ Future<void> _uebergang(
       backupid: backupid,
       kontext: kontext,
       verified: verified,
-      vorherCmids: vorherCmids);
+      vorherCmids: vorherCmids,
+      wiederherstellungAktivitaeten: wiederherstellungAktivitaeten);
 }
 
 /// Stellt eine Sicherungsdatei aus dem Sicherungsordner wieder her. [datei] liegt
@@ -196,6 +198,7 @@ Future<String> wiederherstellen(
         neuerKursName: neuerKursName,
         kurzname: kurzname,
         vorherCmids: vorherCmids,
+        wiederherstellungAktivitaeten: befund.aktivitaeten,
         vorherText: vorherText,
         name: p.basename(datei));
   } finally {
@@ -236,6 +239,7 @@ Future<String> _ausfuehren(
   required String? neuerKursName,
   required String? kurzname,
   required List<int> vorherCmids,
+  required List<ArchivAktivitaet> wiederherstellungAktivitaeten,
   required String vorherText,
   required String name,
 }) async {
@@ -251,7 +255,8 @@ Future<String> _ausfuehren(
     final itemid = wertIn(f.felder, 'backupfile');
     if (itemid == null) throw MoodleFehler('Das Formular nennt keinen Entwurfsbereich. Nichts geändert.');
     await hochladen(moodle, f, itemid, '/', name, bytes);
-    await _uebergang(vorgaenge, vg, WiederherstellungStand.hochgeladen, vorherCmids: vorherCmids);
+    await _uebergang(vorgaenge, vg, WiederherstellungStand.hochgeladen,
+        vorherCmids: vorherCmids, wiederherstellungAktivitaeten: wiederherstellungAktivitaeten);
 
     // Formular absenden: Moodle legt die Datei ab und leitet zum Assistenten.
     final r = await moodle.senden(f.aktion, f.felder);
@@ -339,6 +344,7 @@ Future<String> _ausfuehren(
         kontext: kontext,
         kurs: kurs,
         vorherCmids: vorherCmids,
+        wiederherstellungAktivitaeten: wiederherstellungAktivitaeten,
         sichtbarGesetzt: sichtbarGesetzt);
     return ergebnis;
   } catch (e) {
@@ -417,6 +423,7 @@ Future<String> _warten(
   required int kontext,
   required int? kurs,
   required List<int> vorherCmids,
+  required List<ArchivAktivitaet> wiederherstellungAktivitaeten,
   bool sichtbarGesetzt = false,
   Duration gesamt = const Duration(minutes: 10),
   Duration takt = const Duration(seconds: 3),
@@ -455,7 +462,8 @@ Future<String> _warten(
       return 'Neuer Kurs angelegt (Nummer ${vg.id}). Die Kursnummer ist nicht bekannt; Kurs bitte in Moodle prüfen '
           '(nicht verifiziert).${sichtbarGesetzt ? ' Verborgen gesetzt, sofern das Formular es bot.' : ''}';
     }
-    return await _gegenlesen(moodle, vorgaenge, vg, kurs: kurs, vorherCmids: vorherCmids);
+    return await _gegenlesen(moodle, vorgaenge, vg, kurs: kurs, vorherCmids: vorherCmids,
+        erwartet: wiederherstellungAktivitaeten);
   } on MoodleFehler {
     await _uebergang(vorgaenge, vg, WiederherstellungStand.unklar,
         text: 'Abfrage nicht gelungen; wiederherstellung_status prüft erneut.');
@@ -475,13 +483,17 @@ Future<String> _gegenlesen(
   Vorgang vg, {
   required int kurs,
   required List<int> vorherCmids,
+  required List<ArchivAktivitaet> erwartet,
 }) async {
   // Erneut aufrufbar (nach „unklar"): Verborgenes wird nicht noch einmal angefasst.
   final vorVerbergen = await kursLesen(moodle, kurs);
-  final sichtbareNeue = [
-    for (final a in vorVerbergen.nachCmid.values)
-      if (!vorherCmids.contains(a.cmid) && a.sichtbar) a.cmid,
-  ];
+  final zugeordnet = importierteCmidsEindeutig(
+    erwartet: erwartet,
+    vorher: vorherCmids.toSet(),
+    aktuell: [for (final a in vorVerbergen.nachCmid.values) (cmid: a.cmid, modul: a.modul, titel: a.name)],
+  );
+  final sichtbareNeue = zugeordnet == null ? const <int>[] :
+      [for (final cmid in zugeordnet) if (vorVerbergen.nachCmid[cmid]!.sichtbar) cmid];
   if (sichtbareNeue.isNotEmpty) {
     await kursAktion(moodle, kurs, 'cm_hide', sichtbareNeue);
   }
@@ -491,9 +503,21 @@ Future<String> _gegenlesen(
     for (final a in jetzt.nachCmid.values)
       if (!vorherCmids.contains(a.cmid)) a,
   ];
-  final alleVerborgen = neue.isNotEmpty && neue.every((a) => !a.sichtbar);
+  final abschliessendZugeordnet = importierteCmidsEindeutig(
+    erwartet: erwartet,
+    vorher: vorherCmids.toSet(),
+    aktuell: [for (final a in jetzt.nachCmid.values) (cmid: a.cmid, modul: a.modul, titel: a.name)],
+  );
+  final zuordnungUnveraendert = zugeordnet != null && abschliessendZugeordnet != null &&
+      zugeordnet.toSet().containsAll(abschliessendZugeordnet) && abschliessendZugeordnet.toSet().containsAll(zugeordnet);
+  final alleVerborgen = zuordnungUnveraendert && zugeordnet.isNotEmpty &&
+      zugeordnet.every((cmid) => jetzt.nachCmid[cmid]?.sichtbar == false);
   final liste = neue.map((a) => '„${a.name}" (${a.modul}${a.sichtbar ? ', sichtbar' : ', verborgen'})').join(', ');
-  final text = neue.isEmpty
+  final text = zugeordnet == null
+      ? 'Importierte Aktivitäten konnten nicht eindeutig von anderen neuen Aktivitäten unterschieden werden. Keine Aktivität wurde verborgen; bitte prüfen.'
+      : !zuordnungUnveraendert
+          ? 'Nach dem Verbergen kamen weitere oder mehrdeutige neue Aktivitäten hinzu. Nur zuvor eindeutig zugeordnete Importaktivitäten wurden verborgen; bitte prüfen.'
+      : neue.isEmpty
       ? 'Keine neuen Aktivitäten im Kurs gefunden.'
       : alleVerborgen
           ? 'Neu im Kurs: $liste.'
@@ -529,7 +553,8 @@ Future<String> wiederherstellungStatus(MoodleZugang moodle, Vorgaenge vorgaenge,
           restoreid: v.backupid!,
           kontext: kontext,
           kurs: v.kurs == 0 ? null : v.kurs,
-          vorherCmids: v.vorherCmids ?? const []);
+          vorherCmids: v.vorherCmids ?? const [],
+          wiederherstellungAktivitaeten: v.wiederherstellungAktivitaeten ?? const []);
     } finally {
       _laufendeWiederherstellungen.remove(v.id);
     }

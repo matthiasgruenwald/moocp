@@ -85,7 +85,7 @@ class McpDienst {
   final Einstellungen einstellungen;
 
   /// Das Instanzprofil dieses Servers (E31): Port, Name und Adresse kommen von dort.
-  final Profil profil;
+  Profil profil;
   final MoodleZugang moodle;
   final Protokoll protokoll;
   final Freigaben freigaben;

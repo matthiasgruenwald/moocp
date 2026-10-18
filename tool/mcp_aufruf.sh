@@ -49,34 +49,51 @@ U=$(cat "$UF")
 K="$TMPD/kopf.txt"
 ANF="$TMPD"/anfrage.json
 ANT="$TMPD"/antwort.json
-curl -s -D "$K" -o /dev/null -X POST "$U" --config "$CFG" "${H[@]}" \
+# Eingaben validieren, bevor irgendein Werkzeug aufgerufen wird.
+ARG="$TMPD"/argumente.json
+printf '%s' "${2:-{\}}" > "$ARG"
+if ! "$PY" -c 'import json,sys; json.loads(open(sys.argv[1],"rb").read().decode("utf-8"))' "$ARG" 2>/dev/null; then
+  echo "Argumente sind kein gültiges JSON." >&2
+  exit 2
+fi
+if ! curl -sS --fail -D "$K" -o /dev/null -X POST "$U" --config "$CFG" "${H[@]}" \
   -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"mcp_aufruf","version":"1"}}}'
+then echo "Transportfehler bei der MCP-Initialisierung." >&2; exit 3; fi
 SID=$(grep -i "^mcp-session-id:" "$K" | tr -d '\r' | awk '{print $2}')
 [ -n "$SID" ] || { echo "Keine Antwort von $U -- läuft die App?" >&2; exit 2; }
 S=(-H "Mcp-Session-Id: $SID" -H "MCP-Protocol-Version: 2025-06-18")
-curl -s -o /dev/null -X POST "$U" --config "$CFG" "${S[@]}" "${H[@]}" -d '{"jsonrpc":"2.0","method":"notifications/initialized"}'
+if ! curl -sS --fail -o /dev/null -X POST "$U" --config "$CFG" "${S[@]}" "${H[@]}" -d '{"jsonrpc":"2.0","method":"notifications/initialized"}'; then
+  echo "Transportfehler beim Initialisieren der MCP-Sitzung." >&2; exit 3
+fi
 # Die Anfrage baut Python (json.dumps): Bash halbierte Backslashes in Pfaden.
 # Die Argumente gehen als UTF-8-Datei hinüber, nicht über die Kommandozeile:
 # Dort kommen sie über die Codepage an, und was nicht in Latin-1 liegt, ging
 # verloren (… wurde zum Steuerzeichen U+0085, € verschwand).
-ARG="$TMPD"/argumente.json
-printf '%s' "${2:-{\}}" > "$ARG"
-$PY -c "import json,sys;print(json.dumps({'jsonrpc':'2.0','id':2,'method':'tools/call','params':{'name':sys.argv[1],'arguments':json.loads(open(sys.argv[2],'rb').read().decode('utf-8'))}}))" "$1" "$ARG" > "$ANF"
-curl -s -X POST "$U" --config "$CFG" "${S[@]}" "${H[@]}" --data-binary @"$ANF" > "$ANT"
+"$PY" -c "import json,sys;print(json.dumps({'jsonrpc':'2.0','id':2,'method':'tools/call','params':{'name':sys.argv[1],'arguments':json.loads(open(sys.argv[2],'rb').read().decode('utf-8'))}}))" "$1" "$ARG" > "$ANF"
+if ! curl -sS --fail -X POST "$U" --config "$CFG" "${S[@]}" "${H[@]}" --data-binary @"$ANF" > "$ANT"; then
+  echo "Transportfehler beim MCP-Werkzeugaufruf." >&2; exit 3
+fi
 $PY -c "
 import sys, json
 sys.stdout.reconfigure(encoding='utf-8')
 try:
     d = json.loads(open(sys.argv[1], 'rb').read().decode('utf-8'))
+    if not isinstance(d, dict): raise ValueError('response shape')
     token = json.load(open(sys.argv[2], encoding='utf-8')).get('schluessel', '')
     sauber = lambda s: str(s).replace(token, '[geschwärzt]') if token else str(s)
     if 'error' in d:
         print('JSON-RPC-Fehler:', sauber(d['error']))
+        sys.exit(4)
     else:
         r = d['result']
+        if not isinstance(r, dict): raise ValueError('result shape')
         print('isError:', r.get('isError', False))
         for c in r.get('content', []):
             print(sauber(c.get('text', '')))
-except Exception:
-    print('Antwort konnte nicht gelesen werden.')
+except (UnicodeDecodeError, json.JSONDecodeError):
+    print('MCP-Antwort enthält ungültiges JSON.', file=sys.stderr)
+    sys.exit(5)
+except (KeyError, TypeError, ValueError):
+    print('MCP-Antwort hat eine ungültige Struktur.', file=sys.stderr)
+    sys.exit(5)
 " "$ANT" "$F"

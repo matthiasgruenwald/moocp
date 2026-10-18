@@ -17,6 +17,8 @@ SCRIPT = Path(__file__).with_name("mcp_aufruf.sh")
 
 class FakeMcp(http.server.BaseHTTPRequestHandler):
     authorizations = {}
+    tool_response = None
+    tool_calls = 0
 
     def do_POST(self):
         self.authorizations[self.server.server_port].append(
@@ -24,19 +26,23 @@ class FakeMcp(http.server.BaseHTTPRequestHandler):
         )
         length = int(self.headers.get("Content-Length", "0"))
         request = json.loads(self.rfile.read(length))
+        if request.get("method") == "tools/call":
+            type(self).tool_calls += 1
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
         self.send_header("Mcp-Session-Id", "test-session")
         self.end_headers()
         if request.get("method") == "tools/call":
-            response = {
+            response = type(self).tool_response or {
                 "jsonrpc": "2.0",
                 "id": 2,
                 "error": {"code": -32000, "message": f"Fehler {SECRET}"},
             }
         else:
             response = {"jsonrpc": "2.0", "result": {}}
-        self.wfile.write(json.dumps(response).encode())
+        self.wfile.write(
+            response.encode() if isinstance(response, str) else json.dumps(response).encode()
+        )
 
     def log_message(self, _format, *_args):
         pass
@@ -45,6 +51,8 @@ class FakeMcp(http.server.BaseHTTPRequestHandler):
 class McpAufrufTest(unittest.TestCase):
     def setUp(self):
         FakeMcp.authorizations = {}
+        FakeMcp.tool_response = None
+        FakeMcp.tool_calls = 0
         self.servers = []
         self.threads = []
         for _ in range(2):
@@ -117,7 +125,7 @@ class McpAufrufTest(unittest.TestCase):
     def test_macos_uses_selected_profile_and_redacts_error_response(self):
         result = self.call("moodle-test")
 
-        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.returncode, 4, result.stderr)
         self.assertEqual(
             FakeMcp.authorizations[self.servers[1].server_port],
             [f"Bearer {SECRET}"] * 3,
@@ -129,7 +137,7 @@ class McpAufrufTest(unittest.TestCase):
     def test_without_selector_uses_first_profile(self):
         result = self.call()
 
-        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.returncode, 4, result.stderr)
         self.assertEqual(
             FakeMcp.authorizations[self.servers[0].server_port],
             [f"Bearer {SECRET}"] * 3,
@@ -143,6 +151,38 @@ class McpAufrufTest(unittest.TestCase):
 
         self.assertEqual(result.returncode, 2)
         self.assertIn("Profil", result.stderr)
+        self.assert_no_secret_leak(result)
+
+    def test_malformed_request_json_fails_before_tool_call(self):
+        result = subprocess.run(
+            ["bash", str(SCRIPT), "testwerkzeug", "{bad"],
+            capture_output=True,
+            text=True,
+            env=self.environment,
+            check=False,
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(FakeMcp.tool_calls, 0)
+        self.assertIn("JSON", result.stderr)
+        self.assert_no_secret_leak(result)
+
+    def test_malformed_response_returns_nonzero_and_safe_cause(self):
+        FakeMcp.tool_response = "not-json"
+        result = self.call()
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("ungültiges JSON", result.stderr)
+        self.assert_no_secret_leak(result)
+
+    def test_transport_failure_returns_nonzero_without_secret(self):
+        server = self.servers.pop(0)
+        server.shutdown()
+        server.server_close()
+        result = self.call()
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Transportfehler", result.stderr)
         self.assert_no_secret_leak(result)
 
 
