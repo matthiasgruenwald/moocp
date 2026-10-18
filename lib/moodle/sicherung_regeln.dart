@@ -190,43 +190,12 @@ SicherungStand bewerteFortschritt(Object? antwort, String backupid) {
 /// Abstände); das zeigt die Messung im Testkurs.
 List<String> sicherungsLinks(String html, String dateiname) {
   final name = RegExp.escape(dateiname);
-  final muster = RegExp('/pluginfile\\.php/\\d+/user/backup/\\d+/$name\\?forcedownload=1(?=["\'\\s<>])');
+  final muster = RegExp('/pluginfile\\.php/\\d+/user/backup/(?:\\d+/)?$name\\?forcedownload=1(?=["\'\\s<>])');
   final treffer = <String>{};
   for (final m in muster.allMatches(html.replaceAll('&amp;', '&'))) {
     treffer.add(m.group(0)!);
   }
   return treffer.toList();
-}
-
-/// Die Namen aller Sicherungsdateien (.mbz) auf der Seite Wiederherstellen, in
-/// der Reihenfolge der Seite, ohne Doppelte. Nutzerdateien anderer Art bleiben
-/// außen vor.
-///
-/// Gemessen: Moodle benennt die Datei selbst. Der Wunschname aus dem Formular
-/// kam nicht an; die Datei hieß page-cm1892-2026-10-18_052530.mbz (Serverzeit).
-/// Deshalb liest die App die Seite vor dem Start und nach dem Ende und sucht
-/// den neuen Namen dazwischen (neueSicherungen).
-List<String> sicherungsDateien(String html) {
-  final muster = RegExp(r'/pluginfile\.php/\d+/user/backup/\d+/([^/?#"\s<>]+\.mbz)\?forcedownload=1(?=["\s<>])');
-  final namen = <String>{};
-  for (final m in muster.allMatches(html.replaceAll('&amp;', '&'))) {
-    namen.add(m.group(1)!);
-  }
-  return namen.toList();
-}
-
-/// Die Namen, die nach dem Start neu auf der Seite stehen und zur Aktivität
-/// [cmid] gehören: nicht in [vorher], mit „-cm`cmid`-" im Namen. Genau ein
-/// Treffer ist die Sicherung; keiner oder mehrere heißen: nicht raten.
-///
-/// UNGEMESSEN: ob zwei Sicherungsläufe derselben Aktivität, die dicht
-/// hintereinander enden, eindeutig bleiben; die Zeit im Namen trennt sie.
-List<String> neueSicherungen(List<String> nachher, List<String> vorher, int cmid) {
-  final teil = '-cm$cmid-';
-  return [
-    for (final n in nachher)
-      if (!vorher.contains(n) && n.contains(teil)) n,
-  ];
 }
 
 /// Der Dateiname im Sicherungsordner: Modul und cmid, Zeitpunkt. Kein Name

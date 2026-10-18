@@ -102,15 +102,15 @@ void main() {
     const eigene = 'sicherung-cm2384-2026-10-18_090507.mbz';
     const andere = 'sicherung-cm1-2026-10-17_120000.mbz';
     String zeile(String datei, {String id = '7'}) =>
-        '<li><a href="https://m.example/pluginfile.php/$id/user/backup/0/$datei?forcedownload=1">Herunterladen</a></li>';
+        '<li><a href="https://m.example/pluginfile.php/$id/user/backup/$datei?forcedownload=1">Herunterladen</a></li>';
 
     test('genau ein Treffer des eigenen Namens, in &amp;-Schreibweise der Seite', () {
-      final html = '<ul>${zeile(andere)}<a href="https://m.example/pluginfile.php/7/user/backup/0/$eigene?forcedownload=1" title="a&amp;b">x</a></ul>';
-      expect(sicherungsLinks(html, eigene), ['/pluginfile.php/7/user/backup/0/$eigene?forcedownload=1']);
+      final html = '<ul>${zeile(andere)}<a href="https://m.example/pluginfile.php/7/user/backup/$eigene?forcedownload=1" title="a&amp;b">x</a></ul>';
+      expect(sicherungsLinks(html, eigene), ['/pluginfile.php/7/user/backup/$eigene?forcedownload=1']);
     });
 
     test('Zusatzparameter nach dem Link: kein Treffer, die Positivliste ließe ihn nicht zu', () {
-      final html = '<a href="https://m.example/pluginfile.php/7/user/backup/0/$eigene?forcedownload=1&amp;x=1">x</a>';
+      final html = '<a href="https://m.example/pluginfile.php/7/user/backup/$eigene?forcedownload=1&amp;x=1">x</a>';
       expect(sicherungsLinks(html, eigene), isEmpty);
     });
 
@@ -127,54 +127,15 @@ void main() {
       expect(sicherungsLinks(zeile('x-$eigene'), eigene), isEmpty);
     });
 
+    test('gemessene Form: Link ohne itemid, daneben choosebackupfile-Link, nur der Downloadlink zählt', () {
+      const gemessen = 'sicherung-moodle2-activity-1892-page1892-20261018-0532-nu.mbz';
+      final html = '<a href="https://m.example/pluginfile.php/75/user/backup/$gemessen?forcedownload=1">Herunterladen</a>'
+          '<a href="https://m.example/backup/restorefile.php?action=choosebackupfile&amp;filename=$gemessen&amp;contextid=75">Wiederherstellen</a>';
+      expect(sicherungsLinks(html, gemessen), ['/pluginfile.php/75/user/backup/$gemessen?forcedownload=1']);
+    });
+
     test('Punkte im Namen sind wörtlich, nicht als Muster', () {
       expect(sicherungsLinks(zeile('sicherungXcm1.mbz'), 'sicherung.cm1.mbz'), isEmpty);
-    });
-  });
-
-  group('Neuer Name auf der Seite Wiederherstellen (Fixturen vorher und nachher)', () {
-    const eigene = 'page-cm1892-2026-10-18_052530.mbz';
-    const vorhanden = 'sicherung-cm1-2026-10-17_120000.mbz';
-    String seite(List<String> dateien) => [
-          for (final d in dateien)
-            '<li><a href="https://m.example/pluginfile.php/7/user/backup/0/$d?forcedownload=1">Herunterladen</a></li>',
-        ].join();
-
-    test('vorher und nachher: genau ein neuer Name für die Aktivität', () {
-      final vorher = sicherungsDateien(seite([vorhanden]));
-      final nachher = sicherungsDateien(seite([vorhanden, eigene]));
-      final neu = neueSicherungen(nachher, vorher, 1892);
-      expect(neu, [eigene]);
-      expect(sicherungsLinks(seite([vorhanden, eigene]), eigene),
-          ['/pluginfile.php/7/user/backup/0/$eigene?forcedownload=1']);
-    });
-
-    test('kein neuer Name: leer, also unklar beim Aufrufer', () {
-      final vorher = sicherungsDateien(seite([vorhanden]));
-      expect(neueSicherungen(sicherungsDateien(seite([vorhanden])), vorher, 1892), isEmpty);
-    });
-
-    test('zwei neue Namen derselben Aktivität: beide, also unklar beim Aufrufer', () {
-      final vorher = sicherungsDateien(seite([vorhanden]));
-      final nachher = sicherungsDateien(seite([vorhanden, eigene, 'page-cm1892-2026-10-18_052531.mbz']));
-      expect(neueSicherungen(nachher, vorher, 1892), hasLength(2));
-    });
-
-    test('neue Namen anderer Aktivitäten zählen nicht; cm1 trifft cm18 nicht', () {
-      final vorher = sicherungsDateien(seite([vorhanden]));
-      final nachher = sicherungsDateien(seite([vorhanden, 'page-cm18-2026-10-18_052530.mbz', eigene]));
-      expect(neueSicherungen(nachher, vorher, 1), isEmpty);
-      expect(neueSicherungen(nachher, vorher, 1892), [eigene]);
-    });
-
-    test('Nutzerdateien anderer Art und Namen ohne .mbz zählen nicht', () {
-      final html = '<a href="https://m.example/pluginfile.php/7/user/private/notizen-cm1892.pdf?forcedownload=1">x</a>'
-          '<a href="https://m.example/pluginfile.php/7/user/backup/0/$eigene?forcedownload=1&amp;x=1">y</a>';
-      expect(sicherungsDateien(html), isEmpty);
-    });
-
-    test('gleicher Name zweimal auf der Seite: einmal gezählt', () {
-      expect(sicherungsDateien(seite([eigene, eigene])), [eigene]);
     });
   });
 
@@ -195,6 +156,12 @@ void main() {
     final z = MoodleZugang(Protokoll());
 
     test('Sicherungsdatei mit forcedownload=1: durch die Sperrliste, nur sie', () {
+      final u = Uri.parse('https://m.example/pluginfile.php/7/user/backup/page-cm2384-x.mbz?forcedownload=1');
+      expect(gesperrt(u), isFalse);
+      expect(z.erlaubt('GET', u), isTrue);
+    });
+
+    test('Sicherungsdatei mit itemid-Segment (Zahl vor dem Namen): ebenfalls durch', () {
       final u = Uri.parse('https://m.example/pluginfile.php/7/user/backup/0/page-cm2384-x.mbz?forcedownload=1');
       expect(gesperrt(u), isFalse);
       expect(z.erlaubt('GET', u), isTrue);
@@ -202,7 +169,7 @@ void main() {
 
     test('Nutzerdatei ohne Sicherungs-Muster bleibt gesperrt', () {
       for (final a in [
-        '/pluginfile.php/7/user/backup/0/page-cm2384-x.mbz',
+        '/pluginfile.php/7/user/backup/page-cm2384-x.mbz',
         '/pluginfile.php/7/user/private/notizen.pdf?forcedownload=1',
         '/pluginfile.php/7/user/icon/f1.png?forcedownload=1',
       ]) {
@@ -246,16 +213,6 @@ void main() {
       expect(neu.backupid, '42');
       expect(neu.kontext, 99);
       expect(File('${ordner.path}/vorgaenge.json.tmp').existsSync(), isFalse);
-    });
-
-    test('vorher überlebt den Neustart; ohne Eintrag bleibt es null', () async {
-      final v = Vorgaenge(ordner.path);
-      final vg = await v.neu(kurs: 12, cmid: 1892, datei: 'x.mbz');
-      expect(vg.vorher, isNull);
-      await v.aktualisieren(vg, stand: SicherungStand.laufend, vorher: ['a.mbz']);
-
-      final neu = await Vorgaenge(ordner.path).finde(vg.id);
-      expect(neu!.vorher, ['a.mbz']);
     });
 
     test('beschädigte Datei: Fehler, nichts überschrieben', () async {

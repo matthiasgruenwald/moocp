@@ -29,8 +29,9 @@ final RegExp _nutzerDateien = RegExp(r'^/pluginfile\.php/\d+/user/');
 /// prüft der Ablauf vor dem Herunterladen (bestaetigungFehler in
 /// moodle/sicherung_regeln.dart). Nur mit genau diesem Pfad und forcedownload=1,
 /// nicht mit einem Prefix.
-/// UNGEMESSEN: der Itemid-Teil (0 bei der Probe?), gemessen ist nur die .mbz-Endung.
-final RegExp _sicherungDatei = RegExp(r'^/pluginfile\.php/\d+/user/backup/\d+/[^/?#]+\.mbz\?forcedownload=1$');
+/// Gemessen: der Link trägt kein itemid-Segment (`user/backup/<datei>`). Das
+/// Segment bleibt optional, falls Moodle es anderswo mit einer Zahl setzt.
+final RegExp _sicherungDatei = RegExp(r'^/pluginfile\.php/\d+/user/backup/(?:\d+/)?[^/?#]+\.mbz\?forcedownload=1$');
 
 final List<RegExp> _gesperrt = [
   // Bewertungen, Abgaben, Versuche

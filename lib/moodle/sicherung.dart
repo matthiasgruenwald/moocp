@@ -4,8 +4,7 @@
 // Regeln stehen in sicherung_regeln.dart):
 //   Kurs und Name prüfen -> Schritt 1 -> Schritt 2 (genau diese Aktivität) ->
 //   Bestätigungsseite gegen die Bestellung prüfen -> Freigabe in der App ->
-//   Seite Wiederherstellen vorher lesen -> Schritt 4 starten -> Fortschritt abfragen
-//   -> neuen Namen auf der Seite Wiederherstellen suchen -> Datei holen, Größe prüfen.
+//   Schritt 4 starten -> Fortschritt abfragen -> Datei holen, Größe prüfen.
 //
 // Der Vorgang steht von Anfang an in vorgaenge.json, auch während auf die
 // Freigabe gewartet wird. Bricht der Client ab, bleibt der Eintrag; sicherung_status
@@ -50,7 +49,6 @@ class Vorgang {
     this.backupid,
     this.kontext,
     this.dateiname,
-    this.vorher,
     this.text = '',
     this.bytes,
     this.verified = false,
@@ -70,14 +68,8 @@ class Vorgang {
   String? backupid;
   int? kontext;
 
-  /// Dateiname, den Moodle für die Sicherung führt. Zuerst der Wert aus dem
-  /// Formular, nach dem Ende der Name, unter dem die Datei auf der Seite
-  /// Wiederherstellen steht (Moodle benennt sie selbst).
+  /// Dateiname, den Moodle für die Sicherung führt (setting_root_filename).
   String? dateiname;
-
-  /// Die Sicherungsdateien auf der Seite Wiederherstellen vor dem Start. Neu ist,
-  /// was danach dazukommt. Null heißt: nicht gelesen.
-  List<String>? vorher;
 
   /// Ein fester, kurzer Hinweis zum Stand. Ohne Inhalte aus Moodle.
   String text;
@@ -95,7 +87,6 @@ class Vorgang {
         'backupid': backupid,
         'kontext': kontext,
         'dateiname': dateiname,
-        'vorher': vorher,
         'text': text,
         'bytes': bytes,
         'verified': verified,
@@ -117,7 +108,6 @@ class Vorgang {
       backupid: o['backupid'] as String?,
       kontext: o['kontext'] as int?,
       dateiname: o['dateiname'] as String?,
-      vorher: o['vorher'] is List ? [for (final x in o['vorher'] as List) if (x is String) x] : null,
       text: o['text'] as String? ?? '',
       bytes: o['bytes'] as int?,
       verified: o['verified'] == true,
@@ -186,7 +176,6 @@ class Vorgaenge {
     String? backupid,
     int? kontext,
     String? dateiname,
-    List<String>? vorher,
     int? bytes,
     bool? verified,
   }) async {
@@ -195,7 +184,6 @@ class Vorgaenge {
     if (backupid != null) v.backupid = backupid;
     if (kontext != null) v.kontext = kontext;
     if (dateiname != null) v.dateiname = dateiname;
-    if (vorher != null) v.vorher = vorher;
     if (bytes != null) v.bytes = bytes;
     if (verified != null) v.verified = verified;
     v.aktualisiert = DateTime.now();
@@ -314,18 +302,9 @@ Future<String> aktivitaetSichern(
           '${freigaben.frist.inMinutes} Minuten freigegeben. Nichts geändert.';
     }
 
-    // Vor dem Start: die Sicherungen, die schon auf der Seite Wiederherstellen stehen.
-    // Nach dem Ende ist neu, was dazukommt (siehe _warten). Im Vorgang gespeichert,
-    // damit sicherung_status den Stand nach einem Abbruch wieder findet.
-    final vorher = sicherungsDateien((await moodle.lesen('/backup/restorefile.php?contextid=$kontext')).text);
-
     // Schritt 4 starten. Ob Moodle den Start angenommen hat, zeigt erst die Abfrage.
     await vorgaenge.aktualisieren(vg,
-        stand: SicherungStand.laufend,
-        backupid: backupid,
-        kontext: kontext,
-        dateiname: dateiname,
-        vorher: vorher);
+        stand: SicherungStand.laufend, backupid: backupid, kontext: kontext, dateiname: dateiname);
     try {
       await moodle.senden(s4.aktion, [...s4.felder, const MapEntry('submitbutton', 'Weiter')]);
     } on MoodleFehler {
@@ -375,30 +354,21 @@ Future<String> _warten(
       await Future<void>.delayed(takt);
     }
 
-    // Name und Link holt die Seite „Wiederherstellen": neu seit dem Start, zur
-    // Aktivität passend. Genau ein Treffer, sonst unklar; nicht raten.
-    final vorher = vg.vorher;
-    if (vorher == null) {
-      await vorgaenge.aktualisieren(vg, stand: SicherungStand.unklar, text: 'Der Stand vor dem Start fehlt im Vorgang.');
-      return 'Unklar (Nummer ${vg.id}): Der Stand vor dem Start fehlt im Vorgang.';
+    final dateiname = vg.dateiname;
+    if (dateiname == null) {
+      await vorgaenge.aktualisieren(vg, stand: SicherungStand.unklar, text: 'Der Dateiname fehlt im Vorgang.');
+      return 'Unklar (Nummer ${vg.id}): Der Dateiname fehlt im Vorgang.';
     }
+    // Den Link holt die Seite „Wiederherstellen" (siehe sicherungsLinks).
     final seite = await moodle.lesen('/backup/restorefile.php?contextid=${vg.kontext}');
-    final neue = neueSicherungen(sicherungsDateien(seite.text), vorher, vg.cmid);
-    if (neue.length != 1) {
-      final grund = neue.isEmpty
-          ? 'Die Sicherung steht nicht auf der Seite Wiederherstellen.'
-          : 'Auf der Seite Wiederherstellen stehen mehrere neue Sicherungen dieser Aktivität.';
-      await vorgaenge.aktualisieren(vg, stand: SicherungStand.unklar, text: grund);
-      return 'Unklar (Nummer ${vg.id}): $grund sicherung_status prüft erneut.';
-    }
-    final tatsaechlich = neue.single;
-    final pfade = sicherungsLinks(seite.text, tatsaechlich);
+    final pfade = sicherungsLinks(seite.text, dateiname);
     if (pfade.length != 1) {
-      const grund = 'Der Name steht auf der Seite Wiederherstellen mit mehreren Links.';
+      final grund = pfade.isEmpty
+          ? 'Der Downloadlink fehlt auf der Seite Wiederherstellen.'
+          : 'Auf der Seite Wiederherstellen steht der Name mehrfach.';
       await vorgaenge.aktualisieren(vg, stand: SicherungStand.unklar, text: grund);
       return 'Unklar (Nummer ${vg.id}): $grund sicherung_status prüft erneut.';
     }
-    await vorgaenge.aktualisieren(vg, dateiname: tatsaechlich);
     final pfad = pfade.single;
     final ziel = File(p.join(vorgaenge.ordner, vg.datei));
     final bytes = await moodle.herunterladen(pfad, ziel);

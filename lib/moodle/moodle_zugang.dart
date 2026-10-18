@@ -343,7 +343,7 @@ class MoodleZugang {
             parameter: (q) => _nurSchluessel(q, {'id', 'cm'}) && _zahl(q['id']) && (q['cm'] == null || _zahl(q['cm']))),
         Erlaubt('GET', r'^/backup/restorefile\.php$', 'Sicherung: Seite Wiederherstellen (Downloadlink suchen)',
             parameter: (q) => _nurSchluessel(q, {'contextid'}) && _zahl(q['contextid'])),
-        Erlaubt('GET', r'^/pluginfile\.php/\d+/user/backup/\d+/[^/?#]+\.mbz$', 'Sicherungsdatei',
+        Erlaubt('GET', r'^/pluginfile\.php/\d+/user/backup/(?:\d+/)?[^/?#]+\.mbz$', 'Sicherungsdatei',
             parameter: (q) => q.length == 1 && q['forcedownload'] == '1'),
         Erlaubt('GET', r'^/draftfile\.php/\d+/user/draft/\d+/.+', 'Datei im Entwurfsbereich'),
         Erlaubt('GET', r'^/pluginfile\.php/\d+/.+', 'Datei im Kurs'),
