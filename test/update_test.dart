@@ -72,6 +72,10 @@ void main() {
   });
 
   group('Wann überhaupt geprüft wird', () {
+    test('unter macOS nie: es gibt keinen Installer zum Selbstersetzen', () {
+      expect(updateMoeglich([], {'LOCALAPPDATA': '/x', 'HOME': '/Users/x'}), isFalse);
+    }, skip: Platform.isMacOS ? null : 'nur unter macOS');
+
     test('der Schalter schaltet ab', () {
       expect(updateMoeglich([keinUpdateSchalter], {'LOCALAPPDATA': r'C:\x'}), isFalse);
     });

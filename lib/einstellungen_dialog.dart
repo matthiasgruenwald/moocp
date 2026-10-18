@@ -7,6 +7,8 @@
 // wäre ein weiterer Weg, ihn aus Versehen weiterzugeben. Wer ihn braucht,
 // findet ihn in der README.
 
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 
 import 'einstellungen.dart';
@@ -101,9 +103,12 @@ class _EinstellungenDialogState extends State<EinstellungenDialog> {
               Padding(
                 padding: const EdgeInsets.only(top: 8),
                 child: Text(
-                    'Diese Version kann sich nicht selbst aktualisieren: Sie läuft nicht aus '
-                    'dem Installationsverzeichnis, oder die Prüfung ist über die Kommandozeile '
-                    'abgeschaltet ($keinUpdateSchalter).',
+                    Platform.isWindows
+                        ? 'Diese Version kann sich nicht selbst aktualisieren: Sie läuft nicht aus '
+                            'dem Installationsverzeichnis, oder die Prüfung ist über die Kommandozeile '
+                            'abgeschaltet ($keinUpdateSchalter).'
+                        : 'Diese Version aktualisiert sich nicht selbst. Auf dem Mac prüft moocp nicht '
+                            'bei GitHub und lädt nichts herunter; eine neue Version kommt von Hand.',
                     style: klein),
               )
             else ...[
