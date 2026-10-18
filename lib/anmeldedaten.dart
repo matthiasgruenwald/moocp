@@ -65,7 +65,7 @@ class Anmeldedaten {
 
   /// Nur Entwicklerbau: Zugangsdaten aus einer Datei im Format `SCHLUESSEL=WERT`,
   /// deren Ort die Umgebungsvariable `MOOCP_TESTZUGANG` nennt. Die Datei liegt
-  /// außerhalb des Repos (E2E-Zugang der Spike-Instanz, `TEACHER_USERNAME` und
+  /// außerhalb des Repos (E2E-Zugang der Testinstanz, `TEACHER_USERNAME` und
   /// `TEACHER_PASSWORD`). Dann kein Schlüsselbund und keine Abfrage des
   /// Mac-Passworts; im Release-Bau gibt es das nicht.
   static String? get _testdatei {

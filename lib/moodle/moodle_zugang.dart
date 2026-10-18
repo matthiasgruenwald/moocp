@@ -145,7 +145,7 @@ class MoodleZugang {
 
   final Protokoll protokoll;
 
-  static bool _zahl(String? s) => s != null && RegExp(r'^\d+$').hasMatch(s);
+  static bool _zahl(String? s) => istZahl(s);
   static bool _gesetzt(String? s) => s != null && s.isNotEmpty;
 
   /// Das Formular trägt die Marke seiner Klasse (`_qf__<klasse>`). Die Klassen
@@ -575,7 +575,7 @@ class MoodleZugang {
                 RegExp(r'^[a-f0-9]{40}$').hasMatch(q['pathnamehash'] ?? '') &&
                 RegExp(r'^[a-z_]{1,50}$').hasMatch(q['component'] ?? 'backup') &&
                 RegExp(r'^[a-z_]{1,50}$').hasMatch(q['filearea'] ?? 'draft')),
-        // Sicherungsdetails (gemessen, Spike): das Weiter-Formular trägt nur diese Felder und stage=2.
+        // Sicherungsdetails (gemessen auf der Testinstanz): das Weiter-Formular trägt nur diese Felder und stage=2.
         Erlaubt('POST', r'^/backup/restore\.php$', 'Wiederherstellen: Sicherungsdetails bestätigen',
             parameter: (q) => _nurSchluessel(q, {'contextid', 'filename'}),
             formular: (f) =>
