@@ -14,8 +14,8 @@ import 'package:xml/xml.dart';
 
 import 'sicherung_regeln.dart' show nutzerdatenOptionen;
 
-/// Obergrenze für eine hochgeladene Sicherung. Das geprüfte Formular nennt 200 MB;
-/// steht im Formular ein kleinerer Wert (maxbytes), gilt der kleinere.
+/// Obergrenze für eine hochgeladene Sicherung. Fest 200 MB; der Wert aus dem
+/// Upload-Formular (maxbytes) wird nicht gelesen (TODO.md).
 const int archivGrenzeStandard = 200 * 1024 * 1024;
 
 /// Obergrenze für den entpackten Inhalt (Schutz vor Gzip-Bomben).
@@ -26,14 +26,6 @@ const int eintragGrenzeStandard = 20000;
 
 /// Das Verhältnis entpackt zu gepackt, ab dem das Archiv als verdächtig gilt.
 const int verhaeltnisGrenze = 200;
-
-/// Die Obergrenze für den Upload: der kleinere Wert aus dem Formular (maxbytes,
-/// falls lesbar) und der Standard. Nicht größer als der Standard.
-int hochladeGrenze(String? maxbytes) {
-  final n = int.tryParse(maxbytes ?? '');
-  if (n == null || n <= 0) return archivGrenzeStandard;
-  return n < archivGrenzeStandard ? n : archivGrenzeStandard;
-}
 
 /// Der Stand einer Wiederherstellung, in vorgaenge.json als wiederherstellung_status.
 enum WiederherstellungStand {
@@ -319,9 +311,9 @@ enum Zielweg {
 }
 
 /// Entscheidet den Zielweg aus den Angaben des Auftrags, bevor Moodle gelesen
-/// wird. Ohne `weg` gilt der bisherige Weg (verschmelzen in den genannten Kurs).
-/// Sonst entscheidet nichts geraten: Der Befund ist eine Rückfrage mit den
-/// Optionen. Wird keine Rückfrage zurückgegeben, ist [weg] gesetzt.
+/// wird. `weg` ist Pflicht: Fehlt er, wird nichts geraten, sondern gefragt; der
+/// Befund ist dann eine Rückfrage mit den Optionen. Wird keine Rückfrage
+/// zurückgegeben, ist [weg] gesetzt.
 ({Zielweg? weg, String? rueckfrage}) zielwegPruefen({
   required String? weg,
   required bool loeschend,
@@ -330,7 +322,13 @@ enum Zielweg {
   required String? kurzname,
 }) {
   const nichtGeraten = 'Nichts geändert.';
-  final gewaehlt = weg == null ? Zielweg.anderKursVerschmelzen : Zielweg.aus(weg);
+  if (weg == null) {
+    return (
+      weg: null,
+      rueckfrage: 'Der Parameter weg fehlt. Möglich sind: ${Zielweg.optionen}. $nichtGeraten',
+    );
+  }
+  final gewaehlt = Zielweg.aus(weg);
   if (gewaehlt == null) {
     return (
       weg: null,

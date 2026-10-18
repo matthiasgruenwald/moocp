@@ -67,16 +67,16 @@ Future<void> _uebergang(
 }
 
 /// Stellt eine Sicherungsdatei aus dem Sicherungsordner wieder her. [datei] liegt
-/// relativ zum Sicherungsordner. [weg] ist einer der fünf Zielwege (Zielweg); ohne
-/// Angabe gilt verschmelzen in den Kurs [kurs]. [instanz] ist der Name des Profils,
-/// nur für die Freigabe. Löschende Wege brauchen [loeschend].
+/// relativ zum Sicherungsordner. [weg] ist einer der fünf Zielwege (Zielweg) und
+/// Pflicht; fehlt er, kommt eine Rückfrage statt eines Standardwegs. [instanz] ist
+/// der Name des Profils, nur für die Freigabe. Löschende Wege brauchen [loeschend].
 Future<String> wiederherstellen(
   MoodleZugang moodle,
   Freigaben freigaben,
   Vorgaenge vorgaenge, {
   required String datei,
   required String instanz,
-  String? weg,
+  required String? weg,
   int? kurs,
   String? name,
   bool loeschend = false,

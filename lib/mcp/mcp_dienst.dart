@@ -263,7 +263,11 @@ class McpDienst {
     final ziele = <ZielAngabe>[];
     for (final x in (a['ziele'] as List?) ?? const []) {
       final m = _karte(x);
-      ziele.add(ZielAngabe(kurs: _zahl(m, 'kurs'), name: _text(m, 'name'), weg: m['weg'] as String?));
+      ziele.add(ZielAngabe(
+          kurs: _zahl(m, 'kurs'),
+          name: _text(m, 'name'),
+          weg: m['weg'] as String?,
+          loeschend: m['loeschend'] == true));
     }
     final angegeben = a['datei'] as String?;
     final erneut = a['erneut'] == true;
@@ -849,8 +853,8 @@ class McpDienst {
             'Parameter weg: neuer_kurs (neuer Kurs, braucht neuer_kurs_name und kurzname, optional kategorie_id), '
             'aktueller_kurs_verschmelzen und anderer_kurs_verschmelzen (Inhalte kommen dazu, nichts wird gelöscht; '
             'brauchen kurs und name), aktueller_kurs_ersetzen und anderer_kurs_ersetzen (löschen vorhandene Inhalte '
-            'des Kurses; brauchen kurs, name und loeschend: true). Ohne weg gilt anderer_kurs_verschmelzen mit kurs. '
-            'Ein unklarer Weg wird nicht geraten: die Antwort nennt die Optionen. Die Datei wird vor dem Hochladen '
+            'des Kurses; brauchen kurs, name und loeschend: true). weg ist Pflicht; fehlt er oder ist er unklar, wird '
+            'nicht geraten: die Antwort nennt die Optionen. Die Datei wird vor dem Hochladen '
             'geprüft (gepacktes Tar, keine Nutzerdaten, keine Pfade nach außen, höchstens 200 MB). Der Kursname muss '
             'zu der Nummer passen. Vor dem Start fragt die App nach einer Freigabe, die Kurs, Datei, Modus und die '
             'neuen Aktivitäten zeigt; bei löschenden Wegen steht dort, dass vorhandene Inhalte gelöscht werden. '
@@ -862,7 +866,7 @@ class McpDienst {
               description: 'Dateiname der .mbz relativ zum Sicherungsordner, wie sichern_aktivitaet ihn nennt.'),
           'weg': JsonSchema.string(
               enumValues: [for (final z in Zielweg.values) z.nennung],
-              description: 'Zielweg. Ohne Angabe: anderer_kurs_verschmelzen (mit kurs).'),
+              description: 'Zielweg, Pflicht. Die Optionen stehen in enumValues.'),
           'loeschend': JsonSchema.boolean(
               description: 'Pflicht und nur true bei aktueller_kurs_ersetzen und anderer_kurs_ersetzen: '
                   'vorhandene Inhalte des Zielkurses werden gelöscht.'),
@@ -875,7 +879,7 @@ class McpDienst {
           'kategorie_id': JsonSchema.integer(
               description: 'Nur bei neuer_kurs, optional: Kategorie-Nummer. Ohne Angabe die Vorgabe des Kursformulars.'),
         },
-        pflicht: ['datei'],
+        pflicht: ['datei', 'weg'],
         ausfuehren: (a) => _zeitlimit(
               wiederherstellen(moodle, freigaben, vorgaenge,
                   datei: _text(a, 'datei'),
@@ -981,6 +985,9 @@ class McpDienst {
                   'weg': JsonSchema.string(
                       enumValues: [for (final z in Zielweg.values) if (z.brauchtKurs) z.nennung],
                       description: 'Zielweg dieses Ziels. Pflicht; ohne Angabe wird nichts geraten.'),
+                  'loeschend': JsonSchema.boolean(
+                      description: 'Pflicht und nur true bei aktueller_kurs_ersetzen und anderer_kurs_ersetzen: '
+                          'vorhandene Inhalte dieses Zielkurses werden gelöscht. Sonst weglassen.'),
                 },
                 required: const ['kurs', 'name'],
               ),

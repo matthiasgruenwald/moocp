@@ -218,12 +218,6 @@ void main() {
       expect(nutzerdatenPfad('activities/page_1/page.xml'), isFalse);
     });
 
-    test('hochladeGrenze nimmt den kleineren Wert, nie mehr als 200 MB', () {
-      expect(hochladeGrenze(null), archivGrenzeStandard);
-      expect(hochladeGrenze('abc'), archivGrenzeStandard);
-      expect(hochladeGrenze('1000'), 1000);
-      expect(hochladeGrenze('${1024 * 1024 * 1024}'), archivGrenzeStandard);
-    });
   });
 
   group('Zustandsfolge', () {

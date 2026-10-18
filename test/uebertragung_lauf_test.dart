@@ -88,6 +88,29 @@ void main() {
       final p = pruefeZiele([const ZielAngabe(kurs: 0, name: 'Kurs 0', weg: 'anderer_kurs_verschmelzen')]);
       expect(p, isA<PlanungRueckfrage>());
     });
+
+    test('löschender Weg ohne loeschend: true ist eine Rückfrage', () {
+      for (final weg in ['aktueller_kurs_ersetzen', 'anderer_kurs_ersetzen']) {
+        final p = pruefeZiele([ZielAngabe(kurs: 12, name: 'Kurs 12', weg: weg)]);
+        expect(p, isA<PlanungRueckfrage>(), reason: weg);
+        expect((p as PlanungRueckfrage).text, contains('loeschend: true'), reason: weg);
+      }
+    });
+
+    test('löschender Weg mit loeschend: true wird geprüft', () {
+      final p = pruefeZiele([
+        const ZielAngabe(kurs: 12, name: 'Kurs 12', weg: 'anderer_kurs_ersetzen', loeschend: true),
+      ], quellkurs: 56);
+      expect(p, isA<PlanungOk>());
+      expect((p as PlanungOk).ziele.single.weg, Zielweg.anderKursErsetzen);
+    });
+
+    test('loeschend: true bei einem nicht löschenden Weg ist eine Rückfrage', () {
+      final p = pruefeZiele([
+        const ZielAngabe(kurs: 12, name: 'Kurs 12', weg: 'anderer_kurs_verschmelzen', loeschend: true),
+      ]);
+      expect(p, isA<PlanungRueckfrage>());
+    });
   });
 
   group('wiederholungsRueckfrage', () {

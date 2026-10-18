@@ -51,7 +51,7 @@ Eine Sicherungsdatei zurückspielen kann `wiederherstellen_datei` mit dem Parame
 `neuer_kurs` (neuer Kurs, braucht `neuer_kurs_name` und `kurzname`, optional `kategorie_id`),
 `aktueller_kurs_verschmelzen` oder `anderer_kurs_verschmelzen` (fügt ein, ersetzt nichts)
 und `aktueller_kurs_ersetzen` oder `anderer_kurs_ersetzen` (löscht vorhandene Inhalte;
-nur mit `loeschend: true`). Ohne `weg` gilt `anderer_kurs_verschmelzen` mit `kurs`.
+nur mit `loeschend: true`). `weg` ist Pflicht; ohne ihn fragt die KI nach, statt einen Weg zu wählen.
 Wenn der Auftrag den Zielweg nicht eindeutig nennt, frage nach, statt zu raten. Die
 Lehrkraft nennt Kurs, Nummer und Datei genau; bei löschenden Wegen erklärst du vorher,
 dass vorhandene Inhalte gelöscht werden. Nenne nur die Wege, die Moodle auf der Seite
@@ -263,7 +263,9 @@ in deinem Kopf.
   die Lehrkraft mit der Freigabestufe fest (E20). Sag ihr das vorher.
 - **Rückfragen, bevor etwas geschieht:** Fehlt ein Weg oder ein Kursname, ist ein
   Kurs doppelt genannt oder ist ein Ziel der Quellkurs, fragt das Werkzeug zurück
-  und schreibt nichts. Der Weg `neuer_kurs` gehört nicht zu `uebertragen`; einen
+  und schreibt nichts. Ein löschender Weg (`aktueller_kurs_ersetzen`,
+  `anderer_kurs_ersetzen`) braucht `loeschend: true` im Ziel; fehlt es, fragt das
+  Werkzeug ebenfalls zurück, bevor etwas geschieht. Der Weg `neuer_kurs` gehört nicht zu `uebertragen`; einen
   neuen Kurs legt `wiederherstellen_datei` an. Ist dieselbe Datei für ein Ziel schon
   übertragen worden, kommt eine Rückfrage mit der Nummer. Erst klärst du den Stand
   (`wiederherstellung_status`). Ein erneuter Import mit `erneut: true` ist nur nach

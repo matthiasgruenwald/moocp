@@ -46,13 +46,15 @@ ZielStand zielStandAus(WiederherstellungStand? stand) => switch (stand) {
     };
 
 /// Eine Zielangabe, wie die KI sie schickt. [weg] ist der Name des Zielwegs,
-/// nicht geprüft.
+/// nicht geprüft. [loeschend] muss bei löschenden Wegen true sein und sonst
+/// fehlen; sonst kommt eine Rückfrage, bevor etwas geschieht.
 class ZielAngabe {
-  const ZielAngabe({required this.kurs, required this.name, this.weg});
+  const ZielAngabe({required this.kurs, required this.name, this.weg, this.loeschend = false});
 
   final int kurs;
   final String name;
   final String? weg;
+  final bool loeschend;
 }
 
 /// Ein geprüftes Ziel: Kurs, Name zur Bestätigung und der aufgelöste Zielweg.
@@ -117,6 +119,15 @@ Planung pruefeZiele(List<ZielAngabe> ziele, {int? quellkurs}) {
     }
     if (z.name.trim().isEmpty) {
       return PlanungRueckfrage('Für Kurs ${z.kurs} fehlt der Kursname (name), wie er jetzt in Moodle steht.');
+    }
+    if (weg.loescht && !z.loeschend) {
+      return PlanungRueckfrage(
+          'Für Kurs ${z.kurs} löscht der Weg ${weg.nennung} vorhandene Inhalte. Dafür braucht es loeschend: true '
+          'in diesem Ziel. Nichts wird geraten.');
+    }
+    if (z.loeschend && !weg.loescht) {
+      return PlanungRueckfrage(
+          'Für Kurs ${z.kurs} gilt loeschend nur für die löschenden Wege. Bitte loeschend weglassen. Nichts wird geraten.');
     }
     geprueft.add(PlanZiel(kurs: z.kurs, name: z.name, weg: weg));
   }

@@ -38,17 +38,21 @@ void main() {
   });
 
   group('zielwegPruefen', () {
-    test('ohne weg: anderer_kurs_verschmelzen mit kurs', () {
-      final r = zielwegPruefen(weg: null, loeschend: false, kurs: 42, neuerKursName: null, kurzname: null);
-      expect(r.weg, Zielweg.anderKursVerschmelzen);
-      expect(r.rueckfrage, isNull);
+    test('ohne weg: Rückfrage mit allen Optionen, nichts wird geraten', () {
+      for (final kurs in [42, null]) {
+        final r = zielwegPruefen(weg: null, loeschend: false, kurs: kurs, neuerKursName: null, kurzname: null);
+        expect(r.weg, isNull);
+        expect(r.rueckfrage, endsWith('Nichts geändert.'));
+        for (final z in Zielweg.values) {
+          expect(r.rueckfrage, contains(z.nennung));
+        }
+      }
     });
 
-    test('ohne weg und ohne kurs: Rückfrage, nichts wird geraten', () {
-      final r = zielwegPruefen(weg: null, loeschend: false, kurs: null, neuerKursName: null, kurzname: null);
+    test('ohne weg bleibt auch dann eine Rückfrage, wenn alles andere passt', () {
+      final r = zielwegPruefen(weg: null, loeschend: false, kurs: 42, neuerKursName: null, kurzname: null);
       expect(r.weg, isNull);
       expect(r.rueckfrage, isNotNull);
-      expect(r.rueckfrage, endsWith('Nichts geändert.'));
     });
 
     test('unbekannter Weg: Rückfrage mit allen Optionen', () {
