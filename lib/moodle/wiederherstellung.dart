@@ -128,118 +128,132 @@ Future<String> wiederherstellen(
   if (wahl.rueckfrage != null) throw MoodleFehler(wahl.rueckfrage!);
   final zielweg = wahl.weg!;
 
-  // 4. Zielkurs (bestehend) bzw. Kategorie (neuer Kurs) und Kontext des Hochladens.
-  var kursName = '';
-  var vorherCmids = <int>[];
-  var vorherText = '';
-  int kontext;
-  int? kategorie;
-  if (zielweg.brauchtKurs) {
-    final k = kurs!;
-    kursName = await kursname(moodle, k) ?? '';
-    if ((name ?? '').trim().isEmpty) throw MoodleFehler('Der Kursname (name) fehlt. Nichts geändert.');
-    nameBestaetigen(name!, kursName, 'Kurs $k');
-    final vorher = await kursLesen(moodle, k);
-    vorherCmids = vorher.nachCmid.keys.toList();
-    if (zielweg.loescht) {
-      final liste = [for (final a in vorher.nachCmid.values) '„${a.name}" (${a.modul})'];
-      vorherText = 'Vor dem Lauf im Kurs $k: ${liste.isEmpty ? 'keine Aktivitäten' : liste.join(', ')}.';
-    }
-    // Kontext des Kurses (Seitenangaben der Kursseite; UNGEMESSEN).
-    final seite = await moodle.lesen('/course/view.php?id=$k');
-    final ctx = int.tryParse(Seitenangaben.aus(seite.text).kontext ?? '');
-    if (ctx == null) throw MoodleFehler('Moodle nennt den Kontext des Kurses nicht. Nichts geändert.');
-    kontext = ctx;
-  } else {
-    kategorie = await _kategorie(moodle, kategorieId);
-    kontext = await _kategorieKontext(moodle, kategorie);
-  }
-
-  // 4b. Doppelstart-Schutz (Ticket #19, Spec #17): Vor der Freigabe prüfen, damit ein
-  // abgewiesener Aufruf nichts fragt. Der Inhalt zählt, nicht der Dateiname.
+  // 4a. Der Zielweg steht fest: Der Fingerabdruck reserviert die Datei, bevor
+  // die erste Moodle-Anfrage wartet. Zwei Aufrufe mit derselben Datei können so
+  // nicht beide durch die Prüfung (Befund 1, Befund 2).
   final fp = fingerabdruck(bytes, kurs: kurs ?? 0, weg: zielweg);
+  return _reservieren(fp, () async {
+    // 4. Zielkurs (bestehend) bzw. Kategorie (neuer Kurs) und Kontext des Hochladens.
+    var kursName = '';
+    var vorherCmids = <int>[];
+    var vorherText = '';
+    int kontext;
+    int? kategorie;
+    if (zielweg.brauchtKurs) {
+      final k = kurs!;
+      kursName = await kursname(moodle, k) ?? '';
+      if ((name ?? '').trim().isEmpty) throw MoodleFehler('Der Kursname (name) fehlt. Nichts geändert.');
+      nameBestaetigen(name!, kursName, 'Kurs $k');
+      final vorher = await kursLesen(moodle, k);
+      vorherCmids = vorher.nachCmid.keys.toList();
+      if (zielweg.loescht) {
+        final liste = [for (final a in vorher.nachCmid.values) '„${a.name}" (${a.modul})'];
+        vorherText = 'Vor dem Lauf im Kurs $k: ${liste.isEmpty ? 'keine Aktivitäten' : liste.join(', ')}.';
+      }
+      // Kontext des Kurses (Seitenangaben der Kursseite; UNGEMESSEN).
+      final seite = await moodle.lesen('/course/view.php?id=$k');
+      final ctx = int.tryParse(Seitenangaben.aus(seite.text).kontext ?? '');
+      if (ctx == null) throw MoodleFehler('Moodle nennt den Kontext des Kurses nicht. Nichts geändert.');
+      kontext = ctx;
+    } else {
+      kategorie = await _kategorie(moodle, kategorieId);
+      kontext = await _kategorieKontext(moodle, kategorie);
+    }
+
+    // 4b. Doppelstart-Schutz (Ticket #19, Spec #17): Vor der Freigabe prüfen, damit ein
+    // abgewiesener Aufruf nichts fragt. Der Inhalt zählt, nicht der Dateiname.
+    final sperre = doppelstartSperre(
+      doppelstartEintraege(await vorgaenge.alle()),
+      fingerabdruck: fp,
+      wiederholungVon: wiederholungVon,
+      kurs: kurs ?? 0,
+    );
+    if (sperre != null) {
+      throw MoodleFehler('Dieselbe Datei für diesen Zielweg ist schon im Vorgang Nummer $sperre offen. '
+          'Mit wiederherstellung_status prüfen. Eine erneute Wiederherstellung nur mit wiederholung_von=$sperre. Nichts geändert.');
+    }
+
+    // 5. Freigabe in der App, vor jedem Schreiben (beim neuen Kurs vor dem Platzhalter).
+    final aktivitaeten = [
+      for (final a in befund.aktivitaeten) '„${a.titel}" (${a.modul})',
+    ];
+    final zielZeile = zielweg.brauchtKurs
+        ? 'Kurs ${kurs!} „$kursName" (bestehender Kurs)'
+        : 'Neuer Kurs „$neuerKursName" (Kurzname „$kurzname“) in Kategorie $kategorie. '
+            'Moodle legt vor den Einstellungen einen Platzhalterkurs an; nach einem Abbruch wird er über Moodle entfernt.';
+    final modusZeile = switch (zielweg) {
+      Zielweg.neuerKurs => 'Modus: neuer Kurs. Nichts Bestehendes wird verändert.',
+      Zielweg.aktuellerKursVerschmelzen || Zielweg.anderKursVerschmelzen =>
+        'Modus: verschmelzen. Inhalte werden zum Kurs hinzugefügt; nichts im Kurs wird gelöscht.',
+      _ => 'Modus: ${zielweg.nennung}. Im Kurs gilt: vorhandene Inhalte werden gelöscht, dann wiederhergestellt. '
+          'Die Übersicht vor dem Lauf wird im Vorgang festgehalten. Nicht rückgängig zu machen.',
+    };
+    final herkunftZeilen = await _herkunftZeilen(moodle, befund, sammlung);
+    final ja = await freigaben.anfragen(FreigabeAnfrage(
+      titel: zielweg.loescht ? 'Vorhandene Inhalte löschen und wiederherstellen?' : 'Wiederherstellen ausführen?',
+      punkte: [
+        'Profil: $instanz',
+        zielZeile,
+        'Datei: ${p.basename(datei)} (${befund.typ == 'course' ? 'ganzer Kurs' : 'Aktivität'}, Moodle ${befund.moodleVersion ?? '?'})',
+        modusZeile,
+        if (zielweg.loescht && zielweg.brauchtKurs)
+          'Im Kurs „$kursName" werden vorhandene Inhalte gelöscht, bevor die Datei wieder hineinkommt.',
+        if (aktivitaeten.isNotEmpty) 'Angelegt werden: ${aktivitaeten.join(', ')}',
+        // Fragenherkunft (Issue #20) vor dem Start; die Lesart ist UNGEMESSEN (TODO.md).
+        ...herkunftZeilen,
+        'Moodle stellt die neuen Aktivitäten sichtbar wieder her; die App verbirgt sie danach. Sie können '
+            'kurzzeitig für Lernende sichtbar sein. Verborgen ist kein Schutz: Wer im Kurs Rechte hat, sieht sie und kann sie sichtbar machen.',
+        'Nutzerdaten sind im Archiv nicht enthalten (geprüft). Rechte und Einschreibungen bleiben unverändert.',
+        if (wiederholungVon != null)
+          'Wiederholung des Vorgangs $wiederholungVon, der nicht abgeschlossen ist. Moodle kann ihn schon ausgeführt haben.',
+      ],
+      vergleich: const [],
+      knopf: zielweg.loescht ? 'Löschen und wiederherstellen' : 'Wiederherstellen',
+      ohneEntscheidung: 'wird nichts wiederhergestellt',
+    ));
+    if (!ja) {
+      return 'Nicht wiederhergestellt: in der App abgelehnt oder nicht innerhalb von '
+          '${freigaben.frist.inMinutes} Minuten freigegeben. Nichts geändert.';
+    }
+
+    // 6. Vorgang anlegen und Datei hochladen (jedes Mal neu, nie eine alte Kennung).
+    final vg = await vorgaenge.neuWiederherstellung(
+        kurs: kurs ?? 0, datei: datei, fingerabdruck: fp, wiederholungVon: wiederholungVon);
+    _laufendeWiederherstellungen.add(vg.id);
+    // Die Nummer geht nur an den Aufrufer, damit er das Ergebnis je Ziel
+    // zuordnen kann (uebertragen, Issue #10). Ohne Rückruf unverändert.
+    beiVorgang?.call(vg.id);
+    try {
+      return await _ausfuehren(moodle, vorgaenge, vg,
+          bytes: bytes,
+          kontext: kontext,
+          zielweg: zielweg,
+          kurs: kurs,
+          kategorie: kategorie,
+          neuerKursName: neuerKursName,
+          kurzname: kurzname,
+          vorherCmids: vorherCmids,
+          wiederherstellungAktivitaeten: befund.aktivitaeten,
+          quizQuelle: befund.quizFragen.length == 1 ? befund.quizFragen.values.first : null,
+          vorherText: vorherText,
+          name: p.basename(datei));
+    } finally {
+      _laufendeWiederherstellungen.remove(vg.id);
+    }
+  });
+}
+
+/// Hält [fp] für die Dauer von [lauf] belegt. Die Belegung geschieht synchron beim
+/// Aufruf, ohne Warten dazwischen; ein zweiter Aufruf mit demselben Fingerabdruck
+/// wird sofort abgewiesen und fragt nichts.
+Future<T> _reservieren<T>(String fp, Future<T> Function() lauf) async {
   if (_reserviert.contains(fp)) {
     throw MoodleFehler('Diese Datei wird für diesen Zielweg gerade schon wiederhergestellt. Nichts geändert.');
   }
-  final sperre = doppelstartSperre(
-    doppelstartEintraege(await vorgaenge.alle()),
-    fingerabdruck: fp,
-    wiederholungVon: wiederholungVon,
-    kurs: kurs ?? 0,
-  );
-  if (sperre != null) {
-    throw MoodleFehler('Dieselbe Datei für diesen Zielweg ist schon im Vorgang Nummer $sperre offen. '
-        'Mit wiederherstellung_status prüfen. Eine erneute Wiederherstellung nur mit wiederholung_von=$sperre. Nichts geändert.');
-  }
-
-  // 5. Freigabe in der App, vor jedem Schreiben (beim neuen Kurs vor dem Platzhalter).
   _reserviert.add(fp);
-  final aktivitaeten = [
-    for (final a in befund.aktivitaeten) '„${a.titel}" (${a.modul})',
-  ];
-  final zielZeile = zielweg.brauchtKurs
-      ? 'Kurs ${kurs!} „$kursName" (bestehender Kurs)'
-      : 'Neuer Kurs „$neuerKursName" (Kurzname „$kurzname“) in Kategorie $kategorie. '
-          'Moodle legt vor den Einstellungen einen Platzhalterkurs an; nach einem Abbruch wird er über Moodle entfernt.';
-  final modusZeile = switch (zielweg) {
-    Zielweg.neuerKurs => 'Modus: neuer Kurs. Nichts Bestehendes wird verändert.',
-    Zielweg.aktuellerKursVerschmelzen || Zielweg.anderKursVerschmelzen =>
-      'Modus: verschmelzen. Inhalte werden zum Kurs hinzugefügt; nichts im Kurs wird gelöscht.',
-    _ => 'Modus: ${zielweg.nennung}. Im Kurs gilt: vorhandene Inhalte werden gelöscht, dann wiederhergestellt. '
-        'Die Übersicht vor dem Lauf wird im Vorgang festgehalten. Nicht rückgängig zu machen.',
-  };
-  final herkunftZeilen = await _herkunftZeilen(moodle, befund, sammlung);
-  final ja = await freigaben.anfragen(FreigabeAnfrage(
-    titel: zielweg.loescht ? 'Vorhandene Inhalte löschen und wiederherstellen?' : 'Wiederherstellen ausführen?',
-    punkte: [
-      'Profil: $instanz',
-      zielZeile,
-      'Datei: ${p.basename(datei)} (${befund.typ == 'course' ? 'ganzer Kurs' : 'Aktivität'}, Moodle ${befund.moodleVersion ?? '?'})',
-      modusZeile,
-      if (zielweg.loescht && zielweg.brauchtKurs)
-        'Im Kurs „$kursName" werden vorhandene Inhalte gelöscht, bevor die Datei wieder hineinkommt.',
-      if (aktivitaeten.isNotEmpty) 'Angelegt werden: ${aktivitaeten.join(', ')}',
-      // Fragenherkunft (Issue #20) vor dem Start; die Lesart ist UNGEMESSEN (TODO.md).
-      ...herkunftZeilen,
-      'Moodle stellt die neuen Aktivitäten sichtbar wieder her; die App verbirgt sie danach. Sie können '
-          'kurzzeitig für Lernende sichtbar sein. Verborgen ist kein Schutz: Wer im Kurs Rechte hat, sieht sie und kann sie sichtbar machen.',
-      'Nutzerdaten sind im Archiv nicht enthalten (geprüft). Rechte und Einschreibungen bleiben unverändert.',
-      if (wiederholungVon != null)
-        'Wiederholung des Vorgangs $wiederholungVon, der nicht abgeschlossen ist. Moodle kann ihn schon ausgeführt haben.',
-    ],
-    vergleich: const [],
-    knopf: zielweg.loescht ? 'Löschen und wiederherstellen' : 'Wiederherstellen',
-    ohneEntscheidung: 'wird nichts wiederhergestellt',
-  ));
-  if (!ja) {
-    _reserviert.remove(fp);
-    return 'Nicht wiederhergestellt: in der App abgelehnt oder nicht innerhalb von '
-        '${freigaben.frist.inMinutes} Minuten freigegeben. Nichts geändert.';
-  }
-
-  // 6. Vorgang anlegen und Datei hochladen (jedes Mal neu, nie eine alte Kennung).
-  final vg = await vorgaenge.neuWiederherstellung(
-      kurs: kurs ?? 0, datei: datei, fingerabdruck: fp, wiederholungVon: wiederholungVon);
-  _laufendeWiederherstellungen.add(vg.id);
-  // Die Nummer geht nur an den Aufrufer, damit er das Ergebnis je Ziel
-  // zuordnen kann (uebertragen, Issue #10). Ohne Rückruf unverändert.
-  beiVorgang?.call(vg.id);
   try {
-    return await _ausfuehren(moodle, vorgaenge, vg,
-        bytes: bytes,
-        kontext: kontext,
-        zielweg: zielweg,
-        kurs: kurs,
-        kategorie: kategorie,
-        neuerKursName: neuerKursName,
-        kurzname: kurzname,
-        vorherCmids: vorherCmids,
-        wiederherstellungAktivitaeten: befund.aktivitaeten,
-        quizQuelle: befund.quizFragen.length == 1 ? befund.quizFragen.values.first : null,
-        vorherText: vorherText,
-        name: p.basename(datei));
+    return await lauf();
   } finally {
-    _laufendeWiederherstellungen.remove(vg.id);
     _reserviert.remove(fp);
   }
 }
