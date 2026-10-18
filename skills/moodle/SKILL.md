@@ -55,6 +55,9 @@ Eine Sicherungsdatei zurückspielen kann `wiederherstellen_datei` mit dem Parame
 `aktueller_kurs_verschmelzen` oder `anderer_kurs_verschmelzen` (fügt ein, ersetzt nichts)
 und `aktueller_kurs_ersetzen` oder `anderer_kurs_ersetzen` (löscht vorhandene Inhalte;
 nur mit `loeschend: true`). `weg` ist Pflicht; ohne ihn fragt die KI nach, statt einen Weg zu wählen.
+Dieselbe Datei für denselben Weg wird nicht ein zweites Mal gestartet, solange ein Vorgang offen ist;
+die Antwort nennt seine Nummer. Erst `wiederherstellung_status` klären. Eine bewusste Wiederholung
+nur mit `wiederholung_von` und dieser Nummer, und nur nach ausdrücklichem Wunsch der Lehrkraft.
 Wenn der Auftrag den Zielweg nicht eindeutig nennt, frage nach, statt zu raten. Die
 Lehrkraft nennt Kurs, Nummer und Datei genau; bei löschenden Wegen erklärst du vorher,
 dass vorhandene Inhalte gelöscht werden. Nenne nur die Wege, die Moodle auf der Seite
@@ -63,6 +66,9 @@ Aktivitäten sichtbar her; die App verbirgt sie danach, kurzzeitig können sie a
 sichtbar sein. Verbergen schützt nicht vor Einsicht oder Änderungen durch andere. Die Datei wird vor dem
 Hochladen geprüft; eine Datei mit Nutzerdaten wird abgelehnt. Läuft die
 Wiederherstellung länger, rufe `wiederherstellung_status` mit der Nummer auf.
+Der Bericht prüft danach Bilder und Anhänge der neuen Aktivitäten gegen die Sicherungsdatei
+(Inhalt, nicht Adresse). Steht dort „nicht vollständig verifiziert", sag das so; repariert wird
+nichts von allein.
 Bei einem Stillstand (kein Fortschritt seit 15 Minuten) gilt dasselbe wie bei der
 Sicherung: nicht belegt, nicht neu starten; die Administration prüft Cron und
 Ad-hoc-Aufgaben.

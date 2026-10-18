@@ -860,10 +860,15 @@ class McpDienst {
             'neuen Aktivitäten zeigt; bei löschenden Wegen steht dort, dass vorhandene Inhalte gelöscht werden. '
             'Neue Aktivitäten werden danach verborgen (kurzzeitig können sie sichtbar sein). Verborgen ist kein Schutz. '
             'Dauert es länger als eine Minute, läuft es weiter: dann wiederherstellung_status mit der Nummer aufrufen. '
-            'Nach dem Start wird nie neu gesendet.',
+            'Nach dem Start wird nie neu gesendet. Dieselbe Datei für denselben Zielweg wird nicht ein zweites Mal '
+            'gestartet, solange ein Vorgang offen ist (auch nach dem Zeitlimit oder einem Neustart); die Antwort nennt '
+            'dann seine Nummer. Eine bewusste Wiederholung nur mit wiederholung_von und dieser Nummer, nach Freigabe.',
         parameter: {
           'datei': JsonSchema.string(
               description: 'Dateiname der .mbz relativ zum Sicherungsordner, wie sichern_aktivitaet ihn nennt.'),
+          'wiederholung_von': JsonSchema.string(
+              description: 'Nur bei einer bewussten Wiederholung: Nummer des offenen Vorgangs, den die Antwort '
+                  'vorher genannt hat. Ohne Angabe wird eine Wiederholung abgewiesen.'),
           'weg': JsonSchema.string(
               enumValues: [for (final z in Zielweg.values) z.nennung],
               description: 'Zielweg, Pflicht. Die Optionen stehen in enumValues.'),
@@ -894,6 +899,7 @@ class McpDienst {
                   kurzname: a['kurzname'] as String?,
                   kategorieId: _zahlOder(a, 'kategorie_id'),
                   sammlung: _zahlOder(a, 'sammlung'),
+                  wiederholungVon: a['wiederholung_von'] as String?,
                   instanz: profil.name),
               const Duration(minutes: 1),
               () => 'Die Wiederherstellung läuft weiter. Mit wiederherstellung_status und der Nummer später prüfen.',
