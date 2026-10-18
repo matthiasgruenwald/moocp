@@ -35,6 +35,7 @@ import 'package:html/parser.dart' as html_parser;
 import '../protokoll.dart';
 import 'browserliste.dart';
 import 'sicherung_regeln.dart';
+import 'wiederherstellung_regeln.dart';
 import 'sperrliste.dart';
 
 class MoodleFehler implements Exception {
@@ -581,17 +582,31 @@ class MoodleZugang {
                 f.every((e) => const {'contextid', 'filepath', 'filename', 'stage', 'sesskey'}.contains(e.key)) &&
                 wertIn(f, 'stage') == '2' &&
                 _gesetzt(wertIn(f, 'sesskey'))),
-        // Zielwahl: nur „in einem vorhandenen Kurs" (target=4), Schritt 2.
-        Erlaubt('POST', r'^/backup/restore\.php$', 'Wiederherstellen: Ziel „vorhandener Kurs" (Formular mit stage=4)',
-            parameter: (q) => _nurSchluessel(q, {'contextid', 'filename'}),
-            formular: (f) =>
-                const {'2', '4'}.contains(wertIn(f, 'stage')) &&
-                wertIn(f, 'target') == '4' &&
-                _zahl(wertIn(f, 'targetid')) &&
-                _gesetzt(wertIn(f, 'sesskey')) &&
-                f.every((e) => const {'contextid', 'filepath', 'filename', 'stage', 'sesskey', 'target', 'targetid', 'search'}
-                    .contains(e.key)), // gemessen: kein _qf__-Feld auf dieser Seite
-            ),
+        // Zielwahl je Zielweg (Issue #9): jeder Weg hat eine eigene, enge Schlüsselmenge.
+        // Der Wert target ist der gemessene Moodle-Wert des Weges; ein anderer wird abgelehnt.
+        // Kein _qf__-Feld auf dieser Seite (gemessen). Die Felder search (Kurssuche) und
+        // catsearch (Kategoriesuche) gehören je nur zu den Wegen, die sie brauchen.
+        for (final ziel in Zielweg.values)
+          Erlaubt('POST', r'^/backup/restore\.php$', 'Wiederherstellen: Ziel „${ziel.nennung}" (Formular mit stage=2 oder 4)',
+              parameter: (q) => _nurSchluessel(q, {'contextid', 'filename'}),
+              formular: (f) {
+                final erlaubt = {
+                  'contextid', 'filepath', 'filename', 'stage', 'sesskey', 'target', 'targetid',
+                  if (ziel == Zielweg.neuerKurs) 'catsearch',
+                  if (ziel == Zielweg.anderKursVerschmelzen || ziel == Zielweg.anderKursErsetzen) 'search',
+                };
+                return const {'2', '4'}.contains(wertIn(f, 'stage')) &&
+                    wertIn(f, 'target') == '${ziel.moodle}' &&
+                    _zahl(wertIn(f, 'targetid')) &&
+                    _gesetzt(wertIn(f, 'sesskey')) &&
+                    f.every((e) => erlaubt.contains(e.key));
+              }),
+        // Kursformular (nur für die Kategorie eines neuen Kurses): ohne Angabe oder mit category.
+        Erlaubt('GET', r'^/course/edit\.php$', 'Kursformular lesen (Kategorie des neuen Kurses)',
+            parameter: (q) => _nurSchluessel(q, {'category'}) && (q['category'] == null || _zahl(q['category']))),
+        // Kursverwaltung der Kategorie (Kontext der Kategorie; UNGEMESSEN).
+        Erlaubt('GET', r'^/course/management\.php$', 'Kategorie ansehen (Kontext; UNGEMESSEN)',
+            parameter: (q) => _nurSchluessel(q, {'categoryid'}) && _zahl(q['categoryid'])),
         // Einstellungen, Schema und Prüfung: ohne Nutzerdaten, mit dem Schalter „restore".
         for (final (schritt, form) in const [
           ('4', 'settings'),

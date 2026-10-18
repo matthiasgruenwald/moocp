@@ -2,6 +2,7 @@
 
 ## 0.9.23
 - Wiederherstellung: Eine Sicherungsdatei lässt sich in einen bestehenden Kurs einfügen, ohne etwas zu ersetzen; die Freigabe nennt Kurs, Datei und was neu angelegt wird, und die Datei wird vor dem Hochladen geprüft. UNGEMESSEN: noch nicht auf einer Instanz durchgespielt.
+- Wiederherstellung: Fünf Ziele statt einem – als neuer Kurs (verborgen angelegt), in den aktuellen oder einen anderen Kurs, jeweils einfügen oder vorhandene Inhalte ersetzen. Ersetzen braucht eine eigene Bestätigung, die den Kurs nennt. Bei unklarer Angabe fragt die KI nach. UNGEMESSEN: die Wege außer dem Einfügen in einen bestehenden Kurs sind nicht auf einer Instanz durchgespielt; der Abbruch eines neuen Kurses fehlt.
 - Sicherung: Eine einzelne Aktivität lässt sich als Datei ohne Nutzerdaten in den Sicherungsordner der App sichern; nach der Freigabe läuft sie in Moodle und die Datei wird geprüft.
 - Sicherung: Mehrere Aktivitäten, ganze Abschnitte oder der ganze Kurs lassen sich in einer Datei ohne Nutzerdaten sichern; die Freigabe nennt die Inhalte, die dabei fehlen.
 - macOS: Die App startet als Entwicklerversion auf dem Mac; ein zweiter Start holt das laufende Fenster nach vorn, ohne den Arbeitsordner zu berühren.

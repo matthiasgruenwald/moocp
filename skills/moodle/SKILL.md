@@ -46,10 +46,15 @@ ihr Abschnitt mitgeht; dieser Abschnitt ist dann ein Rahmen, und die Freigabe
 nennt ihn. Ob Moodle den Rahmen ohne seine übrigen Aktivitäten hält und wie
 Moodle den Kurs bei einer Auswahl benennt, prüft die Lehrkraft vor dem Einsatz.
 
-Eine Sicherungsdatei zurückspielen kann `wiederherstellen_datei`: Sie fügt die
-Aktivitäten einer Datei aus dem Sicherungsordner in einen bestehenden Kurs ein
-(Modus „verschmelzen"), ersetzt aber nichts. Nenne der Lehrkraft Kurs, Nummer
-und Datei genau. Die Freigabe zeigt, was neu entsteht. Moodle stellt die neuen
+Eine Sicherungsdatei zurückspielen kann `wiederherstellen_datei` mit dem Parameter `weg`:
+`neuer_kurs` (neuer Kurs, braucht `neuer_kurs_name` und `kurzname`, optional `kategorie_id`),
+`aktueller_kurs_verschmelzen` oder `anderer_kurs_verschmelzen` (fügt ein, ersetzt nichts)
+und `aktueller_kurs_ersetzen` oder `anderer_kurs_ersetzen` (löscht vorhandene Inhalte;
+nur mit `loeschend: true`). Ohne `weg` gilt `anderer_kurs_verschmelzen` mit `kurs`.
+Wenn der Auftrag den Zielweg nicht eindeutig nennt, frage nach, statt zu raten. Die
+Lehrkraft nennt Kurs, Nummer und Datei genau; bei löschenden Wegen erklärst du vorher,
+dass vorhandene Inhalte gelöscht werden. Nenne nur die Wege, die Moodle auf der Seite
+anbietet (Fehlermeldung nennt sie). Die Freigabe zeigt, was neu entsteht. Moodle stellt die neuen
 Aktivitäten sichtbar her; die App verbirgt sie danach, kurzzeitig können sie also
 sichtbar sein. Verbergen schützt nicht vor Einsicht oder Änderungen durch andere. Die Datei wird vor dem
 Hochladen geprüft; eine Datei mit Nutzerdaten wird abgelehnt. Läuft die

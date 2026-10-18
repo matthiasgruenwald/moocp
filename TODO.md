@@ -159,6 +159,21 @@ Umgesetzt (`wiederherstellen_datei`, `wiederherstellung_status`, `lib/moodle/wie
 - Abbruch oder verlorene Antwort nach dem Absenden von Schritt 16: Die App liest den Stand nach und wiederholt nie blind. Ob Moodle den Lauf nach einem Abbruch der Sitzung tatsächlich weiterführt, ist ungemessen.
 - Freigabe-Test „Die Stufe steht in den Einstellungen …" schlug einmal im Gesamtlauf fehl und lief beim Wiederholen durch (Flake, nicht durch diese Änderung verursacht). Beobachten.
 
+## Wiederherstellen: alle Zielwege und Abbruch (Issue #9): UNGEMESSEN
+
+Umgesetzt (`zielwegPruefen`, `Zielweg` in `lib/moodle/wiederherstellung_regeln.dart`; `wiederherstellen` in `lib/moodle/wiederherstellung.dart`; Positivliste je Weg in `lib/moodle/moodle_zugang.dart`), offline getestet (`test/wiederherstellung_weg_test.dart`). Nicht auf einer Instanz durchgespielt. Die Werte der fünf Wege (2, 1, 0, 4, 3) stammen aus `docs/plans/moodle-sicherung-formulare.md`; was dort nicht steht, ist unten als UNGEMESSEN geführt.
+
+- Löschende Wege (`aktueller_kurs_ersetzen` target 0, `anderer_kurs_ersetzen` target 3): nie ausgeführt. Ob Moodle vorhandene Inhalte vollständig entfernt und ob die Wiederherstellung danach ohne Rest läuft, ist ungemessen. Die Freigabe nennt den Kurs und sagt „vorhandene Inhalte werden gelöscht"; Test nur in Kurs 42.
+- Neuer Kurs (`neuer_kurs` target 2): Feldnamen des Platzhalter-Schemas sind nur mit dem Präfix `setting_course_course_fullname` / `setting_course_course_shortname` angenommen; keine Treffer führen zu einem Fehler. Das Sichtbarkeitsfeld `setting_course_course_visible` (auf `0` gesetzt) ist ungemessen.
+- Neuer Kurs: Die Kursnummer nach dem Anlegen ist nicht gelesen; `targetid`-Rücklesen fehlt, deshalb bleibt `verified` bei neuen Kursen `false`.
+- Neuer Kurs: Kategorie. `kategorie_id` wird nur übernommen, wenn gesetzt; ohne Angabe bleibt die Kategorie aus dem Formular, sonst Rückfrage. Der Kategorie-Kontext kommt aus `/course/management.php?categoryid=` (erlaubt, GET); ob diese Seite die Kontext-ID trägt, ist ungemessen.
+- Neuer Kurs, Abbruch: NICHT umgesetzt. Bricht die Wiederherstellung vor dem Schritt 16 ab, bleibt der Platzhalterkurs möglicherweise stehen. Im Fehlertext steht nur ein Hinweis. Der Abbruch über Moodles nativen Cleanup mit Rücklesen fehlt; die Felder der Abbrechen- und Bestätigungs-Seite sind unbekannt. Nachrüsten im Testkurs, nicht in der Arbeitssitzung (A6).
+- Fehlende Rechte: Verhalten bei Konten ohne Recht zum Anlegen, Löschen oder Wiederherstellen ist ungemessen; die App meldet den Fehler, wie Moodle ihn zurückgibt.
+- Fehlende Plugins oder Formulare: Die App verlangt die Formulare der Schritte 2, 4, 8, 16; fehlt ein Formular, bricht sie mit Fehler ab. Welche Meldung Moodle dabei gibt, ist ungemessen.
+- Die Positivliste ist je Weg eng: nur die Schlüsselmenge des jeweiligen Wegs (`catsearch` bei neuer_kurs, `search` bei den Wegen 4 und 3). Dass Moodle die Stufen 2 und 4 für jeden Weg gleich beantwortet, ist ungemessen.
+- Fortschritt bei einem neuen Kurs: Die Abfrage `core_backup_get_async_backup_progress` mit `operation=restore` ist für jeden Weg ungemessen (siehe #8).
+- Der Befehl `wiederherstellung_status` startet nie neu. Vorgänge im Stand „anstehend" oder „hochgeladen" werden als fehlgeschlagen markiert; ob ein Abbruch in Moodle danach sichtbar ist, ist ungemessen.
+
 ## Instanzprofile (Issue #4): offene Teile
 
 - Oberfläche für ein zweites Profil fehlt: Anmeldung, Titelzeile und Dialoge zeigen nur das Hauptprofil (erstes Profil). Weitere Profile kommen über die Einstellungsdatei, ein Anmeldefeld je Profil fehlt.

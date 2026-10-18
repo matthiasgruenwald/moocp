@@ -40,6 +40,7 @@ import '../moodle/sicherung.dart';
 import '../moodle/stack.dart';
 import '../moodle/test.dart';
 import '../moodle/wiederherstellung.dart';
+import '../moodle/wiederherstellung_regeln.dart';
 import '../moodle/wiki.dart';
 import '../protokoll.dart';
 
@@ -706,25 +707,47 @@ class McpDienst {
     // ---- Wiederherstellen einer Sicherungsdatei in einen bestehenden Kurs (E29, moodle/wiederherstellung.dart)
     _werkzeug(server, 'wiederherstellen_datei',
         titel: 'Datei in Kurs wiederherstellen',
-        beschreibung: 'Stellt eine Sicherungsdatei (.mbz) aus dem Sicherungsordner in einen bestehenden Kurs wieder '
-            'her, verschmelzend: Inhalte kommen dazu, nichts im Kurs wird gelöscht. Die Datei wird vor dem Hochladen '
+        beschreibung: 'Stellt eine Sicherungsdatei (.mbz) aus dem Sicherungsordner wieder her. Der Zielweg steht im '
+            'Parameter weg: neuer_kurs (neuer Kurs, braucht neuer_kurs_name und kurzname, optional kategorie_id), '
+            'aktueller_kurs_verschmelzen und anderer_kurs_verschmelzen (Inhalte kommen dazu, nichts wird gelöscht; '
+            'brauchen kurs und name), aktueller_kurs_ersetzen und anderer_kurs_ersetzen (löschen vorhandene Inhalte '
+            'des Kurses; brauchen kurs, name und loeschend: true). Ohne weg gilt anderer_kurs_verschmelzen mit kurs. '
+            'Ein unklarer Weg wird nicht geraten: die Antwort nennt die Optionen. Die Datei wird vor dem Hochladen '
             'geprüft (gepacktes Tar, keine Nutzerdaten, keine Pfade nach außen, höchstens 200 MB). Der Kursname muss '
             'zu der Nummer passen. Vor dem Start fragt die App nach einer Freigabe, die Kurs, Datei, Modus und die '
-            'neuen Aktivitäten zeigt; neue Aktivitäten werden danach verborgen (kurzzeitig können sie sichtbar sein). Verborgen ist kein Schutz. Dauert '
-            'es länger als eine Minute, läuft es weiter: dann wiederherstellung_status mit der Nummer aufrufen. '
+            'neuen Aktivitäten zeigt; bei löschenden Wegen steht dort, dass vorhandene Inhalte gelöscht werden. '
+            'Neue Aktivitäten werden danach verborgen (kurzzeitig können sie sichtbar sein). Verborgen ist kein Schutz. '
+            'Dauert es länger als eine Minute, läuft es weiter: dann wiederherstellung_status mit der Nummer aufrufen. '
             'Nach dem Start wird nie neu gesendet.',
         parameter: {
           'datei': JsonSchema.string(
               description: 'Dateiname der .mbz relativ zum Sicherungsordner, wie sichern_aktivitaet ihn nennt.'),
+          'weg': JsonSchema.string(
+              enumValues: [for (final z in Zielweg.values) z.nennung],
+              description: 'Zielweg. Ohne Angabe: anderer_kurs_verschmelzen (mit kurs).'),
+          'loeschend': JsonSchema.boolean(
+              description: 'Pflicht und nur true bei aktueller_kurs_ersetzen und anderer_kurs_ersetzen: '
+                  'vorhandene Inhalte des Zielkurses werden gelöscht.'),
           'kurs': _kurs,
           'name': _name,
+          'neuer_kurs_name': JsonSchema.string(
+              description: 'Nur bei neuer_kurs: vollständiger Name des neuen Kurses.'),
+          'kurzname': JsonSchema.string(
+              description: 'Nur bei neuer_kurs: Kurzname des neuen Kurses.'),
+          'kategorie_id': JsonSchema.integer(
+              description: 'Nur bei neuer_kurs, optional: Kategorie-Nummer. Ohne Angabe die Vorgabe des Kursformulars.'),
         },
-        pflicht: ['datei', 'kurs', 'name'],
+        pflicht: ['datei'],
         ausfuehren: (a) => _zeitlimit(
               wiederherstellen(moodle, freigaben, vorgaenge,
                   datei: _text(a, 'datei'),
-                  kurs: _zahl(a, 'kurs'),
-                  name: _text(a, 'name'),
+                  weg: a['weg'] as String?,
+                  loeschend: a['loeschend'] == true,
+                  kurs: _zahlOder(a, 'kurs'),
+                  name: a['name'] as String?,
+                  neuerKursName: a['neuer_kurs_name'] as String?,
+                  kurzname: a['kurzname'] as String?,
+                  kategorieId: _zahlOder(a, 'kategorie_id'),
                   instanz: profil.name),
               const Duration(minutes: 1),
               () => 'Die Wiederherstellung läuft weiter. Mit wiederherstellung_status und der Nummer später prüfen.',

@@ -285,3 +285,97 @@ String? _text1(XmlDocument doc, String name) {
   final e = doc.findAllElements(name).firstOrNull;
   return e?.innerText.trim();
 }
+
+/// Die fünf Zielwege einer Wiederherstellung (E9-Ablauf, Issue #9). [moodle] ist
+/// Moodles Wert für `target`. Löschende Wege (0, 3) entfernen vorhandene Inhalte
+/// des Zielkurses, bevor sie wiederherstellen; nur mit `loeschend: true`.
+enum Zielweg {
+  neuerKurs(2, 'neuer_kurs', false),
+  aktuellerKursVerschmelzen(1, 'aktueller_kurs_verschmelzen', false),
+  aktuellerKursErsetzen(0, 'aktueller_kurs_ersetzen', true),
+  anderKursVerschmelzen(4, 'anderer_kurs_verschmelzen', false),
+  anderKursErsetzen(3, 'anderer_kurs_ersetzen', true);
+
+  const Zielweg(this.moodle, this.nennung, this.loescht);
+
+  final int moodle;
+
+  /// Der Name, mit dem der Auftrag den Weg nennt (und den Moodle-Fehlertexten fehlt).
+  final String nennung;
+
+  final bool loescht;
+
+  /// Der neue Kurs hat noch keine Nummer; alle anderen Wege brauchen die Kurs-ID.
+  bool get brauchtKurs => this != neuerKurs;
+
+  static Zielweg? aus(String text) {
+    for (final z in values) {
+      if (z.nennung == text) return z;
+    }
+    return null;
+  }
+
+  static String get optionen => values.map((z) => z.nennung).join(', ');
+}
+
+/// Entscheidet den Zielweg aus den Angaben des Auftrags, bevor Moodle gelesen
+/// wird. Ohne `weg` gilt der bisherige Weg (verschmelzen in den genannten Kurs).
+/// Sonst entscheidet nichts geraten: Der Befund ist eine Rückfrage mit den
+/// Optionen. Wird keine Rückfrage zurückgegeben, ist [weg] gesetzt.
+({Zielweg? weg, String? rueckfrage}) zielwegPruefen({
+  required String? weg,
+  required bool loeschend,
+  required int? kurs,
+  required String? neuerKursName,
+  required String? kurzname,
+}) {
+  const nichtGeraten = 'Nichts geändert.';
+  final gewaehlt = weg == null ? Zielweg.anderKursVerschmelzen : Zielweg.aus(weg);
+  if (gewaehlt == null) {
+    return (
+      weg: null,
+      rueckfrage: 'Der Weg „$weg" ist unbekannt. Möglich sind: ${Zielweg.optionen}. $nichtGeraten',
+    );
+  }
+  if (gewaehlt.brauchtKurs) {
+    if (kurs == null) {
+      return (
+        weg: null,
+        rueckfrage: 'Der Weg ${gewaehlt.nennung} braucht die Kurs-ID (kurs). $nichtGeraten',
+      );
+    }
+    if (neuerKursName != null || kurzname != null) {
+      return (
+        weg: null,
+        rueckfrage: 'neuer_kurs_name und kurzname gehören nur zum Weg neuer_kurs. $nichtGeraten',
+      );
+    }
+  } else {
+    if (kurs != null) {
+      return (
+        weg: null,
+        rueckfrage: 'Der Weg neuer_kurs legt einen Kurs an; kurs bitte weglassen. $nichtGeraten',
+      );
+    }
+    if ((neuerKursName ?? '').trim().isEmpty || (kurzname ?? '').trim().isEmpty) {
+      return (
+        weg: null,
+        rueckfrage: 'Für neuer_kurs sind neuer_kurs_name und kurzname Pflicht. $nichtGeraten',
+      );
+    }
+  }
+  if (gewaehlt.loescht && !loeschend) {
+    return (
+      weg: null,
+      rueckfrage: 'Der Weg ${gewaehlt.nennung} löscht vorhandene Inhalte des Zielkurses. '
+          'Dafür braucht es loeschend: true. $nichtGeraten',
+    );
+  }
+  if (loeschend && !gewaehlt.loescht) {
+    return (
+      weg: null,
+      rueckfrage: 'loeschend gilt nur für die löschenden Wege. Bitte loeschend weglassen. $nichtGeraten',
+    );
+  }
+  return (weg: gewaehlt, rueckfrage: null);
+}
