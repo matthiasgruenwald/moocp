@@ -42,6 +42,60 @@
   Knöpfe neu auf.
 - STACK: einen vorhandenen Fragetest ändern, löschen oder ergänzen. Er steht auf einer eigenen Seite (`questiontestedit.php`, nicht auf der Positivliste); bisher hilft nur, die Frage neu anzulegen.
 
+## Morgen früh zu testen (Issues #4 bis #10)
+
+Umgesetzt, nicht durchgespielt. In der Umsetzungssitzung war der MCP-Server `moodle`
+nicht erreichbar (ECONNREFUSED); darum ist hier nichts live geprüft worden. Offline
+geprüft sind die Regeln und Abläufe mit Fakes (`flutter test` grün, `flutter analyze`
+ohne Befund). Gemessen ist nur, was in den Abschnitten zu #6 bis #8 ausdrücklich als
+gemessen steht.
+
+Im Testkurs (Präfix `ZZ`, Quelle und Ziel, nie ein Produktivkurs) nachprüfen:
+
+- **#10 Übertragung in einem Auftrag (`uebertragen`), zuerst:** Ohne `datei` auf dem
+  Testkurs sichern, dann je Ziel wiederherstellen; jedes Ziel bekommt eine eigene
+  Nummer und einen eigenen Stand. Ungemessen: ob die Zusammenfassung in der Freigabe
+  stimmt, ob der Bericht die Dubletten-Hinweise zeigt, ob Moodle die Namen-Prüfung vor
+  dem Schreiben abfängt.
+- **#10 Teilweise fehlgeschlagener Lauf:** Nur mit Fakes geprüft (fertig, fehlgeschlagen,
+  fertig; das erste Ziel wird nicht erneut angefasst). Live ungemessen: wie ein Fehler
+  bei einem zweiten Ziel entsteht, ohne Produktivkurs herbeizuführen.
+- **#10 Ablehnung in der App:** Die Erkennung „abgelehnt" ist eine Annahme. Die App
+  liefert bei Ablehnung keinen Vorgang und keine Ausnahme, und das Werkzeug ordnet
+  das dann als abgelehnt ein. Prüfen: Kommt bei einer Ablehnung wirklich der Text
+  „in der App abgelehnt" zurück, und stoppt der Lauf dann die übrigen Ziele?
+- **#10 Wiederholungsschutz:** Dieselbe Datei für dasselbe Ziel gibt eine Rückfrage.
+  Ungemessen: Ob `erneut: true` im echten Ablauf nur den einen Aufruf betrifft, und
+  ob die Rückfrage bei einer frischen Sicherung (ohne `datei`) über den Quellkurs greift.
+- **#10 Protokoll `uebertragungen.json`:** Ungemessen, ob ein Abbruch mitten im Lauf
+  die bis dahin geschriebenen Einträge erhält, und ob eine beschädigte Datei wirklich
+  unverändert stehen bleibt.
+- **#10 Rundlauf A → Datei → B:** Nicht geprüft. Die Logik ist mit Fakes getestet; ein
+  echter Rundlauf über `sichern_auswahl` und `wiederherstellen_datei` fehlt. Der Ablauf
+  zwischen zwei Instanzen setzt voraus, dass beide denselben Sicherungsordner nutzen.
+  Das ist ungemessen.
+- **#10 Freigaben:** Ein Auftrag fragt einmal für alle Ziele, und jeder Schreibschritt
+  fragt danach erneut. Offen, ob das für die Stufe „mittel" zu viel ist. Bei der
+  Datei-Variante fehlt der Quellkurs, darum zeigt die Freigabe dort die einfachen
+  Angaben statt der Zusammenfassung mit Quelle.
+- **#10 Entscheidungen offen:** `erneut: true` gilt für den ganzen Aufruf, nicht je
+  Ziel. Ob Coursepilot die Buchführung über die Übertragungen tatsächlich aus
+  `uebertragungen.json` abgleicht, ist nicht geprüft; der Skill sagt nur, dass die
+  Buchführung dort liegt.
+- **#9 Zielwege (Wiederherstellen):** Auf keiner Instanz durchgespielt; die löschenden
+  Wege sind nie ausgeführt. Der Abbruch eines neuen Kurses fehlt (Abschnitt zu #9 unten).
+- **#8 Wiederherstellen in bestehenden Kurs:** Die offenen Punkte stehen im Abschnitt
+  zu #8 unten; dort steht auch, was gemessen ist.
+- **#7 Auswahl sichern und #6 Aktivität sichern:** Die offenen Punkte stehen in den
+  Abschnitten unten. Der Rahmen eines Abschnitts (ob Moodle ihn ohne die übrigen
+  Aktivitäten hält) ist nicht gemessen.
+- **#5 Rollen und Projektkontext:** Rein lokal; Moodle wird nicht angefragt. Die
+  Richtungsregeln sind offline geprüft, ein Test auf der Instanz steht aus.
+- **#4 Instanzprofile:** Zweites Profil in der Oberfläche, zwei laufende Server und
+  die Freigabe-Dialoge mit Profilnamen. Die offenen Punkte stehen im Abschnitt
+  „Instanzprofile (Issue #4)" unten.
+- **Bau:** Release-Bau und Windows-Installer sind mit dieser Änderung nicht geprüft.
+
 ## Anonyme Aufgabenbewertung
 
 Im Kurs die Teilnehmerliste lesen und substitutionen aufbauen und als Tabelle merken, die Schüler S1, S2, S3, usw. nennen. Auf der MCP-Seite werden nur die ersetzten Kürzel übertragen - in beide Richtungen.

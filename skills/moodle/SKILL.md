@@ -25,6 +25,7 @@ Moodle-Instanz hat einen eigenen Server mit eigenem Präfix (etwa
 | Kursrahmen | `sichtbarkeit_setzen`, `verschieben`, `duplizieren`, `loeschen`, `buchkapitel_loeschen`, `wikiseite_loeschen` |
 | Sichern | `sichern_aktivitaet`, `sichern_auswahl`, `sicherung_status` |
 | Wiederherstellen | `wiederherstellen_datei`, `wiederherstellung_status` |
+| Übertragung | `uebertragen` (Rollen und Kontext: `uebertragung_rolle_setzen`, `uebertragung_kontext`, `uebertragung_kontext_setzen`) |
 | Ansehen | `bildschirmfoto` |
 | Tests und Fragen | im Skill `moodle-fragen` |
 
@@ -239,6 +240,45 @@ in deinem Kopf.
   Quellkurs mit Namen und Nummer, die Inhaltsauswahl, jeden Zielkurs mit Namen,
   Nummer und Instanz, und den Wiederherstellungsweg (A5). Fehlt ein Kursname, ist
   der Plan nicht vollständig: Dann frag nach, statt eine Lücke zu zeigen.
+- **Ablauf eines Auftrags (`uebertragen`).** Ein Auftrag mit mehreren Zielkursen
+  und derselben Auswahl. Das Werkzeug arbeitet nur auf dieser Instanz: Ohne
+  `datei` sichert es die Auswahl zuerst im Quellkurs, mit `datei` nimmt es die
+  vorhandene Sicherungsdatei. Danach stellt es die Datei für jedes Ziel wieder
+  her. Jedes Ziel hat seinen eigenen Vorgang und sein eigenes Ergebnis: fertig,
+  fehlgeschlagen, unklar oder abgelehnt. Ein Fehler bei einem Ziel hält die
+  übrigen nicht an, weil sie unabhängig sind; eine Ablehnung in der App hält sie
+  an, weil die Lehrkraft den Auftrag damit gestoppt hat.
+- **Ziele auf einer anderen Instanz** bedienst du mit zwei Aufrufen, nicht mit
+  `uebertragen`: auf der Quellinstanz `sichern_auswahl` (die Datei liegt dann im
+  Sicherungsordner der App), auf der Zielinstanz `wiederherstellen_datei` je Ziel
+  mit seinem Weg. Ob beide Instanzen denselben Sicherungsordner nutzen, ist nicht
+  gemessen; sag das der Lehrkraft, bevor du es ihr als Weg anbietest.
+- **Rollen:** Die Quelle ist die Instanz des Quellkurses, die Ziele liegen auf der
+  Instanz, auf der das Werkzeug läuft. Welche Instanz Quelle ist, entscheidet der
+  Projektkontext oder die Lehrkraft; bei Zweifel fragst du, statt zu raten.
+- **Zusammenfassung vor dem ersten Schreiben:** Der Plan nennt Quelle, Inhalt, jeden
+  Zielkurs mit Name, Nummer und Weg (A5). Die App zeigt dieselbe Zusammenfassung
+  in der Freigabe, einmal für den ganzen Auftrag. Jeder Schreibschritt (das Sichern
+  und je Ziel das Wiederherstellen) fragt danach erneut in der App; wie oft, legt
+  die Lehrkraft mit der Freigabestufe fest (E20). Sag ihr das vorher.
+- **Rückfragen, bevor etwas geschieht:** Fehlt ein Weg oder ein Kursname, ist ein
+  Kurs doppelt genannt oder ist ein Ziel der Quellkurs, fragt das Werkzeug zurück
+  und schreibt nichts. Der Weg `neuer_kurs` gehört nicht zu `uebertragen`; einen
+  neuen Kurs legt `wiederherstellen_datei` an. Ist dieselbe Datei für ein Ziel schon
+  übertragen worden, kommt eine Rückfrage mit der Nummer. Erst klärst du den Stand
+  (`wiederherstellung_status`). Ein erneuter Import mit `erneut: true` ist nur nach
+  ausdrücklichem Wunsch der Lehrkraft zulässig.
+- **Im Ergebnis sagen, was nicht zugesagt ist:** Eine Einfüge-Wiederherstellung kann
+  Inhalte doppelt anlegen, und ein Aktualisieren bestehender Inhalte gibt es nicht.
+  Das nennst du im Bericht, auch wenn die Lehrkraft eine Aktualisierung erwartet.
+  Bei fehlgeschlagenen oder unklaren Zielen nennst du die Nummer und sendest nicht
+  erneut.
+- **Protokoll und Planung:** Jedes Ziel steht mit Stand und Zeit in
+  `uebertragungen.json` im Einstellungsordner. Die Planung des Auftrags und die
+  Buchführung darüber, welche Übertragung wann lief, liegen bei Coursepilot; die
+  App führt nur dieses Protokoll.
+- **Stand:** Der Ablauf ist umgesetzt, nicht geprüft. Auf einer Instanz ist er
+  noch nicht durchgespielt.
 
 <!-- <<< gemeinsam/luecken.md - von build.py erzeugt, hier nicht bearbeiten -->
 ## Was der Skill nicht kann: fragen, nicht improvisieren

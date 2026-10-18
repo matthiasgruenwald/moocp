@@ -7,6 +7,7 @@
 - Sicherung: Mehrere Aktivitäten, ganze Abschnitte oder der ganze Kurs lassen sich in einer Datei ohne Nutzerdaten sichern; die Freigabe nennt die Inhalte, die dabei fehlen.
 - macOS: Die App startet als Entwicklerversion auf dem Mac; ein zweiter Start holt das laufende Fenster nach vorn, ohne den Arbeitsordner zu berühren.
 - Übertragung: Jedes Profil bekommt eine Rolle (Quelle, Ziel), der Projektkontext hält Quellkurs und Durchführungskurse fest; fehlt etwas, fragt die KI nach, statt zu raten.
+- Übertragung: Eine Auswahl lässt sich in einem Auftrag auf mehrere Zielkurse dieser Instanz übertragen; jedes Ziel hat sein eigenes Ergebnis, und fehlgeschlagene Ziele halten die übrigen nicht an. Dieselbe Datei für dasselbe Ziel wird nicht ohne Rückfrage ein zweites Mal eingespielt. Eine Einfüge-Wiederherstellung kann Inhalte doppelt anlegen. UNGEMESSEN: noch nicht auf einer Instanz durchgespielt.
 
 ## 0.9.22
 - Freigaben: Warten weitere Anfragen hinter der offenen, zeigt der Dialog, wie viele, und das Protokoll nennt jede, die sich einreiht.

@@ -83,6 +83,7 @@ Future<String> wiederherstellen(
   String? neuerKursName,
   String? kurzname,
   int? kategorieId,
+  void Function(String vorgangId)? beiVorgang,
 }) async {
   // 1. Datei: nur ein .mbz innerhalb des Sicherungsordners, nicht zu groß.
   final fehler = pfadFehler(datei);
@@ -182,6 +183,9 @@ Future<String> wiederherstellen(
   // 6. Vorgang anlegen und Datei hochladen (jedes Mal neu, nie eine alte Kennung).
   final vg = await vorgaenge.neuWiederherstellung(kurs: kurs ?? 0, datei: datei);
   _laufendeWiederherstellungen.add(vg.id);
+  // Die Nummer geht nur an den Aufrufer, damit er das Ergebnis je Ziel
+  // zuordnen kann (uebertragen, Issue #10). Ohne Rückruf unverändert.
+  beiVorgang?.call(vg.id);
   try {
     return await _ausfuehren(moodle, vorgaenge, vg,
         bytes: bytes,

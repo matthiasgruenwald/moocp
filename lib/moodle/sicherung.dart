@@ -395,6 +395,7 @@ Future<String> auswahlSichern(
   required List<({int id, String name})> abschnitte,
   required bool ganzerKurs,
   String? zielOrdner,
+  void Function(String vorgangId)? beiVorgang,
 }) async {
   final ziel = zielOrdnerPruefen(zielOrdner);
   if (ziel == null) {
@@ -497,6 +498,7 @@ Future<String> auswahlSichern(
   final anzahl = '${ausgewaehlt.length} Aktivitäten, ${wahlAbschnitte.length + rahmen.length} Abschnitte';
   final vg = await vorgaenge.neu(
       kurs: kurs, cmid: 0, datei: p.join(ziel, dateiName), auswahl: '${art.text}: $anzahl');
+  beiVorgang?.call(vg.id);
 
   return _nachFreigabe(moodle, freigaben, vorgaenge, vg,
       s4: s4,
