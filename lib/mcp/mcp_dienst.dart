@@ -710,7 +710,7 @@ class McpDienst {
             'her, verschmelzend: Inhalte kommen dazu, nichts im Kurs wird gelöscht. Die Datei wird vor dem Hochladen '
             'geprüft (gepacktes Tar, keine Nutzerdaten, keine Pfade nach außen, höchstens 200 MB). Der Kursname muss '
             'zu der Nummer passen. Vor dem Start fragt die App nach einer Freigabe, die Kurs, Datei, Modus und die '
-            'neuen Aktivitäten zeigt; neue Aktivitäten werden verborgen angelegt. Verborgen ist kein Schutz. Dauert '
+            'neuen Aktivitäten zeigt; neue Aktivitäten werden danach verborgen (kurzzeitig können sie sichtbar sein). Verborgen ist kein Schutz. Dauert '
             'es länger als eine Minute, läuft es weiter: dann wiederherstellung_status mit der Nummer aufrufen. '
             'Nach dem Start wird nie neu gesendet.',
         parameter: {

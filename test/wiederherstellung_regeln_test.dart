@@ -331,18 +331,38 @@ void main() {
       expect(get('https://m.example/backup/restore.php?contextid=5'), isFalse);
     });
 
-    test('Zielwahl (Schritt 2) nur mit target 4 und Kurs-ID', () {
+    test('Sicherungsdetails (stage 2) nur mit den gemessenen Feldern', () {
       const ziel = 'https://m.example/backup/restore.php?contextid=5&filename=kurs.mbz';
       const gut = [
+        MapEntry('contextid', '5'),
+        MapEntry('filepath', '/'),
+        MapEntry('filename', 'kurs.mbz'),
         MapEntry('stage', '2'),
-        MapEntry('target', '4'),
-        MapEntry('targetid', '42'),
         MapEntry('sesskey', 'abc'),
-        MapEntry('_qf__restore_target_form', '1'),
       ];
       expect(post(ziel, gut), isTrue);
-      expect(post(ziel, [...gut]..[1] = const MapEntry('target', '2')), isFalse);
-      expect(post(ziel, [...gut]..[2] = const MapEntry('targetid', 'x')), isFalse);
+      expect(post(ziel, [...gut, const MapEntry('name', 'x')]), isFalse);
+      expect(post(ziel, [...gut]..[3] = const MapEntry('stage', '4')), isFalse);
+      expect(post(ziel, [...gut, const MapEntry('_qf__restore_target_form', '1')]), isFalse);
+    });
+
+    test('Zielwahl (Formular mit stage 4) nur mit target 4, Kurs-ID und den gemessenen Feldern', () {
+      const ziel = 'https://m.example/backup/restore.php?contextid=5&filename=kurs.mbz';
+      const gut = [
+        MapEntry('contextid', '5'),
+        MapEntry('filepath', '/'),
+        MapEntry('filename', 'kurs.mbz'),
+        MapEntry('stage', '4'),
+        MapEntry('target', '4'),
+        MapEntry('targetid', '42'),
+        MapEntry('search', ''),
+        MapEntry('sesskey', 'abc'),
+      ];
+      expect(post(ziel, gut), isTrue);
+      expect(post(ziel, [...gut]..[4] = const MapEntry('target', '2')), isFalse);
+      expect(post(ziel, [...gut]..[5] = const MapEntry('targetid', 'x')), isFalse);
+      expect(post(ziel, [...gut, const MapEntry('_qf__restore_target_form', '1')]), isFalse);
+      expect(post(ziel, [...gut, const MapEntry('setting_root_users', '1')]), isFalse);
     });
 
     test('Schritte 4, 8, 16 nur ohne Nutzerdaten und mit dem Schalter restore', () {

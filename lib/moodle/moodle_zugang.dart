@@ -553,7 +553,7 @@ class MoodleZugang {
         // Nur diese Felder: Marke, Sitzung, Draft-Itemid und ggf. der Absendeknopf und die Kurs-ID.
         // Jedes andere Feld lehnt die Regel ab (UNGEMESSEN: Feldnamen, TODO.md).
         Erlaubt('POST', r'^/backup/restorefile\.php$', 'Wiederherstellen: Datei hochladen (Formular)',
-            parameter: (q) => _nurSchluessel(q, {'contextid'}) && _zahl(q['contextid']),
+            parameter: (q) => _nurSchluessel(q, {'contextid'}) && (q['contextid'] == null || _zahl(q['contextid'])),
             formular: (f) =>
                 f.every((e) => const {'contextid', 'sesskey', '_qf__course_restore_form', 'backupfile', 'submitbutton'}
                     .contains(e.key)) &&
@@ -574,15 +574,23 @@ class MoodleZugang {
                 RegExp(r'^[a-f0-9]{40}$').hasMatch(q['pathnamehash'] ?? '') &&
                 RegExp(r'^[a-z_]{1,50}$').hasMatch(q['component'] ?? 'backup') &&
                 RegExp(r'^[a-z_]{1,50}$').hasMatch(q['filearea'] ?? 'draft')),
-        // Zielwahl: nur „in einem vorhandenen Kurs" (target=4), Schritt 2.
-        Erlaubt('POST', r'^/backup/restore\.php$', 'Wiederherstellen: Ziel „vorhandener Kurs" (Schritt 2)',
+        // Sicherungsdetails (gemessen, Spike): das Weiter-Formular trägt nur diese Felder und stage=2.
+        Erlaubt('POST', r'^/backup/restore\.php$', 'Wiederherstellen: Sicherungsdetails bestätigen',
             parameter: (q) => _nurSchluessel(q, {'contextid', 'filename'}),
             formular: (f) =>
+                f.every((e) => const {'contextid', 'filepath', 'filename', 'stage', 'sesskey'}.contains(e.key)) &&
                 wertIn(f, 'stage') == '2' &&
+                _gesetzt(wertIn(f, 'sesskey'))),
+        // Zielwahl: nur „in einem vorhandenen Kurs" (target=4), Schritt 2.
+        Erlaubt('POST', r'^/backup/restore\.php$', 'Wiederherstellen: Ziel „vorhandener Kurs" (Formular mit stage=4)',
+            parameter: (q) => _nurSchluessel(q, {'contextid', 'filename'}),
+            formular: (f) =>
+                const {'2', '4'}.contains(wertIn(f, 'stage')) &&
                 wertIn(f, 'target') == '4' &&
                 _zahl(wertIn(f, 'targetid')) &&
                 _gesetzt(wertIn(f, 'sesskey')) &&
-                f.any((e) => e.key.startsWith('_qf__restore_')), // UNGEMESSEN: Formularname
+                f.every((e) => const {'contextid', 'filepath', 'filename', 'stage', 'sesskey', 'target', 'targetid', 'search'}
+                    .contains(e.key)), // gemessen: kein _qf__-Feld auf dieser Seite
             ),
         // Einstellungen, Schema und Prüfung: ohne Nutzerdaten, mit dem Schalter „restore".
         for (final (schritt, form) in const [

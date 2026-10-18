@@ -5,9 +5,9 @@
 // Ablauf:
 //   Datei und Archiv prüfen (vor jedem Hochladen) -> Kurs und Name prüfen ->
 //   Kontext des Kurses -> Freigabe in der App (Kurs, Inhalt, „verschmelzen",
-//   neue Aktivitäten verborgen) -> Datei in den Entwurfsbereich -> Formular
+//   neue Aktivitäten danach verborgen) -> Datei in den Entwurfsbereich -> Formular
 //   „Wiederherstellen" -> Schritte 2, 4, 8 und 16 des Assistenten -> Hintergrund-
-//   auftrag abfragen -> Kurs zurücklesen und die neuen Aktivitäten nennen.
+//   auftrag abfragen (Kennung: restoreid aus dem Prüfformular) -> neue Aktivitäten// verbergen -> Kurs zurücklesen und die neuen Aktivitäten nennen.
 //
 // Nach dem Schritt 16 gilt: Bricht die Verbindung ab oder läuft die Sitzung
 // ab, steht der Vorgang auf „unklar". Er wird nie neu gestartet; sicherung_status
@@ -20,11 +20,14 @@ import 'dart:io';
 
 import 'package:path/path.dart' as p;
 
+import 'package:html/parser.dart' as html_parser;
+
 import '../freigabe.dart';
 import 'formular.dart';
 import 'formular_lesen.dart';
 import 'formular_schreiben.dart';
 import 'kurs.dart';
+import 'kurs_aendern.dart';
 import 'moodle_zugang.dart';
 import 'sicherung.dart';
 import 'sicherung_regeln.dart';
@@ -113,8 +116,8 @@ Future<String> wiederherstellen(
       'Datei: ${p.basename(datei)} (${befund.typ == 'course' ? 'ganzer Kurs' : 'Aktivität'}, Moodle ${befund.moodleVersion ?? '?'})',
       'Modus: verschmelzen. Inhalte werden zum Kurs hinzugefügt; nichts im Kurs wird gelöscht.',
       if (aktivitaeten.isNotEmpty) 'Angelegt werden: ${aktivitaeten.join(', ')}',
-      'Neue Aktivitäten werden verborgen angelegt. Verborgen ist kein Schutz: '
-          'Wer im Kurs Rechte hat, sieht sie und kann sie sichtbar machen.',
+      'Moodle stellt die neuen Aktivitäten sichtbar wieder her; die App verbirgt sie danach. Sie können '
+          'kurzzeitig für Lernende sichtbar sein. Verborgen ist kein Schutz: Wer im Kurs Rechte hat, sieht sie und kann sie sichtbar machen.',
       'Nutzerdaten sind im Archiv nicht enthalten (geprüft). Rechte und Einschreibungen bleiben unverändert.',
     ],
     vergleich: const [],
@@ -169,17 +172,22 @@ Future<String> _ausfuehren(
     }
     await vorgaenge.aktualisieren(vg, wiederherstellungDatei: laufzeit);
 
-    // Schritt 2: Ziel „in einem vorhandenen Kurs" mit target=4.
+    // Schritt 2: Sicherungsdetails (gemessen: schlichtes Formular ohne mform, stage=2),
+    // dann die Zielseite mit stage=4, target/targetid/search vorausgefüllt.
     final adresse = '/backup/restore.php?contextid=$kontext&filename=$laufzeit';
-    final s2 = seiteVon(await moodle.lesen(adresse));
-    if (schrittVon(s2.felder) != '2') {
+    final s1 = restoreSeite(await moodle.lesen(adresse));
+    if (schrittVon(s1.felder) != '2') {
+      throw MoodleFehler('Die Seite Sicherungsdetails kommt nicht wie gemessen. Nichts geändert.');
+    }
+    final s2 = restoreSeite(await moodle.senden(s1.aktion, s1.felder));
+    if (schrittVon(s2.felder) != '4') {
       throw MoodleFehler('Die Zielseite kommt nicht wie gemessen. Nichts geändert.');
     }
     final f2 = [...s2.felder];
     setze(f2, 'target', '4');
     setze(f2, 'targetid', '$kurs');
-    final s4 = seiteVon(await moodle.senden(s2.aktion, f2));
-    if (schrittVon(s4.felder) != '4') {
+    final s4 = restoreSeite(await moodle.senden(s2.aktion, f2));
+    if (!s4.felder.any((e) => e.key == '_qf__restore_settings_form')) {
       throw MoodleFehler('Der Zielkurs wird nicht angenommen (Kurssuche nötig; UNGEMESSEN). Nichts geändert.');
     }
 
@@ -187,21 +195,30 @@ Future<String> _ausfuehren(
     if (!ohneNutzerdaten(s4.felder)) {
       throw MoodleFehler('Die Einstellungen sehen Nutzerdaten vor; abgebrochen. Nichts geändert.');
     }
-    final s8 = seiteVon(await moodle.senden(s4.aktion, s4.felder));
-    if (schrittVon(s8.felder) != '8') {
+    final s8 = restoreSeite(await moodle.senden(s4.aktion, s4.felder));
+    if (!s8.felder.any((e) => e.key == '_qf__restore_schema_form')) {
       throw MoodleFehler('Das Schema kommt nicht wie gemessen. Nichts geändert.');
     }
     if (!ohneNutzerdaten(s8.felder)) {
       throw MoodleFehler('Das Schema sieht Nutzerdaten vor; abgebrochen. Nichts geändert.');
     }
-    final s16 = seiteVon(await moodle.senden(s8.aktion, s8.felder));
-    if (schrittVon(s16.felder) != '16') {
+    final s16 = restoreSeite(await moodle.senden(s8.aktion, s8.felder));
+    if (!s16.felder.any((e) => e.key == '_qf__restore_review_form')) {
       throw MoodleFehler('Die Prüfseite kommt nicht wie gemessen. Nichts geändert.');
+    }
+
+    // Die Kennung für den Fortschritt ist die Restore-ID aus dem Prüfformular
+    // (Feld restoreid), nicht der Dateinamen-Hash der Laufzeit (gemessen: Moodle
+    // lehnt den Hash mit „Ungültiger Parameterwert" ab). Fehlt sie, startet nichts.
+    final restoreid = wertIn(s16.felder, 'restoreid');
+    if (restoreid == null || !RegExp(r'^[0-9]{1,18}$').hasMatch(restoreid)) {
+      throw MoodleFehler('Das Prüfformular nennt keine Kennung der Wiederherstellung (restoreid). Nichts geändert.');
     }
 
     // Ab hier: Schritt 16 startet die Wiederherstellung. Nie erneut senden.
     vorUpload = false;
-    await _uebergang(vorgaenge, vg, WiederherstellungStand.laufend, laufzeit: laufzeit, backupid: laufzeit, kontext: kontext);
+    await _uebergang(vorgaenge, vg, WiederherstellungStand.laufend,
+        laufzeit: laufzeit, backupid: restoreid, kontext: kontext);
     try {
       await moodle.senden(s16.aktion, s16.felder);
     } catch (_) {
@@ -209,7 +226,8 @@ Future<String> _ausfuehren(
           text: 'Der Start ist nicht bestätigt. wiederherstellung_status prüft erneut; nicht neu senden.');
       rethrow;
     }
-    return await _warten(moodle, vorgaenge, vg, kontext: kontext, kurs: kurs, vorherCmids: vorherCmids);
+    return await _warten(moodle, vorgaenge, vg,
+        restoreid: restoreid, kontext: kontext, kurs: kurs, vorherCmids: vorherCmids);
   } catch (e) {
     if (vorUpload) {
       await _uebergang(vorgaenge, vg, WiederherstellungStand.fehlgeschlagen,
@@ -219,28 +237,44 @@ Future<String> _ausfuehren(
   }
 }
 
+/// Das Formular des Wiederherstellungsassistenten: Er hat auf manchen Seiten
+/// kein `form.mform`; dann ist es das Formular mit Ziel /backup/restore.php
+/// (gemessen auf der Seite „Sicherungsdetails").
+({String aktion, Felder felder, Seitenangaben seite}) restoreSeite(Antwort r) {
+  final doc = html_parser.parse(r.text);
+  final form = doc.querySelectorAll('form').where((f) => (f.attributes['action'] ?? '').contains('/backup/restore.php')).firstOrNull ??
+      hauptformular(doc);
+  if (form == null) throw MoodleFehler('Moodle liefert kein Formular des Wiederherstellungsassistenten.');
+  final ziel = r.adresse.resolve(form.attributes['action'] ?? r.adresse.path);
+  return (
+    aktion: ziel.hasQuery ? '${ziel.path}?${ziel.query}' : ziel.path,
+    felder: formularFelder(form),
+    seite: Seitenangaben.aus(r.text),
+  );
+}
+
 /// Fragt den Hintergrundauftrag ab. Dann liest sie den Kurs zurück.
 Future<String> _warten(
   MoodleZugang moodle,
   Vorgaenge vorgaenge,
   Vorgang vg, {
+  required String restoreid,
   required int kontext,
   required int kurs,
   required List<int> vorherCmids,
   Duration gesamt = const Duration(minutes: 10),
   Duration takt = const Duration(seconds: 3),
 }) async {
-  final id = vg.wiederherstellungDatei!;
   final ende = DateTime.now().add(gesamt);
   try {
     while (true) {
-      // UNGEMESSEN: operation „restore" und die Kennung als backupids (TODO.md).
+      // Operation „restore" und die Restore-ID als backupids: ungemessen, siehe TODO.md.
       final antwort = await moodle.dienst('core_backup_get_async_backup_progress', {
-        'backupids': [id],
+        'backupids': [restoreid],
         'contextid': kontext,
         'operation': 'restore',
       });
-      final stand = bewerteFortschritt(antwort, id);
+      final stand = bewerteFortschritt(antwort, restoreid);
       if (stand == SicherungStand.fertig) break;
       if (stand == SicherungStand.fehlgeschlagen) {
         await _uebergang(vorgaenge, vg, WiederherstellungStand.fehlgeschlagen,
@@ -266,7 +300,11 @@ Future<String> _warten(
   }
 }
 
-/// Liest den Kurs zurück. Neue Aktivitäten werden mit Namen und Art genannt.
+/// Verbirgt die neuen Aktivitäten und liest den Kurs zurück. Moodle stellt die
+/// wiederhergestellten Seiten sichtbar wieder her (gemessen), darum verbirgt die
+/// App sie danach über dieselbe Kursaktion wie sichtbarkeit_setzen. Die Freigabe
+/// für den ganzen Lauf gilt dafür; eine weitere gibt es nicht. Verborgen ist
+/// kein Schutz: Kurzzeitig können Lernende die Aktivitäten gesehen haben.
 /// verified nur, wenn es neue Aktivitäten gibt und alle verborgen sind.
 Future<String> _gegenlesen(
   MoodleZugang moodle,
@@ -275,6 +313,16 @@ Future<String> _gegenlesen(
   required int kurs,
   required List<int> vorherCmids,
 }) async {
+  // Erneut aufrufbar (nach „unklar"): Verborgenes wird nicht noch einmal angefasst.
+  final vorVerbergen = await kursLesen(moodle, kurs);
+  final sichtbareNeue = [
+    for (final a in vorVerbergen.nachCmid.values)
+      if (!vorherCmids.contains(a.cmid) && a.sichtbar) a.cmid,
+  ];
+  if (sichtbareNeue.isNotEmpty) {
+    await kursAktion(moodle, kurs, 'cm_hide', sichtbareNeue);
+  }
+
   final jetzt = await kursLesen(moodle, kurs);
   final neue = [
     for (final a in jetzt.nachCmid.values)
@@ -288,8 +336,8 @@ Future<String> _gegenlesen(
           ? 'Neu im Kurs: $liste.'
           : 'Neu im Kurs: $liste. Nicht alle sind verborgen; bitte prüfen.';
   await _uebergang(vorgaenge, vg, WiederherstellungStand.fertig, text: text, verified: alleVerborgen);
-  return 'Wiederherstellt (Nummer ${vg.id}): ${neue.isEmpty ? 'keine neuen Aktivitäten' : liste}. '
-      'verified: $alleVerborgen';
+  final befund = alleVerborgen ? 'verborgen: verified' : 'verborgen: nicht bestätigt, siehe Zustand oben';
+  return 'Wiederhergestellt (Nummer ${vg.id}): ${neue.isEmpty ? 'keine neuen Aktivitäten' : liste}. $befund';
 }
 
 /// Der Stand eines Wiederherstellungsvorgangs. Fragt nur ab, startet nie neu.
@@ -308,13 +356,13 @@ Future<String> wiederherstellungStatus(MoodleZugang moodle, Vorgaenge vorgaenge,
         text: 'Unterbrochen, bevor die Wiederherstellung startete; im Kurs ist nichts geändert.');
     return 'fehlgeschlagen (Nummer ${v.id}): Unterbrochen, bevor sie startete. Im Kurs ist nichts geändert.';
   }
-  if ((stand == WiederherstellungStand.laufend || stand == WiederherstellungStand.unklar) && v.wiederherstellungDatei != null) {
+  if ((stand == WiederherstellungStand.laufend || stand == WiederherstellungStand.unklar) && v.backupid != null) {
     _laufendeWiederherstellungen.add(v.id);
     try {
       final kontext = v.kontext;
       if (kontext == null) throw MoodleFehler('Der Vorgang ${v.id} hat keinen Kontext. Nichts geändert.');
       return await _warten(moodle, vorgaenge, v,
-          kontext: kontext, kurs: v.kurs, vorherCmids: v.vorherCmids ?? const []);
+          restoreid: v.backupid!, kontext: kontext, kurs: v.kurs, vorherCmids: v.vorherCmids ?? const []);
     } finally {
       _laufendeWiederherstellungen.remove(v.id);
     }
