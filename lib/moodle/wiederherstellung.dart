@@ -131,7 +131,7 @@ Future<String> wiederherstellen(
   // 4a. Der Zielweg steht fest: Der Fingerabdruck reserviert die Datei, bevor
   // die erste Moodle-Anfrage wartet. Zwei Aufrufe mit derselben Datei können so
   // nicht beide durch die Prüfung (Befund 1, Befund 2).
-  final fp = fingerabdruck(bytes, kurs: kurs ?? 0, weg: zielweg);
+  final fp = fingerabdruck(bytes, instanz: instanz, kurs: kurs ?? 0, weg: zielweg);
   return _reservieren(fp, () async {
     // 4. Zielkurs (bestehend) bzw. Kategorie (neuer Kurs) und Kontext des Hochladens.
     var kursName = '';

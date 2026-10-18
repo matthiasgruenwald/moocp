@@ -421,8 +421,10 @@ enum Zielweg {
 /// Doppelstart-Schutz (Ticket #19, Spec #17). Der Fingerabdruck hängt am Inhalt der
 /// Datei, nie am Namen: umbenannt bleibt es dieselbe Wiederherstellung. Kurs (0 bei
 /// neuem Kurs) und Zielweg gehören dazu, damit ein anderer Ziel-Lauf nicht gesperrt wird.
-String fingerabdruck(List<int> bytes, {required int kurs, required Zielweg weg}) =>
-    '${sha256.convert(bytes)}|$kurs|${weg.name}';
+/// Das Profil ([instanz]) gehört ebenfalls dazu: Dieselbe Datei auf zwei Instanzen
+/// sperrt sich nicht gegenseitig (Befund 3).
+String fingerabdruck(List<int> bytes, {required String instanz, required int kurs, required Zielweg weg}) =>
+    '${sha256.convert(bytes)}|$instanz|$kurs|${weg.name}';
 
 /// Was die Doppelstart-Prüfung von einem Vorgang braucht. Ohne Dateien und Texte.
 typedef DoppelstartEintrag = ({
