@@ -204,13 +204,14 @@ Future<ArchivBefund> archivPruefen(
     if (nutzer && wert != '0') return nein('Die Sicherung enthält Nutzerdaten (Einstellung $name); nicht angenommen.');
   }
 
-  // Bewertungen und Rollenzuordnungen: leere Platzhalter sind in Ordnung,
+  // Bewertungen und Rollenzuordnungen: leere Platzhalter sind in Ordnung (auch
+  // das Wurzelelement grade_history, gemessen an einer Sicherung ohne Nutzerdaten),
   // Einträge zu Personen nicht.
   for (final datei in const ['grades.xml', 'grade_history.xml', 'roles.xml']) {
     final inhalt = dateien[datei];
     if (inhalt == null) continue;
     final text = utf8.decode(inhalt, allowMalformed: true);
-    if (RegExp(r'<(grade_grade|grade_history|role_assignment|userid)\b').hasMatch(text)) {
+    if (RegExp(r'<(grade_grade|role_assignment|userid)\b').hasMatch(text)) {
       return nein('Die Sicherung enthält Bewertungen oder Rollen von Personen; nicht angenommen.');
     }
   }

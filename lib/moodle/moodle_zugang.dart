@@ -550,17 +550,30 @@ class MoodleZugang {
         // Wiederherstellen (wiederherstellung.dart): die gemessenen Schritte.
         Erlaubt('GET', r'^/course/view\.php$', 'Kurs ansehen (Gegenlesen, Kontext; UNGEMESSEN)',
             parameter: (q) => _nurSchluessel(q, {'id'}) && _zahl(q['id'])),
+        // Nur diese Felder: Marke, Sitzung, Draft-Itemid und ggf. der Absendeknopf und die Kurs-ID.
+        // Jedes andere Feld lehnt die Regel ab (UNGEMESSEN: Feldnamen, TODO.md).
         Erlaubt('POST', r'^/backup/restorefile\.php$', 'Wiederherstellen: Datei hochladen (Formular)',
             parameter: (q) => _nurSchluessel(q, {'contextid'}) && _zahl(q['contextid']),
             formular: (f) =>
+                f.every((e) => const {'contextid', 'sesskey', '_qf__course_restore_form', 'backupfile', 'submitbutton'}
+                    .contains(e.key)) &&
                 _marke(f, RegExp(r'^_qf__course_restore_form$')) &&
                 _gesetzt(wertIn(f, 'sesskey')) &&
-                _zahl(wertIn(f, 'backupfile'))), // UNGEMESSEN: Feldname Draft-Dateibereich
+                _zahl(wertIn(f, 'backupfile')) &&
+                (wertIn(f, 'contextid') == null || _zahl(wertIn(f, 'contextid')))),
         Erlaubt('GET', r'^/backup/restore\.php$', 'Wiederherstellen: Seite des Assistenten',
             parameter: (q) =>
                 _nurSchluessel(q, {'contextid', 'filename'}) &&
                 _zahl(q['contextid']) &&
                 RegExp(r'^[A-Za-z0-9_.-]{1,200}$').hasMatch(q['filename'] ?? '')),
+        // Weiterleitung nach dem Hochladen (UNGEMESSEN): Moodle nennt die Datei über ihren Dateiablagen-Hash.
+        Erlaubt('GET', r'^/backup/restore\.php$', 'Wiederherstellen: Weiterleitung nach dem Hochladen (UNGEMESSEN)',
+            parameter: (q) =>
+                _nurSchluessel(q, {'contextid', 'pathnamehash', 'component', 'filearea'}) &&
+                _zahl(q['contextid']) &&
+                RegExp(r'^[a-f0-9]{40}$').hasMatch(q['pathnamehash'] ?? '') &&
+                RegExp(r'^[a-z_]{1,50}$').hasMatch(q['component'] ?? 'backup') &&
+                RegExp(r'^[a-z_]{1,50}$').hasMatch(q['filearea'] ?? 'draft')),
         // Zielwahl: nur „in einem vorhandenen Kurs" (target=4), Schritt 2.
         Erlaubt('POST', r'^/backup/restore\.php$', 'Wiederherstellen: Ziel „vorhandener Kurs" (Schritt 2)',
             parameter: (q) => _nurSchluessel(q, {'contextid', 'filename'}),

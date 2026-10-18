@@ -182,6 +182,18 @@ void main() {
       expect(b.ok, isFalse);
     });
 
+    test('leere Bewertungs- und Rollendateien einer Sicherung ohne Nutzerdaten werden angenommen (Regression Live-Messung #8)', () async {
+      // Form wie in der gemessenen Sicherung: das Wurzelelement grade_history ist kein Eintrag zu einer Person.
+      final b = await archivPruefen(_mbz([
+        _eintrag('moodle_backup.xml', _xml(_sicherungXml())),
+        _eintrag('grades.xml', _xml('<grade_grades>\n</grade_grades>\n')),
+        _eintrag('grade_history.xml', _xml('<grade_history>\n  <grade_grades>\n  </grade_grades>\n</grade_history>\n')),
+        _eintrag('roles.xml', _xml('<roles>\n  <role_assignments>\n  </role_assignments>\n</roles>\n')),
+        _eintrag('activities/page_1/page.xml', _xml('<activity/>')),
+      ]));
+      expect(b.ok, isTrue, reason: b.grund);
+    });
+
     test('Format, das kein Moodle-2-Archiv ist, wird abgelehnt', () async {
       final xml = _sicherungXml().replaceAll('moodle2', 'moodle1');
       final b = await archivPruefen(_mbz([_eintrag('moodle_backup.xml', _xml(xml))]));
@@ -299,8 +311,24 @@ void main() {
         MapEntry('backupfile', '99'),
       ];
       expect(post(ziel, gut), isTrue);
+      expect(post(ziel, [...gut, const MapEntry('submitbutton', 'Weiter')]), isTrue);
+      expect(post(ziel, [...gut, const MapEntry('contextid', '5')]), isTrue);
       expect(post('https://m.example/backup/restorefile.php?contextid=5&x=1', gut), isFalse);
       expect(post(ziel, const [MapEntry('sesskey', 'abc'), MapEntry('backupfile', '99')]), isFalse);
+      // Jedes weitere Feld lehnt die Regel ab, auch wenn Marke, Sitzung und Itemid stimmen.
+      expect(post(ziel, [...gut, const MapEntry('name', 'x')]), isFalse);
+      expect(post(ziel, [...gut, const MapEntry('contextid', 'abc')]), isFalse);
+      expect(post(ziel, [...gut]..[2] = const MapEntry('backupfile', 'abc')), isFalse);
+    });
+
+    test('Weiterleitung nach dem Hochladen nur mit Dateiablagen-Hash und den erlaubten Schlüsseln', () {
+      const hash = 'da39a3ee5e6b4b0d3255bfef95601890afd80709';
+      expect(get('https://m.example/backup/restore.php?contextid=5&pathnamehash=$hash'), isTrue);
+      expect(get('https://m.example/backup/restore.php?contextid=5&pathnamehash=$hash&component=backup&filearea=draft'),
+          isTrue);
+      expect(get('https://m.example/backup/restore.php?contextid=5&pathnamehash=xyz'), isFalse);
+      expect(get('https://m.example/backup/restore.php?contextid=5&pathnamehash=$hash&extra=1'), isFalse);
+      expect(get('https://m.example/backup/restore.php?contextid=5'), isFalse);
     });
 
     test('Zielwahl (Schritt 2) nur mit target 4 und Kurs-ID', () {
