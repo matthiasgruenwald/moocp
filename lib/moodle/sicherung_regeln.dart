@@ -359,8 +359,9 @@ bool istStillstand(DateTime jetzt, DateTime? seit) =>
     seit != null && jetzt.difference(seit) >= stillstandsFrist;
 
 /// Der Hinweistext bei Stillstand (Ticket #18). Feste Worte und Kennzahlen, keine
-/// Moodle-Inhalte. Stillstand ist keine Aussage über Erfolg oder Fehler: Moodle
-/// meldet nichts, und ob der Vorgang hängt, ist nicht belegt.
+/// Moodle-Inhalte. Stillstand ist keine Aussage über Erfolg oder Fehler: Die letzte
+/// Abfrage nannte weder Ende noch Fehler (oder die Angaben fehlten), und ob der
+/// Vorgang hängt, ist nicht belegt.
 String stillstandText({
   required String nummer,
   required String werkzeug,
@@ -370,8 +371,8 @@ String stillstandText({
 }) {
   final prozent = fortschritt == null ? 'unbekannt' : '${(fortschritt * 100).round()} %';
   return 'Stillstand (Nummer $nummer): Seit ${seit.inMinutes} Minuten kein neuer Fortschritt, '
-      'letzte Beobachtung $prozent. Moodle meldet weder Ende noch Fehler; ob der Vorgang hängt, '
-      'ist nicht belegt. Mögliche Ursachen: $ursachen '
+      'letzte Beobachtung $prozent. Die letzte Abfrage nannte kein Ende und keinen Fehler; ob der Vorgang '
+      'hängt, ist nicht belegt. Mögliche Ursachen: $ursachen '
       'Mit $werkzeug später erneut prüfen.';
 }
 
@@ -459,3 +460,11 @@ String? zielOrdnerPruefen(String? ordner) {
   if (!teile.every((s) => RegExp(r'^[A-Za-z0-9_ äöüÄÖÜß-]+$').hasMatch(s))) return null;
   return teile.join('/');
 }
+
+/// Der Text, den ein Werkzeug bei Zeitlimit zurückgibt (Befund 9). Ist die
+/// Nummer schon vergeben, nennt er sie und genau einen Folgeaufruf. Ist sie es
+/// nicht, sagt er das, und es gibt keinen Folgeaufruf mit einer Nummer, die es
+/// noch nicht gibt. In beiden Fällen ist nichts neu gestartet.
+String laufText(String was, String? nummer, String werkzeug) => nummer == null
+    ? '$was läuft noch. Die Nummer steht noch nicht fest; es ist noch nichts gestartet.'
+    : '$was läuft weiter (Nummer $nummer). Mit $werkzeug und der Nummer $nummer später prüfen.';

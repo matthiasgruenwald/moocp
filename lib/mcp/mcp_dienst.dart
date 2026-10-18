@@ -821,16 +821,19 @@ class McpDienst {
                   'kein Laufwerk).'),
         },
         pflicht: ['kurs', 'cmid', 'name'],
-        ausfuehren: (a) => _zeitlimit(
-              aktivitaetSichern(moodle, freigaben, vorgaenge,
-                  kurs: _zahl(a, 'kurs'),
-                  cmid: _zahl(a, 'cmid'),
-                  name: _text(a, 'name'),
-                  zielOrdner: a['ziel_ordner'] as String?),
-              const Duration(minutes: 1),
-              () => 'Die Sicherung läuft weiter. Mit sicherung_status und der Nummer später prüfen, '
-                  'ob sie fertig ist.',
-            ));
+        ausfuehren: (a) {
+          String? vid;
+          return _zeitlimit(
+            aktivitaetSichern(moodle, freigaben, vorgaenge,
+                kurs: _zahl(a, 'kurs'),
+                cmid: _zahl(a, 'cmid'),
+                name: _text(a, 'name'),
+                zielOrdner: a['ziel_ordner'] as String?,
+                beiVorgang: (id) => vid = id),
+            const Duration(minutes: 1),
+            () => laufText('Die Sicherung', vid, 'sicherung_status'),
+          );
+        });
 
     _werkzeug(server, 'sicherung_status',
         titel: 'Sicherung prüfen',
@@ -887,22 +890,26 @@ class McpDienst {
                   'ob die Fragen eines Quiz aus der eigenen Sammlung stammen; ohne Angabe bleibt das eine Prüflücke.'),
         },
         pflicht: ['datei', 'weg'],
-        ausfuehren: (a) => _zeitlimit(
-              wiederherstellen(moodle, freigaben, vorgaenge,
-                  datei: _text(a, 'datei'),
-                  weg: a['weg'] as String?,
-                  loeschend: a['loeschend'] == true,
-                  kurs: _zahlOder(a, 'kurs'),
-                  name: a['name'] as String?,
-                  neuerKursName: a['neuer_kurs_name'] as String?,
-                  kurzname: a['kurzname'] as String?,
-                  kategorieId: _zahlOder(a, 'kategorie_id'),
-                  sammlung: _zahlOder(a, 'sammlung'),
-                  wiederholungVon: a['wiederholung_von'] as String?,
-                  instanz: profil.name),
-              const Duration(minutes: 1),
-              () => 'Die Wiederherstellung läuft weiter. Mit wiederherstellung_status und der Nummer später prüfen.',
-            ));
+        ausfuehren: (a) {
+          String? vid;
+          return _zeitlimit(
+            wiederherstellen(moodle, freigaben, vorgaenge,
+                datei: _text(a, 'datei'),
+                weg: a['weg'] as String?,
+                loeschend: a['loeschend'] == true,
+                kurs: _zahlOder(a, 'kurs'),
+                name: a['name'] as String?,
+                neuerKursName: a['neuer_kurs_name'] as String?,
+                kurzname: a['kurzname'] as String?,
+                kategorieId: _zahlOder(a, 'kategorie_id'),
+                sammlung: _zahlOder(a, 'sammlung'),
+                wiederholungVon: a['wiederholung_von'] as String?,
+                instanz: profil.name,
+                beiVorgang: (id) => vid = id),
+            const Duration(minutes: 1),
+            () => laufText('Die Wiederherstellung', vid, 'wiederherstellung_status'),
+          );
+        });
 
     _werkzeug(server, 'wiederherstellung_status',
         titel: 'Wiederherstellung prüfen',
@@ -957,6 +964,7 @@ class McpDienst {
           List<Map<String, dynamic>> liste(String n) => [
                 for (final x in (a[n] as List?) ?? const []) (x as Map).cast<String, dynamic>(),
               ];
+          String? vid;
           return _zeitlimit(
             auswahlSichern(moodle, freigaben, vorgaenge,
                 kurs: _zahl(a, 'kurs'),
@@ -964,10 +972,10 @@ class McpDienst {
                 aktivitaeten: [for (final x in liste('aktivitaeten')) (cmid: _zahl(x, 'cmid'), name: _text(x, 'name'))],
                 abschnitte: [for (final x in liste('abschnitte')) (id: _zahl(x, 'id'), name: _text(x, 'name'))],
                 ganzerKurs: a['ganzer_kurs'] == true,
-                zielOrdner: a['ziel_ordner'] as String?),
+                zielOrdner: a['ziel_ordner'] as String?,
+                beiVorgang: (id) => vid = id),
             const Duration(minutes: 1),
-            () => 'Die Sicherung läuft weiter. Mit sicherung_status und der Nummer später prüfen, '
-                'ob sie fertig ist.',
+            () => laufText('Die Sicherung', vid, 'sicherung_status'),
           );
         });
 
@@ -1029,8 +1037,7 @@ class McpDienst {
         ausfuehren: (a) => _zeitlimit(
               _uebertragen(vorgaenge, a),
               const Duration(minutes: 4),
-              () => 'Die Übertragung läuft weiter. Mit wiederherstellung_status und den Nummern prüfen; '
-                  'uebertragungen.json zeigt den Stand je Ziel.',
+              () => 'Die Übertragung läuft weiter. Mit wiederherstellung_status und der Nummer des Ziels prüfen.',
             ));
 
     // ---- Bücher

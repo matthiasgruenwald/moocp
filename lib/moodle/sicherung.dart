@@ -335,6 +335,7 @@ Future<String> aktivitaetSichern(
   required int cmid,
   required String name,
   String? zielOrdner,
+  void Function(String vorgangId)? beiVorgang,
 }) async {
   final ziel = zielOrdnerPruefen(zielOrdner);
   if (ziel == null) {
@@ -380,6 +381,7 @@ Future<String> aktivitaetSichern(
   await Directory(ordner).create(recursive: true);
   final dateiName = await freierName(ordner, sicherungsName(a.modul, cmid, DateTime.now()));
   final vg = await vorgaenge.neu(kurs: kurs, cmid: cmid, datei: p.join(ziel, dateiName));
+  beiVorgang?.call(vg.id);
   final kursText = await kursBezeichnung(moodle, kurs);
   return _nachFreigabe(moodle, freigaben, vorgaenge, vg,
       s4: s4,
@@ -706,14 +708,22 @@ Future<String> sicherungStatus(MoodleZugang moodle, Vorgaenge vorgaenge, {String
   return _zeile(v);
 }
 
+/// Eine Zeile je Vorgang für die Übersicht. Offene Vorgänge nennen genau einen
+/// Folgeaufruf mit ihrer Nummer (Befund 9).
 String _zeile(Vorgang v) {
   if (v.wiederherstellung != null) {
     final verified = v.wiederherstellung == WiederherstellungStand.fertig ? ' · verified: ${v.verified}' : '';
     final hinweis = v.text.isEmpty ? '' : '\n${v.text}';
-    return '${v.id} · Wiederherstellung in Kurs ${v.kurs} · ${v.wiederherstellung!.text} · ${v.datei}$verified$hinweis';
+    final folge = _offen(v.wiederherstellung) ? '\nFolgeaufruf: wiederherstellung_status ${v.id}' : '';
+    return '${v.id} · Wiederherstellung in Kurs ${v.kurs} · ${v.wiederherstellung!.text} · ${v.datei}$verified$hinweis$folge';
   }
   final verified = v.stand == SicherungStand.fertig ? ' · verified: ${v.verified}' : '';
   final hinweis = v.text.isEmpty ? '' : '\n${v.text}';
   final wer = v.auswahl ?? 'cmid ${v.cmid}';
-  return '${v.id} · Kurs ${v.kurs} · $wer · ${v.stand.text} · ${v.datei}$verified$hinweis';
+  final folge = _offenSicherung(v.stand) ? '\nFolgeaufruf: sicherung_status ${v.id}' : '';
+  return '${v.id} · Kurs ${v.kurs} · $wer · ${v.stand.text} · ${v.datei}$verified$hinweis$folge';
 }
+
+bool _offen(WiederherstellungStand? s) => s != null && s != WiederherstellungStand.fertig && s != WiederherstellungStand.fehlgeschlagen;
+
+bool _offenSicherung(SicherungStand s) => s != SicherungStand.fertig && s != SicherungStand.fehlgeschlagen;
