@@ -754,7 +754,8 @@ class _HauptseiteState extends State<Hauptseite> with WindowListener {
   Future<void> _profilBearbeiten({bool neu = false}) async {
     final aktuell = neu ? null : _profil;
     var port = standardPort;
-    while (widget.einstellungen.profile.any((p) => p.port == port)) {
+    while (_instanzen.any((i) => i.dienst.profil.port == port) ||
+        widget.einstellungen.profile.any((p) => p.port == port)) {
       port++;
     }
     final geaendert = await showDialog<Profil>(
@@ -774,7 +775,8 @@ class _HauptseiteState extends State<Hauptseite> with WindowListener {
         name = '${geaendert.mcpName}-${zaehler++}';
       }
       var naechsterPort = standardPort;
-      while (profile.any((p) => p.port == naechsterPort)) {
+      while (_instanzen.any((i) => i.dienst.profil.port == naechsterPort) ||
+          profile.any((p) => p.port == naechsterPort)) {
         naechsterPort++;
       }
       final neuProfil = geaendert.copyWith(mcpName: name, port: naechsterPort);
