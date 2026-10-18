@@ -98,12 +98,38 @@ void main() {
     });
   });
 
-  test('Downloadpfad aus der Antwort, &amp; gelesen', () {
-    const antwort = [
-      {'url': 'https://m.example/pluginfile.php/7/user/backup/0/page-cm2384-x.mbz?forcedownload=1&amp;x=1'}
-    ];
-    expect(sicherungsLink(antwort), '/pluginfile.php/7/user/backup/0/page-cm2384-x.mbz?forcedownload=1');
-    expect(sicherungsLink({'nichts': 'hier'}), isNull);
+  group('Downloadlink auf der Seite Wiederherstellen (Fixturen)', () {
+    const eigene = 'sicherung-cm2384-2026-10-18_090507.mbz';
+    const andere = 'sicherung-cm1-2026-10-17_120000.mbz';
+    String zeile(String datei, {String id = '7'}) =>
+        '<li><a href="https://m.example/pluginfile.php/$id/user/backup/0/$datei?forcedownload=1">Herunterladen</a></li>';
+
+    test('genau ein Treffer des eigenen Namens, in &amp;-Schreibweise der Seite', () {
+      final html = '<ul>${zeile(andere)}<a href="https://m.example/pluginfile.php/7/user/backup/0/$eigene?forcedownload=1" title="a&amp;b">x</a></ul>';
+      expect(sicherungsLinks(html, eigene), ['/pluginfile.php/7/user/backup/0/$eigene?forcedownload=1']);
+    });
+
+    test('Zusatzparameter nach dem Link: kein Treffer, die Positivliste ließe ihn nicht zu', () {
+      final html = '<a href="https://m.example/pluginfile.php/7/user/backup/0/$eigene?forcedownload=1&amp;x=1">x</a>';
+      expect(sicherungsLinks(html, eigene), isEmpty);
+    });
+
+    test('kein Treffer: leer, auch wenn nur ein fremder Name da ist', () {
+      expect(sicherungsLinks('<ul>${zeile(andere)}</ul>', eigene), isEmpty);
+    });
+
+    test('zwei Treffer mit dem eigenen Namen: beide, der Aufrufer bricht ab', () {
+      final html = zeile(eigene) + zeile(eigene, id: '9');
+      expect(sicherungsLinks(html, eigene), hasLength(2));
+    });
+
+    test('Namensteil ist kein Treffer: nur ganze Dateinamen zählen', () {
+      expect(sicherungsLinks(zeile('x-$eigene'), eigene), isEmpty);
+    });
+
+    test('Punkte im Namen sind wörtlich, nicht als Muster', () {
+      expect(sicherungsLinks(zeile('sicherungXcm1.mbz'), 'sicherung.cm1.mbz'), isEmpty);
+    });
   });
 
   test('Dateiname: Modul, cmid und Zeit, sonst nichts', () {
@@ -136,6 +162,13 @@ void main() {
       ]) {
         expect(gesperrt(Uri.parse('https://m.example$a')), isTrue, reason: a);
       }
+    });
+
+    test('Seite Wiederherstellen: nur contextid, sonst nichts', () {
+      expect(z.erlaubt('GET', Uri.parse('https://m.example/backup/restorefile.php?contextid=2010')), isTrue);
+      expect(z.erlaubt('GET', Uri.parse('https://m.example/backup/restorefile.php?contextid=2010&x=1')), isFalse);
+      expect(z.erlaubt('GET', Uri.parse('https://m.example/backup/restorefile.php?contextid=abc')), isFalse);
+      expect(z.erlaubt('GET', Uri.parse('https://m.example/backup/restorefile.php')), isFalse);
     });
 
     test('Einstieg der Sicherung: id und cm, sonst nichts', () {

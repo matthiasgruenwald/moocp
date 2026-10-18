@@ -112,8 +112,9 @@ Offen benannt, nicht still aufgelöst. Entscheidung jeweils durch die Lehrkraft 
 
 Umgesetzt, nicht auf einer Instanz durchgespielt (A10: kein Testkurs genannt). Die folgenden Punkte sind im Code als UNGEMESSEN markiert; sie werden im Testkurs mit `ZZ`-Proben gemessen, bevor die Sicherung als geprüft gilt.
 
-- Form der Antwort von `core_backup_get_async_backup_progress`: angenommen eine Liste mit `backupid`, `progress`, `status`; ein Fehlerfeld (`error`/`errorcode`) gilt als fehlgeschlagen, alles Unbekannte als `unklar` (`bewerteFortschritt`, `lib/moodle/sicherung_regeln.dart`).
-- Form der Antwort von `core_backup_get_async_backup_links_backup`: die App sucht den Downloadpfad im Text der Antwort (`sicherungsLink`); nötig ist die echte Form.
+- Antwort von `core_backup_get_async_backup_progress`: gemessen ist eine Liste mit `backupid`, `progress` (0 oder 1) und `status` (700 läuft, 1000 Ende). Ein Fehlerfeld (`error`/`errorcode`) gilt als fehlgeschlagen, alles Unbekannte als `unklar` (`bewerteFortschritt`, `lib/moodle/sicherung_regeln.dart`). Das Muster mit Zwischenständen ist nicht vollständig gemessen.
+- Downloadlink: `core_backup_get_async_backup_links_backup` meldet im Spike (Kurs 41) `backup_controller_dbops_loading_invalid_controller` und ist deshalb nicht der Weg. Die App liest stattdessen `/backup/restorefile.php?contextid=<ctx>` und nimmt genau den Link für den eigenen Dateinamen (`sicherungsLinks`); keiner oder mehrere Treffer heißen `unklar`. UNGEMESSEN: ob die Seite die Datei immer listet (Rechte, Papierkorb, Abstände). Die Seite listet auch die eigenen Sicherungen anderer Vorgänge; die App übernimmt nur den einen Link.
+- Rückfall (nicht gebaut): `/backup/backupfilesedit.php?currentcontext=<ctx>&contextid=<ctx>&filearea=backup&component=user`, falls die Seite Wiederherstellen nicht reicht.
 - Teil des Downloadpfads: die Zahl nach `user/backup/` (itemid) ist nur als Muster erfasst (`\d+`), nicht gemessen.
 - Antwort mit `contentLength < 0` beim Herunterladen: die App lehnt ab (fail-closed, `herunterladen` in `lib/moodle/moodle_zugang.dart`); wie Moodle die Länge bei großen Dateien meldet, ist nicht gemessen.
 - Feldnamen der Schema-Seite (Schritt 2): `setting_activity_<art>_<cmid>_included` und `_userinfo` sind angenommen; nur Schritt 4 ist gemessen.

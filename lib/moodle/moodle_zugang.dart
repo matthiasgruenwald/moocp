@@ -251,11 +251,9 @@ class MoodleZugang {
           'mod_kanban_$k': (a) => _nur(a, {'cmid', 'boardid', 'data'}),
         // Dynamische Formulare, nur die gemessenen Klassen.
         'core_form_dynamic_form': (a) => _nur(a, {'form', 'formdata'}) && dynamischeFormulare.contains(a['form']),
-        // Sicherung: Fortschritt lesen, und den Downloadlink einer fertigen Sicherung.
+        // Sicherung: Fortschritt lesen.
         'core_backup_get_async_backup_progress': (a) =>
             _nur(a, {'backupids', 'contextid'}) && a['backupids'] is List && a['contextid'] is num,
-        'core_backup_get_async_backup_links_backup': (a) =>
-            _nur(a, {'filename', 'contextid', 'backupid'}) && a['filename'] is String && a['backupid'] != null,
       };
 
   /// Formularklassen für core_form_dynamic_form.
@@ -343,6 +341,8 @@ class MoodleZugang {
         // der Assistenten; Nutzerdaten bleiben aus (sicherung_regeln.dart).
         Erlaubt('GET', r'^/backup/backup\.php$', 'Sicherung: Einstiegsseite einer Aktivität',
             parameter: (q) => _nurSchluessel(q, {'id', 'cm'}) && _zahl(q['id']) && (q['cm'] == null || _zahl(q['cm']))),
+        Erlaubt('GET', r'^/backup/restorefile\.php$', 'Sicherung: Seite Wiederherstellen (Downloadlink suchen)',
+            parameter: (q) => _nurSchluessel(q, {'contextid'}) && _zahl(q['contextid'])),
         Erlaubt('GET', r'^/pluginfile\.php/\d+/user/backup/\d+/[^/?#]+\.mbz$', 'Sicherungsdatei',
             parameter: (q) => q.length == 1 && q['forcedownload'] == '1'),
         Erlaubt('GET', r'^/draftfile\.php/\d+/user/draft/\d+/.+', 'Datei im Entwurfsbereich'),

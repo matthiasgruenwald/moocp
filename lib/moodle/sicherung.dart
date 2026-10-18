@@ -354,17 +354,22 @@ Future<String> _warten(
       await Future<void>.delayed(takt);
     }
 
-    final link = await moodle.dienst('core_backup_get_async_backup_links_backup', {
-      'filename': vg.dateiname,
-      'contextid': vg.kontext,
-      'backupid': id,
-    });
-    final pfad = sicherungsLink(link);
-    if (pfad == null) {
-      await vorgaenge.aktualisieren(vg,
-          stand: SicherungStand.unklar, text: 'Der Downloadlink fehlt in der Antwort von Moodle.');
-      return 'Unklar (Nummer ${vg.id}): Der Downloadlink fehlt in der Antwort von Moodle.';
+    final dateiname = vg.dateiname;
+    if (dateiname == null) {
+      await vorgaenge.aktualisieren(vg, stand: SicherungStand.unklar, text: 'Der Dateiname fehlt im Vorgang.');
+      return 'Unklar (Nummer ${vg.id}): Der Dateiname fehlt im Vorgang.';
     }
+    // Den Link holt die Seite „Wiederherstellen" (siehe sicherungsLinks).
+    final seite = await moodle.lesen('/backup/restorefile.php?contextid=${vg.kontext}');
+    final pfade = sicherungsLinks(seite.text, dateiname);
+    if (pfade.length != 1) {
+      final grund = pfade.isEmpty
+          ? 'Der Downloadlink fehlt auf der Seite Wiederherstellen.'
+          : 'Auf der Seite Wiederherstellen steht der Name mehrfach.';
+      await vorgaenge.aktualisieren(vg, stand: SicherungStand.unklar, text: grund);
+      return 'Unklar (Nummer ${vg.id}): $grund sicherung_status prüft erneut.';
+    }
+    final pfad = pfade.single;
     final ziel = File(p.join(vorgaenge.ordner, vg.datei));
     final bytes = await moodle.herunterladen(pfad, ziel);
 

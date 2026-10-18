@@ -176,30 +176,26 @@ SicherungStand bewerteFortschritt(Object? antwort, String backupid) {
   return SicherungStand.unklar;
 }
 
-final RegExp _sicherungsLink = RegExp(r'/pluginfile\.php/\d+/user/backup/\d+/[^/?#"\s]+\.mbz\?forcedownload=1');
-
-/// Den Downloadpfad (von /pluginfile.php an, mit Query) aus der Antwort von
-/// core_backup_get_async_backup_links_backup. Alle Texte werden durchsucht,
-/// damit die Form der Antwort nicht gebraucht wird.
+/// Die Downloadpfade (von /pluginfile.php an, mit Query) der Sicherung
+/// [dateiname] auf der Seite /backup/restorefile.php. Gesucht wird genau der
+/// eigene Dateiname; andere Sicherungen auf derselben Seite bleiben außen vor.
+/// Die App nimmt nur einen Treffer; keiner oder mehrere heißen: nicht raten.
 ///
-/// UNGEMESSEN: die Form der Antwort. Die Suche nimmt den ersten Treffer; die
-/// Adresse wird nie als Ganzes übernommen, nur der Pfad.
-String? sicherungsLink(Object? antwort) {
-  String? treffer;
-  void suche(Object? o) {
-    if (treffer != null) return;
-    if (o is String) {
-      final m = _sicherungsLink.firstMatch(o.replaceAll('&amp;', '&'));
-      if (m != null) treffer = m.group(0);
-    } else if (o is Map) {
-      o.values.forEach(suche);
-    } else if (o is List) {
-      o.forEach(suche);
-    }
+/// Warum diese Seite und nicht core_backup_get_async_backup_links_backup: Der
+/// Dienst meldet für eine fertige Sicherung `backup_controller_dbops_loading_
+/// invalid_controller` (Messung im Spike, Kurs 41). Die Seite listet dieselbe
+/// Datei mit Downloadlink.
+///
+/// UNGEMESSEN: ob die Seite die Datei immer listet (Rechte, Papierkorb,
+/// Abstände); das zeigt die Messung im Testkurs.
+List<String> sicherungsLinks(String html, String dateiname) {
+  final name = RegExp.escape(dateiname);
+  final muster = RegExp('/pluginfile\\.php/\\d+/user/backup/\\d+/$name\\?forcedownload=1(?=["\'\\s<>])');
+  final treffer = <String>{};
+  for (final m in muster.allMatches(html.replaceAll('&amp;', '&'))) {
+    treffer.add(m.group(0)!);
   }
-
-  suche(antwort);
-  return treffer;
+  return treffer.toList();
 }
 
 /// Der Dateiname im Sicherungsordner: Modul und cmid, Zeitpunkt. Kein Name
