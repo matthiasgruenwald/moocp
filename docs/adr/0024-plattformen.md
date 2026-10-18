@@ -28,7 +28,7 @@ Die vier offenen Stellen sind auf dem Mac so gelöst (Stand 0.9.23):
 - **Brücke und KI-Werkzeuge:** Auf dem Mac gibt es keine Brücke. LM Studio mit Bionic wird nicht angeboten, weil dessen Brücke ein Windows-Programm ist. Claude Code und Codex CLI sprechen HTTP-MCP und werden über ihre Kommandozeile bzw. `~/.codex/config.toml` eingetragen. Gesucht werden sie im `PATH`, unter `~/.local/bin`, `/opt/homebrew/bin` und `/usr/local/bin`. Skills liegen in `~/.claude/skills` und `~/.codex/skills`. Ob die Clients auf dem Mac diese Pfade tatsächlich lesen, ist nicht ausgeführt geprüft; das steht in [TODO.md](../../TODO.md).
 - **Installation und Update:** Es gibt keinen Installer und keine Selbstaktualisierung. Die App läuft aus dem Entwicklungsbau (`flutter run -d macos`, README Teil 4). `updateMoeglich` gibt außerhalb von Windows `false` zurück.
 
-Bildschirmfotos sind auf dem Mac noch nicht umgesetzt. Browsersuche und Prozessbereinigung kommen mit #11 und #3b. Die Entscheidung, nur den App-Browser zu nutzen, steht in [0028](0028-bildschirmfoto-app-browser.md).
+- **Bildschirmfotos (#11, #3):** Die Browsersuche (`/Applications`, `~/Applications`; Edge, Chrome, Chromium), die Richtlinie aus den verwalteten Einstellungen (`defaults read`, fehlend heißt erlaubt) und die Prozessbereinigung nach Profil (`ps`, `kill`) stehen hinter der Schnittstelle `lib/plattform/plattform.dart`, mit je einer Umsetzung für Windows und macOS. Der Kern hat keine Plattformprüfung. Ungemessen auf dem Mac: der Wert `0` der Richtlinie, der Start des Browsers und die Bereinigung in der Praxis (siehe [TODO.md](../../TODO.md)). Die Entscheidung, nur den App-Browser zu nutzen, steht in [0028](0028-bildschirmfoto-app-browser.md).
 
 ## Verworfen
 

@@ -1,6 +1,10 @@
 # Changelog
 
 ## 0.9.23
+- macOS: Bildschirmfotos finden Edge, Chrome oder Chromium im Programmordner; eine Richtlinie, die die Fernsteuerung abschaltet, nennt die App. UNGEMESSEN: noch nicht auf einem Mac durchgespielt.
+- macOS: Die App darf Verbindungen aufbauen (Netzwerkrechte im Entwicklungsbau); Einstellungen ohne Benutzerordner nennen den Fehler, statt still zu scheitern.
+- macOS: Der Einstellungsdialog sagt ausdrücklich, dass sich die Version auf dem Mac nicht selbst aktualisiert und nichts bei GitHub prüft.
+- macOS: Die Einrichtung findet `python3`, wenn kein `python` da ist.
 - Wiederherstellung: Eine Sicherungsdatei lässt sich in einen bestehenden Kurs einfügen, ohne etwas zu ersetzen; die Freigabe nennt Kurs, Datei und was neu angelegt wird, und die Datei wird vor dem Hochladen geprüft. UNGEMESSEN: noch nicht auf einer Instanz durchgespielt.
 - Wiederherstellung: Fünf Ziele statt einem – als neuer Kurs (verborgen angelegt), in den aktuellen oder einen anderen Kurs, jeweils einfügen oder vorhandene Inhalte ersetzen. Ersetzen braucht eine eigene Bestätigung, die den Kurs nennt. Bei unklarer Angabe fragt die KI nach. UNGEMESSEN: die Wege außer dem Einfügen in einen bestehenden Kurs sind nicht auf einer Instanz durchgespielt; der Abbruch eines neuen Kurses fehlt.
 - Sicherung: Eine einzelne Aktivität lässt sich als Datei ohne Nutzerdaten in den Sicherungsordner der App sichern; nach der Freigabe läuft sie in Moodle und die Datei wird geprüft.

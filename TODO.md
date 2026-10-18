@@ -237,3 +237,25 @@ Umgesetzt (`zielwegPruefen`, `Zielweg` in `lib/moodle/wiederherstellung_regeln.d
 - Freigabe-Dialoge nennen das Profil nicht; bei mehreren Profilen soll der Dialog den Profilnamen zeigen.
 - Arbeitsordner: Bei mehreren Profilen je ein Unterordner nach Kennung (umgesetzt); Aufräumen beim Beenden prüfen, wenn Unterordner in Benutzung sind.
 - Der Wechsel des Eintrags `moodle` zur Produktivinstanz (E31, Folgen) ist mit dem Umstellen des Spike-Eintrags zu tun, nicht erledigt.
+
+## Mac-Fassung (Issue #11, #3): UNGEMESSEN und Windows-Prüfung
+
+Umgesetzt, nicht auf einem Mac durchgespielt. Alles hier ist offen, bis es im Testkurs gemessen ist (A6: nachrüsten mit Messung, nicht in der Arbeitssitzung).
+
+UNGEMESSEN auf dem Mac:
+- Bildschirmfotos: Der Wert `0` von `RemoteDebuggingAllowed` in `/Library/Managed Preferences/<Domäne>` ist nicht gemessen; die Lesung ist aus der Richtlinienlogik abgeleitet. Ob Chrome und Edge mit `--remote-debugging-port=0` aus einem `.app`-Bündel starten, ist offen. Die Bereinigung über `ps -axww` und `kill -9` nach Profilpfad ist nicht durchgespielt.
+- Skills für Claude Code auf dem Mac: E30 verlangt `~/.agents/skills` mit Verlinkung von `~/.claude/skills`. Umgesetzt ist das nicht; die App kopiert weiter je Werkzeug. Codex liest auf dem Mac womöglich nicht `~/.codex/skills`; ungemessen.
+- Konfigurationsorte: Claude Code (`~/.claude.json`, `CLAUDE_CONFIG_DIR`) und Codex (`~/.codex/config.toml`, `CODEX_HOME`) auf dem Mac sind nicht mit den Clients geprüft.
+- Werkzeugsuche: `/opt/homebrew/bin`, `/usr/local/bin` und `~/.local/bin` sind fest verdrahtet; die Suche im Kern (`lib/einrichtung.dart`) ist nicht in die Schnittstelle `lib/plattform/` gewandert. Die Tests der Werkzeugsuche sind auf dem Mac übersprungen, weil sie echte Programme auf dem Rechner finden; sie brauchen injizierbare Suchordner.
+- Schlüsselbund und Netzwerk: Die Netzwerkrechte stehen in den Entitlements, ein Lauf mit Moodle ist ungemessen.
+- Fehlende Schriften für `tool/bilder_test.dart`: Die Bilder in `docs/bilder/` stammen von Windows; auf dem Mac weichen sie ab.
+
+Prüfen unter Windows (nach dem Umbau in #11):
+- Browsersuche über App Paths und die Programmordner; Richtlinie in HKLM und HKCU; PowerShell-Bereinigung nach Profil.
+- Claude Desktop (MSIX), klassischer Installer und VS-Code-Erweiterung finden claude.exe; Bionic mit der Brücke.
+- Die übersprungenen Mac-Tests laufen unter Windows (`flutter test`).
+- `python` in `skills/lernsituation/SKILL.md` (Zeilen 148 und 158) ruft `python` wörtlich; auf dem Mac gibt es oft nur `python3`. Entscheidung offen, ob der Skill beide nennt.
+- Ein Start ohne `HOME` (Mac) oder `APPDATA` (Windows) beendet die App mit `StateError` in `einstellungen_ort.dart`; Hauptprogramm fängt das nicht eigens ab.
+
+Nicht Teil dieses Umbaus (eigene Aufgabe):
+- Installer, Signierung, Notarisierung und Release-Bau für den Mac. Der Mac bleibt bei E24 ein Entwicklungsbau.
