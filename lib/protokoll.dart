@@ -4,8 +4,8 @@
 // angefragt wurde und was bei der Anmeldung passiert ist. Nicht hinein
 // kommen Passwörter, Formularwerte, Cookies oder Inhalte.
 //
-// Jeder Eintrag geht zusätzlich in eine Datei (%APPDATA%\moocp\
-// protokoll.log), damit sich ein Vorfall auch nach einem Neustart der App
+// Jeder Eintrag geht zusätzlich in eine Datei (protokoll.log im
+// Einstellungsordner, unter Windows %APPDATA%\moocp\), damit sich ein Vorfall auch nach einem Neustart der App
 // nachvollziehen lässt. Über 1 MB wird die Datei einmal umbenannt (.1).
 // Und an den Logger „protokoll" (log.dart), also auf die Konsole.
 

@@ -1,14 +1,15 @@
 // Gespeicherte Anmeldedaten -- nur, wenn die Lehrkraft den Haken setzt.
 //
 // Wo was liegt:
-//   - Haken und Benutzername: shared_preferences (Klartext-JSON unter
-//     %APPDATA%\moocp\moocp\). Kein Geheimnis.
-//   - Passwort: flutter_secure_storage, unter Windows mit DPAPI verschlüsselt
-//     (flutter_secure_storage.dat im selben Ordner). Entschlüsseln kann nur
-//     Ihr Windows-Konto; eine Kopie der Datei, ein Backup oder ein anderes
-//     Konto sieht Datensalat.
+//   - Haken und Benutzername: shared_preferences (Klartext-JSON im
+//     Einstellungsordner, unter Windows %APPDATA%\moocp\moocp\). Kein Geheimnis.
+//   - Passwort: flutter_secure_storage. Unter Windows mit DPAPI verschlüsselt
+//     (flutter_secure_storage.dat im selben Ordner), auf dem Mac im
+//     Schlüsselbund (E26). Entschlüsseln kann nur das Benutzerkonto des
+//     Rechners; eine Kopie der Datei, ein Backup oder ein anderes Konto sieht
+//     Datensalat.
 //
-// Grenze: Ein Programm, das unter demselben Windows-Konto läuft, kann das
+// Grenze: Ein Programm, das unter demselben Benutzerkonto läuft, kann das
 // Passwort gezielt entschlüsseln -- das gilt für jede Speicherung, die ohne
 // Rückfrage auskommt. Das Passwort geht nie über MCP hinaus und nie ins
 // Protokoll.
