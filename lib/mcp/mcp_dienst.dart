@@ -1014,7 +1014,7 @@ class McpDienst {
         pflicht: ['ziele'],
         ausfuehren: (a) => _zeitlimit(
               _uebertragen(vorgaenge, a),
-              const Duration(minutes: 1),
+              const Duration(minutes: 4),
               () => 'Die Übertragung läuft weiter. Mit wiederherstellung_status und den Nummern prüfen; '
                   'uebertragungen.json zeigt den Stand je Ziel.',
             ));
