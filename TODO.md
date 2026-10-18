@@ -266,6 +266,15 @@ Prüfen unter Windows (nach dem Umbau in #11):
 Nicht Teil dieses Umbaus (eigene Aufgabe):
 - Installer, Signierung, Notarisierung und Release-Bau für den Mac. Der Mac bleibt bei E24 ein Entwicklungsbau.
 
+## Lernlandkarte (Ticket #23): offene Punkte
+- Ändern (Verknüpfungen der Orte setzen) geht nicht: Der Typ der Lernlandkarte steht nicht in `schreibbareModule`, `aendern` lehnt vor jeder Freigabe ab. Ungemessen ist, unter welchem Modulnamen sie in Moodle läuft; der Ticket-Test nutzt einen erfundenen Typ.
+- Entscheidung der Lehrkraft offen: Werkzeug für die Lernlandkarte nachrüsten (mit Messung im Testkurs) oder Verknüpfungen in der Moodle-Oberfläche setzen (A6). Ein Plugin scheidet nach E23 aus.
+- Auswahlfelder mit Zielen (etwa ein Ort) landen in `einstellungen.json` als Anzeigetext, nicht als Nummer. Zwei Aktivitäten mit gleichem Namen lassen sich dort nicht unterscheiden.
+- Verweise prüft die App nur in Textfeldern (`<feld>.html`), nicht in Auswahl- und Eingabefeldern.
+- „Fremd" (Ziel in einem anderen Kurs) wird nicht unterschieden: `_zielTitel` liest nur den Titel. Titel werden für höchstens 10 Ziele außerhalb des Kurses abgerufen; darüber steht ein Hinweis.
+- Lehrkraft-Beobachtungen, nicht reproduziert und nicht gemessen: Verweise gehen beim Kopieren verloren; einmal die Warnung `Undefined array key "p1"`.
+- Quiz-Wiederherstellung (`get_questions_category()` mit `false`, MDL-89981): nicht geprüft, nicht Teil von #23.
+
 ## Aufräumen (Befunde aus dem Review, nicht behoben)
 
 - Doppelt: `seiteVon` (`lib/moodle/sicherung.dart`) und `restoreSeite` (`lib/moodle/wiederherstellung.dart`) lesen dieselben Formularseiten. Zusammenlegen, sobald beide Abläufe gemessen und gegen die Tests geprüft sind.

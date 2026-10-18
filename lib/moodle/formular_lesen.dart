@@ -195,6 +195,15 @@ class FormularGelesen {
         if (kurs != null) 'Kurs $kurs'
       ].join(', ')})')
       ..writeln('Ordner: $ordner');
+    // Ticket #23, E3: Ein Typ außerhalb der Positivliste wird gelesen, aber nicht
+    // geändert. Die Lücke steht im Ergebnis, damit eine Auswertung ohne Verweise
+    // nicht wie ein stiller Erfolg aussieht.
+    if (ziel.art == Zielart.aktivitaet &&
+        modul != null &&
+        !MoodleZugang.schreibbareModule.contains(modul)) {
+      b.writeln('Prüflücke: Typ „$modul" ist nicht schreibbar -- Lesen und Verweisprüfung '
+          'gelten, Ändern nicht (aendern lehnt ab).');
+    }
     if (fehlend.isNotEmpty) {
       b.writeln('NICHT gelesen (${fehlend.length}): ${fehlend.join(", ")}');
     }
