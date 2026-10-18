@@ -34,6 +34,7 @@ import 'kurs_aendern.dart';
 import 'moodle_zugang.dart';
 import 'sicherung.dart';
 import 'sicherung_regeln.dart';
+import 'wiederherstellung_anhaenge.dart';
 import 'wiederherstellung_regeln.dart';
 
 /// Vorgänge, die gerade laufen (Freigabe, Upload oder Abfrage) in dieser Sitzung.
@@ -533,7 +534,16 @@ Future<String> _gegenlesen(
   final alleVerborgen = zuordnungUnveraendert && zugeordnet.isNotEmpty &&
       zugeordnet.every((cmid) => jetzt.nachCmid[cmid]?.sichtbar == false);
   final liste = neue.map((a) => '„${a.name}" (${a.modul}${a.sichtbar ? ', sichtbar' : ', verborgen'})').join(', ');
-  final text = zugeordnet == null
+  // Ticket #21: Anhänge und Bilder der eindeutig zugeordneten Aktivitäten zurücklesen.
+  // Nur bei eindeutiger Zuordnung; sonst bleibt die Prüfung aus (keine Raterei).
+  final bestaetigt = zuordnungUnveraendert ? abschliessendZugeordnet : null;
+  final anhang = bestaetigt == null
+      ? null
+      : await anhaengePruefen(moodle, vorgaenge, vg, [
+          for (final cmid in bestaetigt)
+            (cmid: cmid, modul: jetzt.nachCmid[cmid]!.modul, titel: jetzt.nachCmid[cmid]!.name),
+        ]);
+  final basis = zugeordnet == null
       ? 'Importierte Aktivitäten konnten nicht eindeutig von anderen neuen Aktivitäten unterschieden werden. Keine Aktivität wurde verborgen; bitte prüfen.'
       : !zuordnungUnveraendert
           ? 'Nach dem Verbergen kamen weitere oder mehrdeutige neue Aktivitäten hinzu. Nur zuvor eindeutig zugeordnete Importaktivitäten wurden verborgen; bitte prüfen.'
@@ -542,9 +552,12 @@ Future<String> _gegenlesen(
       : alleVerborgen
           ? 'Neu im Kurs: $liste.'
           : 'Neu im Kurs: $liste. Nicht alle sind verborgen; bitte prüfen.';
-  await _uebergang(vorgaenge, vg, WiederherstellungStand.fertig, text: text, verified: alleVerborgen);
-  final befund = alleVerborgen ? 'verborgen: verified' : 'verborgen: nicht bestätigt, siehe Zustand oben';
-  return 'Wiederhergestellt (Nummer ${vg.id}): ${neue.isEmpty ? 'keine neuen Aktivitäten' : liste}. $befund';
+  final text = anhang == null ? basis : '$basis ${anhang.text}';
+  final anhangOk = anhang == null || anhang.vollstaendig;
+  await _uebergang(vorgaenge, vg, WiederherstellungStand.fertig, text: text, verified: alleVerborgen && anhangOk);
+  final befund = alleVerborgen && anhangOk ? 'verborgen: verified' : 'verborgen: nicht bestätigt, siehe Zustand oben';
+  return 'Wiederhergestellt (Nummer ${vg.id}): ${neue.isEmpty ? 'keine neuen Aktivitäten' : liste}. $befund.'
+      '${anhang == null ? '' : ' ${anhang.text}'}';
 }
 
 /// Der Stand eines Wiederherstellungsvorgangs. Fragt nur ab, startet nie neu.
