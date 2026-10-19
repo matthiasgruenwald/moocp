@@ -1,5 +1,7 @@
 # Features
 
+- Bildschirmfotos: Bei einer schmalen Inhaltsbox werden links Textanfänge abgeschnitten. Im Live-Test auf der zweiten Testinstanz mit einer eigenen ZZ-Textseite mehrfach reproduziert; der rückgelesene Quelltext ist vollständig. Inhaltskoordinaten und Layoutänderungen zwischen Messen und Aufnahme prüfen, ohne den Ausschnitt auf Kopf oder Navigation auszuweiten.
+
 Größere Folgearbeiten zur sicheren Wiederherstellung sind in [Issue #26](https://github.com/matthiasgruenwald/moocp/issues/26) zur menschlichen Klärung gesammelt. Die dortige Reihenfolge gilt nach Abschluss des aktuellen PR.
 - Kompatiblität zu MacOS und Linux herstellen. Müssen einzelne Features wie auto update umgestaltet oder gar entfernt werden? Die Pfade für die Konfiguration und ablage der Skills - sind die gleich?
 - automatisches bauen und erstellen eines releases in github, mit Windows, linux und MacOS Executables (windows sogar installer) und changelog message als Release message

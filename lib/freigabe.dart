@@ -120,17 +120,24 @@ class FreigabeAnfrage {
   bool get offen => !_antwort.isCompleted;
 }
 
+class _AbbruchStand {
+  _AbbruchStand(this.signal) {
+    signal.then((_) => abgebrochen = true);
+  }
+  final Future<void> signal;
+  bool abgebrochen = false;
+}
+
 class Freigaben extends ChangeNotifier {
   Freigaben(this.protokoll,
-      {this.frist = fristVorgabe, this.stufe = Bestaetigungen.vorgabe, this.testmodus = false});
+      {this.frist = fristVorgabe, this.stufe = Bestaetigungen.vorgabe});
 
-  /// Testmodus (Debug-Bau mit ausdrücklich profil- und adressgebundenem Testzugang):
-  /// Jede Anfrage ohne Bilder gilt als erteilt, damit eine KI-Sitzung gegen die
-  /// Testinstanz durchspielen kann. Bilder (E18) bleiben Handarbeit: Was aus
-  /// dem Kurs an die KI geht, entscheidet immer ein Mensch. Das Protokoll hält
-  /// jede übergangene Freigabe fest (A4). Im Release-Bau ist der Testmodus nie
-  /// an, weil der Zugang aus der Datei dort nicht gilt.
-  bool testmodus;
+  static const _testfreigabe = #begrenzteTestfreigabe;
+  int testfreigaben = 0;
+
+  /// Nur der gebundene Testablauf darf seine eigenen Anfragen automatisch freigeben.
+  Future<T> imTest<T>(Future<T> Function() f, {required Future<bool> Function() pruefen}) =>
+      runZoned(f, zoneValues: {_testfreigabe: kDebugMode ? (freigaben: this, pruefen: pruefen) : null});
 
   /// Kürzer als das Zeitlimit, das die App in Bionic einträgt
   /// (`bionicZeitlimit`, einrichtung.dart).
@@ -167,7 +174,7 @@ class Freigaben extends ChangeNotifier {
   /// Führt [f] so aus, dass seine Freigaben verfallen, sobald sich [abbruch]
   /// erfüllt: Dann wartet der Client nicht mehr auf das Ergebnis.
   static Future<T> mitAbbruch<T>(Future<void> abbruch, Future<T> Function() f) =>
-      runZoned(f, zoneValues: {_abbruch: abbruch});
+      runZoned(f, zoneValues: {_abbruch: _AbbruchStand(abbruch)});
 
   /// Ob [a] bei der eingestellten Stufe überhaupt gefragt wird.
   bool fragt(FreigabeAnfrage a) => stufe.index >= a.ab.index;
@@ -191,10 +198,24 @@ class Freigaben extends ChangeNotifier {
   /// Solange ein Freigabedialog offen ist, sperrt er die Titelzeile mit dem
   /// Feld für die Stufe, und ohne offenen Dialog wartet keine Anfrage.
   Future<bool> anfragen(FreigabeAnfrage a) async {
-    if (testmodus && a.bilder.isEmpty) {
-      protokoll.eintrag(Art.schreiben, 'Testmodus, automatisch freigegeben: ${a.titel}');
-      a._antwort.complete(true);
+    final abbruch = Zone.current[_abbruch] as _AbbruchStand?;
+    bool abgebrochen() {
+      if (abbruch?.abgebrochen != true) return false;
+      protokoll.eintrag(Art.info, 'Die KI wartet nicht mehr -- nicht gespeichert');
+      a._antwort.complete(false);
       return true;
+    }
+    if (abgebrochen()) return false;
+    final test = Zone.current[_testfreigabe] as ({Freigaben freigaben, Future<bool> Function() pruefen})?;
+    if (kDebugMode && test != null && identical(test.freigaben, this)) {
+      final erlaubt = await test.pruefen();
+      if (abgebrochen()) return false;
+      if (erlaubt) {
+        testfreigaben++;
+        protokoll.eintrag(Art.schreiben, 'Testmodus, automatisch freigegeben: ${a.titel}');
+        a._antwort.complete(true);
+        return true;
+      }
     }
     if (!fragt(a)) {
       ausgelassen++;
@@ -206,7 +227,7 @@ class Freigaben extends ChangeNotifier {
     // Die Frist hängt an einem eigenen Timer, nicht am Warten auf die Antwort:
     // So läuft sie sicher ab, auch wenn niemand den Dialog sieht.
     final uhr = Timer(frist, () => _verfallen(a, 'Frist abgelaufen'));
-    (Zone.current[_abbruch] as Future<void>?)?.then((_) => _verfallen(a, 'Die KI wartet nicht mehr'));
+    abbruch?.signal.then((_) => _verfallen(a, 'Die KI wartet nicht mehr'));
     if (_aktuell == null) {
       _oeffnen(a);
     } else {

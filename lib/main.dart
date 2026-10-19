@@ -17,6 +17,8 @@ import 'package:path/path.dart' as p;
 import 'package:window_manager/window_manager.dart';
 
 import 'anmeldedaten.dart';
+import 'anmeldung.dart';
+import 'testzugang.dart';
 import 'arbeitsordner.dart';
 import 'einrichtung.dart';
 import 'einrichtung_dialog.dart';
@@ -36,6 +38,8 @@ import 'protokoll.dart';
 import 'ueber.dart';
 import 'update/update.dart';
 import 'update/update_dialoge.dart';
+
+export 'anmeldung.dart' show Instanz, AnmeldeAuftrag, gespeicherteAnmeldedatenVerwenden;
 
 Future<void> main(List<String> argumente) async {
   // Keine Ausgabe auf die Konsole, von niemandem: debugPrint schweigt -- auch
@@ -157,52 +161,12 @@ Instanz _instanzFuer(
   final freigaben = Freigaben(
     ansicht,
     stufe: pr.bestaetigungen,
-    testmodus: Anmeldedaten.testzugangAktivFuer(pr),
   );
   return Instanz(
     zugang,
     freigaben,
     McpDienst(einstellungen, zugang, ansicht, freigaben, ordner, profil: pr),
   );
-}
-
-/// Ein Profil zur Laufzeit: Zugang, Freigaben und MCP-Server (E31).
-class Instanz {
-  const Instanz(this.moodle, this.freigaben, this.dienst);
-  final MoodleZugang moodle;
-  final Freigaben freigaben;
-  final McpDienst dienst;
-}
-
-/// Eingaben einer Anmeldung, festgehalten bevor sie asynchron beginnt.
-class AnmeldeAuftrag {
-  const AnmeldeAuftrag({
-    required this.instanz,
-    required this.profil,
-    required this.adresse,
-    required this.benutzer,
-    required this.passwort,
-    required this.merken,
-  });
-  final Instanz instanz;
-  final Profil profil;
-  final String adresse;
-  final String benutzer;
-  final String passwort;
-  final bool merken;
-}
-
-/// Gibt gespeicherte Zugangsdaten nur zurück, wenn das Profil nach dem Laden
-/// noch ausgewählt ist.
-Future<Anmeldedaten?> gespeicherteAnmeldedatenVerwenden({
-  required Future<Anmeldedaten> Function() laden,
-  required bool Function() zielIstAktiv,
-  required void Function(Anmeldedaten) anwenden,
-}) async {
-  final daten = await laden();
-  if (!zielIstAktiv()) return null;
-  anwenden(daten);
-  return daten;
 }
 
 /// Aufruf durch die Deinstallation (installer/moocp.nsi): die
@@ -509,7 +473,10 @@ class _HauptseiteState extends State<Hauptseite> with WindowListener {
     if (!await _einrichtungPruefen()) return;
     if (!mounted) return;
     setState(() => _eingerichtet = true);
-    await _gespeichertAnmelden();
+    await testprofileStarten(_instanzen, widget.protokoll);
+    if (mounted && Testzugang.fuer(_profil) == null) {
+      await _gespeichertAnmelden();
+    }
   }
 
   /// Ohne Version keine Update-Prüfung: Was sich mit nichts vergleichen
@@ -987,7 +954,6 @@ class _HauptseiteState extends State<Hauptseite> with WindowListener {
       }
       profile[index] = geaendert;
       laufend.dienst.profil = geaendert;
-      laufend.freigaben.testmodus = Anmeldedaten.testzugangAktivFuer(geaendert);
     }
     widget.einstellungen.profile = profile;
     try {
@@ -1046,15 +1012,11 @@ class _HauptseiteState extends State<Hauptseite> with WindowListener {
     );
     final moodle = auftrag.instanz.moodle;
     final dienst = auftrag.instanz.dienst;
-    final freigaben = auftrag.instanz.freigaben;
     final profil = auftrag.profil;
     final adresse = auftrag.adresse;
     final benutzer = auftrag.benutzer;
     final passwort = auftrag.passwort;
     final merken = auftrag.merken;
-    freigaben.testmodus = Anmeldedaten.testzugangAktivFuer(
-      profil.copyWith(adresse: adresse),
-    );
     setState(() {
       _beschaeftigt = true;
       _meldung = null;

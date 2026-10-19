@@ -993,7 +993,11 @@ Future<_Aenderung?> _vorbereiten(
 /// Schreibt eine freigegebene Änderung -- mit frischem Formular, denn die
 /// Freigabe kann gedauert haben; der Stand wird dabei noch einmal geprüft --
 /// und liest zurück. Gibt den Bericht und das Ergebnis der Rückleseprobe.
-Future<(String, bool)> _schreiben(MoodleZugang moodle, _Aenderung a, String arbeitsordner) async {
+Future<(String, bool)> _schreiben(MoodleZugang moodle, _Aenderung a, String arbeitsordner) =>
+    ordnerSperre(ordnerSchluessel(a.ziel, arbeitsordner),
+      () => _schreibenOhneSperre(moodle, a, arbeitsordner));
+
+Future<(String, bool)> _schreibenOhneSperre(MoodleZugang moodle, _Aenderung a, String arbeitsordner) async {
   final alt = felderIn(a.stand);
   Future<(Map<String, String>, List<Gesetzt>, Antwort)> schreiben() async {
     final f = await formularHolen(moodle, a.ziel.adresse);
@@ -1026,7 +1030,7 @@ Future<(String, bool)> _schreiben(MoodleZugang moodle, _Aenderung a, String arbe
     final neueId = int.tryParse(moodle.umleitungsziel(antwort)?.queryParameters['lastchanged'] ?? '');
     if (neueId != null) zurueck = Formularziel.frage(a.ziel.cmid!, neueId);
   }
-  final g = await formularLesen(moodle, zurueck, arbeitsordner);
+  final g = await formularLesenOhneSperre(moodle, zurueck, arbeitsordner);
   final probe = await zuruecklesen(g,
       felder: geschrieben,
       dateien: a.dateien,
@@ -1085,7 +1089,7 @@ Future<String> _aendernOhneSperre(
     return 'Nicht gespeichert: Die Änderung wurde in der App abgelehnt oder nicht innerhalb von '
         '${freigaben.frist.inMinutes} Minuten freigegeben. Der Ordner ist unverändert.';
   }
-  return (await _schreiben(moodle, a, arbeitsordner)).$1;
+  return (await _schreibenOhneSperre(moodle, a, arbeitsordner)).$1;
 }
 
 /// Schreibt mehrere gelesene Ordner eines Abschnitts mit EINER Freigabe
