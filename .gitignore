@@ -53,6 +53,9 @@ failures/
 # Fertige Installer (create_installer.bat)
 /installer/*.exe
 
+# Lokale Codex-Entwicklungseinstellungen
+.codex/config.toml
+
 # Skill-Pakete sind Bauergebnis von skills/build.py, je nach Profil andere
 # (README, „Profile"). Der Ordner selbst muss bleiben: pubspec.yaml nennt ihn.
 /skills/dist/*.skill
