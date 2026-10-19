@@ -778,6 +778,9 @@ Future<String> _gegenlesen(
       : alleVerborgen
           ? 'Neu im Kurs: $liste.'
           : 'Neu im Kurs: $liste. Nicht alle sind verborgen; bitte prüfen.';
+  // Verglichen wird hier nie Text mit Adressen: Aktivitäten nach Typ und Titel, Anhänge nach
+  // Inhalt (SHA-1), Fragen nach Name. Instanzadressen (Quell- und Zieldomain) spielen keine
+  // Rolle. Ein Feldvergleich schreibbarer Typen müsste sie normalisieren (TODO.md).
   // Fragenvergleich (Issue #20) nach dem Wiederherstellen: je Quiz aus dem Archiv, zugeordnet
   // über den Titel (bei genau einem Quiz auf beiden Seiten auch ohne). Was sich nicht
   // eindeutig zuordnen lässt, ist je Quiz eine Prüflücke, nie Gleichheit.
