@@ -14,9 +14,9 @@
 // Die Prüfung repariert nichts. Eine Reparatur über aktivitaet_aendern wäre ein
 // eigener Schritt mit Freigabe und hier nicht enthalten.
 //
-// Lücke: Dateien, die nur im Dateimanager einer Aktivität liegen (etwa mod_resource),
-// erscheinen nicht im Formular als Verweis. Sie gelten darum als nicht verifiziert
-// („fehlend"), bis eine erlaubte Leseseite dafür in der Positivliste steht.
+// Lücke: Dateien, die nur im Dateimanager einer Aktivität liegen (mod_resource,
+// mod_folder), erscheinen nicht im Formular als Verweis. Sie sind eine Prüflücke („nicht
+// lesbar"), kein Fehlbefund, bis eine erlaubte Leseseite dafür in der Positivliste steht.
 
 import 'dart:convert';
 import 'dart:io';
@@ -32,7 +32,11 @@ import 'sicherung.dart';
 import 'wiederherstellung_regeln.dart' show WiederhergestellteAktivitaet;
 
 /// Eine Datei der Quellaufnahme.
-typedef QuellDatei = ({String name, String sha1});
+///
+/// [dateimanager]: Die Datei liegt im Dateimanager der Aktivität (Datei, Verzeichnis), nicht
+/// als Verweis im Text. Das Bearbeitungsformular zeigt sie nicht als Verweis; ihr Fehlen
+/// dort belegt darum nichts.
+typedef QuellDatei = ({String name, String sha1, bool dateimanager});
 
 /// Ein abgerufener Verweis aus dem Formular. [status] null: keine Antwort (Netzfehler).
 /// [sha1] nur bei HTTP 200.
@@ -100,7 +104,12 @@ List<QuellDatei>? quelldateienAus(Uint8List mbz, {required String modul, require
       if ((_text(f, 'component') ?? '').startsWith('user')) continue; // A1: Nutzerdateien nie
       final name = _text(f, 'filename') ?? '';
       if (name.isEmpty || name == '.') continue; // Verzeichniseinträge
-      liste.add((name: name, sha1: _text(f, 'contenthash') ?? ''));
+      final komponente = _text(f, 'component') ?? '';
+      liste.add((
+        name: name,
+        sha1: _text(f, 'contenthash') ?? '',
+        dateimanager: komponente == 'mod_resource' || komponente == 'mod_folder',
+      ));
     }
     return liste;
   } on XmlException {
@@ -175,6 +184,7 @@ AnhangPruefung vergleicheAnhaenge({required List<QuellDatei>? quelle, required L
   }
 
   final namen = <String, Set<String>>{};
+  final imManager = <String>{for (final q in quelle) if (q.dateimanager) q.name};
   for (final q in quelle) {
     namen.putIfAbsent(q.name, () => {}).add(q.sha1);
   }
@@ -209,7 +219,9 @@ AnhangPruefung vergleicheAnhaenge({required List<QuellDatei>? quelle, required L
   }
   for (final name in namen.keys) {
     if (!gelesen.contains(name) && !ziel.any((z) => z.name == name)) {
-      befunde.add('„$name": fehlend im Ziel');
+      befunde.add(imManager.contains(name)
+          ? 'Prüflücke: „$name" liegt im Dateimanager und ist nicht lesbar'
+          : '„$name": fehlend im Ziel');
     }
   }
   return AnhangPruefung(befunde, vollstaendig: befunde.isEmpty);

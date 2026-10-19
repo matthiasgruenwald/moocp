@@ -117,7 +117,19 @@ void main() {
 
       final dateien = quelldateienAus(mbz, modul: 'page', titel: 'Infoblatt');
 
-      expect(dateien, [(name: 'bild.png', sha1: _sha(bild))]);
+      expect(dateien, [(name: 'bild.png', sha1: _sha(bild), dateimanager: false)]);
+    });
+
+    test('Dateien einer Datei-Aktivität liegen im Dateimanager', () {
+      final mbz = _mbz({
+        'moodle_backup.xml': utf8.encode('<moodle_backup><activities><activity><modulename>resource</modulename>'
+            '<title>Blatt</title><directory>activities/resource_3</directory></activity></activities></moodle_backup>'),
+        'activities/resource_3/inforef.xml': utf8.encode('<inforef><fileref><file><id>1</id></file></fileref></inforef>'),
+        'files.xml': utf8.encode('<files><file><id>1</id><contenthash>abc</contenthash><filename>blatt.pdf</filename>'
+            '<component>mod_resource</component><filearea>content</filearea></file></files>'),
+      });
+      expect(quelldateienAus(mbz, modul: 'resource', titel: 'Blatt'),
+          [(name: 'blatt.pdf', sha1: 'abc', dateimanager: true)]);
     });
 
     test('fehlende Quellaufnahme ist null, nicht leer', () {
@@ -148,13 +160,23 @@ void main() {
   });
 
   group('Vergleich', () {
-    const quelle = [(name: 'bild.png', sha1: 'aaa')];
+    const quelle = [(name: 'bild.png', sha1: 'aaa', dateimanager: false)];
     ZielAbruf ok(String name, String sha) => (name: name, entwurf: false, status: 200, sha1: sha);
 
     test('identische Datei: vollständig, nichts zu melden', () {
       final p = vergleicheAnhaenge(quelle: quelle, ziel: [ok('bild.png', 'aaa')]);
       expect(p.vollstaendig, isTrue);
       expect(p.befunde, isEmpty);
+    });
+
+    test('Datei im Dateimanager ist nicht lesbar: Prüflücke, kein „fehlend im Ziel"', () {
+      final p = vergleicheAnhaenge(
+          quelle: [(name: 'blatt.pdf', sha1: 'bbb', dateimanager: true)], ziel: []);
+      expect(p.vollstaendig, isFalse);
+      expect(p.text, contains('Prüflücke'));
+      expect(p.text, contains('blatt.pdf'));
+      expect(p.text, contains('nicht lesbar'));
+      expect(p.text, isNot(contains('fehlend')));
     });
 
     test('fehlende Datei: nicht vollständig', () {
