@@ -583,7 +583,7 @@ Future<String> _warten(
       }
       final fortschritt = fortschrittswert(antwort, restoreid);
       final jetzige = jetzt();
-      if (fortschritt != vg.fortschritt) {
+      if (fortschrittNeuBeobachtet(vg.fortschritt, fortschritt, vg.fortschrittSeit)) {
         await vorgaenge.aktualisieren(vg, fortschritt: fortschritt, fortschrittSeit: jetzige);
       }
       if (erster && istStillstand(jetzige, vg.fortschrittSeit)) {

@@ -358,6 +358,11 @@ const Duration stillstandsFrist = Duration(minutes: 15);
 bool istStillstand(DateTime jetzt, DateTime? seit) =>
     seit != null && jetzt.difference(seit) >= stillstandsFrist;
 
+/// Muss der Zeitpunkt der letzten Beobachtung neu gesetzt werden: bei geändertem Wert
+/// und bei der ersten Beobachtung, auch ohne Fortschrittswert (null, und war schon null).
+/// Sonst bliebe [seit] leer und ein Stillstand würde nie erkannt.
+bool fortschrittNeuBeobachtet(double? alt, double? neu, DateTime? seit) => neu != alt || seit == null;
+
 /// Der Hinweistext bei Stillstand (Ticket #18). Feste Worte und Kennzahlen, keine
 /// Moodle-Inhalte. Stillstand ist keine Aussage über Erfolg oder Fehler: Die letzte
 /// Abfrage nannte weder Ende noch Fehler (oder die Angaben fehlten), und ob der

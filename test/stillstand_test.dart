@@ -206,6 +206,14 @@ void main() {
     expect(text, contains('nicht ausgeschlossen'));
   });
 
+  test('erste Beobachtung setzt den Zeitpunkt auch ohne Fortschrittswert', () {
+    final t = DateTime(2026, 10, 18, 10);
+    expect(fortschrittNeuBeobachtet(null, null, null), isTrue);
+    expect(fortschrittNeuBeobachtet(null, null, t), isFalse);
+    expect(fortschrittNeuBeobachtet(0.5, 0.5, t), isFalse);
+    expect(fortschrittNeuBeobachtet(0.5, 0.6, t), isTrue);
+  });
+
   test('Frist und Fortschrittswert: Wert wird aus der Moodle-Antwort gelesen, Frist ist 15 Minuten', () {
     expect(stillstandsFrist, const Duration(minutes: 15));
     expect(fortschrittswert([_fortschritt(0.25)], 'b-1'), 0.25);
