@@ -333,8 +333,9 @@ Future<String> hochladen(
     Anhang('repo_upload_file', name, bytes, mimeTyp(name)),
   );
   final j = jsonDecode(a.text) as Map<String, dynamic>;
-  if (j['error'] != null)
+  if (j['error'] != null) {
     throw MoodleFehler('Upload von $name abgelehnt: ${j['error']}');
+  }
   final url = j['url'] as String?;
   if (url == null || dateiname(url) != name) {
     throw MoodleFehler(
@@ -374,8 +375,9 @@ Future<String> feldSetzen(
   bool leer = false,
 }) async {
   final itemid = wertIn(f.felder, '$feld[itemid]');
-  if (itemid == null)
+  if (itemid == null) {
     throw MoodleFehler('Feld $feld hat keinen Entwurfsbereich.');
+  }
   final adresse = <String, String>{
     for (final m in attrMuster.allMatches(f.text(feld) ?? ''))
       if (m.group(3)!.contains('/draftfile.php/'))
@@ -499,10 +501,11 @@ Future<Antwort> absenden(
       )
       .whereType<dom.Element>()
       .firstOrNull;
-  if (knopf != null)
+  if (knopf != null) {
     felder.add(
       MapEntry(knopf.attributes['name']!, knopf.attributes['value'] ?? ''),
     );
+  }
   final antwort = await moodle.senden(f.aktion, felder);
   if (moodle.umleitungsziel(antwort) != null) return antwort;
   final d = html_parser.parse(antwort.text);
@@ -581,11 +584,12 @@ Future<Probe> zuruecklesen(
   String? name,
 }) async {
   final probe = Probe();
-  if (name != null)
+  if (name != null) {
     probe.pruefe(
       nameNormal(g.name ?? '') == nameNormal(name),
       'Name (gelesen „${g.name}")',
     );
+  }
   for (final e in felder.entries) {
     final gelesen =
         g.felder.where((x) => x.feld == e.key).firstOrNull?.html ?? '';
@@ -658,8 +662,9 @@ String wichtigeText(FormularGelesen g) {
   Map<String, List<int>> dateien,
 })
 quelleLesen(String? quelle, {required String kopf}) {
-  if (quelle == null)
+  if (quelle == null) {
     return (felder: const {}, bereiche: const {}, dateien: const {});
+  }
   final felder = felderIn(quelle);
   formelnPruefen(felder);
   skripteImTextPruefen(felder);
@@ -1098,8 +1103,9 @@ Future<_Aenderung?> _vorbereiten(
   // In einer Frage gibt es keine Elemente; dort zeichnet STACK.
   final istFrage = ziel.art == Zielart.frage;
   skripteImTextPruefen(lokal, alt: alt, elementeErlaubt: !istFrage);
-  if (!istFrage)
+  if (!istFrage) {
     elementeVorbereiten(quelle, lokal, elementKopfFuer(moodle), stand: stand);
+  }
   final neu = <String>{}, geaendert = <String>{};
   final dateien = <String, List<int>>{};
   for (final n in namen) {
@@ -1126,8 +1132,9 @@ Future<_Aenderung?> _vorbereiten(
   formelnPruefen({for (final k in zuSchreiben) k: lokal[k]!});
   // In einer Frage wirken STACK-Blöcke; nichts davon darf von außen laden
   // (stack_skripte.dart).
-  if (istFrage)
+  if (istFrage) {
     stackSkriptePruefen({for (final k in zuSchreiben) k: lokal[k]!});
+  }
   final nichtMehr = {
     for (final h in alt.values) ...eingebunden(h),
   }.difference(namen).toList()..sort();
@@ -1161,8 +1168,9 @@ Future<_Aenderung?> _vorbereiten(
   if (zuSchreiben.isEmpty &&
       bereiche.isEmpty &&
       einstellungen.isEmpty &&
-      !neuSpeichern)
+      !neuSpeichern) {
     return null;
+  }
 
   // Prüfen, bevor gefragt wird -- und die Einstellungen probehalber setzen:
   // Unbekanntes fällt hier auf, nicht erst nach der Freigabe.
@@ -1195,10 +1203,11 @@ Future<_Aenderung?> _vorbereiten(
     }
   }
   if (neu.isNotEmpty) einzelheiten.add('Neue Dateien: ${neu.join(", ")}');
-  if (geaendert.isNotEmpty)
+  if (geaendert.isNotEmpty) {
     einzelheiten.add(
       'Geänderte Dateien (werden ersetzt): ${geaendert.join(", ")}',
     );
+  }
   // Ein Element ist Code, der bei jedem Betrachter läuft: Die Freigabe zeigt
   // seine Zeilen wie die einer Seite, nicht nur den Namen.
   for (final n in [...geaendert, ...neu].where(istElementdatei)) {
@@ -1246,8 +1255,9 @@ Future<_Aenderung?> _vorbereiten(
       'Unverändert neu speichern (Moodle prüft dabei, was es nur im Formular prüft).',
     );
   }
-  if (ziel.art == Zielart.frage)
+  if (ziel.art == Zielart.frage) {
     einzelheiten.add('Moodle legt dafür eine neue Version der Frage an.');
+  }
 
   return _Aenderung(
     ordner: ordner,
@@ -1392,8 +1402,9 @@ Future<String> _aendernOhneSperre(
     einstellungen: einstellungen,
     neuSpeichern: neuSpeichern,
   );
-  if (a == null)
+  if (a == null) {
     return 'Keine Änderung gegenüber dem Stand beim Lesen -- nichts geschrieben.';
+  }
 
   final ja = await freigaben.anfragen(
     FreigabeAnfrage(
@@ -1456,8 +1467,9 @@ Future<String> aendernMehrere(
         'Fragen einzeln mit aendern. $nichts',
       );
     }
-    if (!ziele.add(ziel.adresse))
+    if (!ziele.add(ziel.adresse)) {
       throw MoodleFehler('$o steht doppelt in der Liste. $nichts');
+    }
     final _Aenderung? a;
     try {
       a = await _vorbereiten(moodle, ordner: o, arbeitsordner: arbeitsordner);
@@ -1470,8 +1482,9 @@ Future<String> aendernMehrere(
       alle.add(a);
     }
   }
-  if (alle.isEmpty)
+  if (alle.isEmpty) {
     return 'Keine Änderung gegenüber dem Stand beim Lesen -- nichts geschrieben.';
+  }
 
   // Ein Kurs, ein Abschnitt. Ein Unterabschnitt gehört zu seinem Abschnitt.
   final kurse = {for (final a in alle) a.vorab.kurs};
@@ -1541,9 +1554,10 @@ Future<String> aendernMehrere(
     try {
       final (text, ok) = await _schreiben(moodle, a, arbeitsordner);
       berichte.add(text);
-      if (!ok)
+      if (!ok) {
         abbruch =
             '${a.kopf(mitKurs: false)} ist gespeichert, aber die Rückleseprobe weicht ab (oben).';
+      }
     } on MoodleFehler catch (x) {
       abbruch = '${a.kopf(mitKurs: false)}: ${x.meldung}';
     } catch (x, st) {

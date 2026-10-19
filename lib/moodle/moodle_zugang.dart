@@ -130,8 +130,9 @@ bool druckaufbereitungErkannt(String html) => html.contains('ab-print-root');
 String? themeStylesheetIn(dom.Document doc) {
   for (final l in doc.querySelectorAll('link[rel="stylesheet"]')) {
     final u = Uri.tryParse(l.attributes['href'] ?? '');
-    if (u != null && u.path.startsWith('/theme/styles.php/'))
+    if (u != null && u.path.startsWith('/theme/styles.php/')) {
       return u.hasQuery ? '${u.path}?${u.query}' : u.path;
+    }
   }
   return null;
 }
@@ -1175,8 +1176,9 @@ class MoodleZugang {
     for (final e in positivliste) {
       if (e.methode != methode || !RegExp(e.pfad).hasMatch(uri.path)) continue;
       if (e.parameter != null && !e.parameter!(uri.queryParameters)) continue;
-      if (e.formular != null && (formular == null || !e.formular!(formular)))
+      if (e.formular != null && (formular == null || !e.formular!(formular))) {
         continue;
+      }
       if ((e.anhang == null) != (anhang == null)) continue;
       if (e.anhang != null && !e.anhang!(anhang!)) continue;
       if ((e.inhalt == null) != (rumpf == null)) continue;
@@ -1284,8 +1286,9 @@ class MoodleZugang {
     _angemeldet = false;
     _druckaufbereitung = false;
     _themeStylesheet = null;
-    if (!stillschweigend)
+    if (!stillschweigend) {
       protokoll.eintrag(Art.anmeldung, 'Abgemeldet, Zugangsdaten verworfen');
+    }
   }
 
   /// Nur zum Testen der Neuanmeldung: vergisst die Sitzung, behält aber die
@@ -1504,8 +1507,9 @@ class MoodleZugang {
           : j is Map && j['error'] != null
           ? j
           : null;
-      if (fehler == null && j is List && j.isNotEmpty)
+      if (fehler == null && j is List && j.isNotEmpty) {
         return (j.first as Map)['data'];
+      }
       final code = '${fehler?['errorcode'] ?? ''}';
       if (versuch == 0 &&
           const {
@@ -1574,8 +1578,9 @@ class MoodleZugang {
     _pruefeAngemeldet();
     final uri = _adresse(pfadMitQuery);
     _pruefePositivliste('GET', uri, null, null);
-    if (await ziel.exists())
+    if (await ziel.exists()) {
       throw MoodleFehler('Zieldatei existiert schon; nichts überschrieben.');
+    }
     final teil = File('${ziel.path}.teil');
     final client = HttpClient()
       ..userAgent = 'moocp (lokal)'
@@ -1591,8 +1596,9 @@ class MoodleZugang {
         Art.moodle,
         'GET ${uri.path}${_querySicher(uri)} → ${res.statusCode}',
       );
-      if (res.statusCode != 200)
+      if (res.statusCode != 200) {
         throw MoodleFehler('Download abgelehnt (HTTP ${res.statusCode}).');
+      }
       if (res.headers.contentType?.mimeType == 'text/html') {
         throw MoodleFehler(
           'Download liefert eine Seite statt einer Datei (Anmeldung abgelaufen?).',
@@ -1670,8 +1676,9 @@ class MoodleZugang {
       final ziel = _umleitung(r);
       if (ziel == null) return r;
       // Umleitung auf die Anmeldeseite: nicht folgen, Aufrufer entscheidet.
-      if (_istAnmeldeseite(ziel))
+      if (_istAnmeldeseite(ziel)) {
         return Antwort(r.status, ziel, Uint8List(0), null);
+      }
       uri = ziel;
     }
     throw MoodleFehler('Zu viele Umleitungen ab ${start.path}');

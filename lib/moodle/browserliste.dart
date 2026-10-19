@@ -196,8 +196,9 @@ bool veraendertBild(String grund, String? art) =>
   String? rumpf,
   String? mathjax,
 }) {
-  if (uri.scheme == 'data' || uri.scheme == 'blob')
+  if (uri.scheme == 'data' || uri.scheme == 'blob') {
     return (BrowserWeg.direkt, 'eingebettet');
+  }
   if (uri.host != basis.host || uri.scheme != 'https') {
     final a = uri.toString();
     if (!dokument &&
@@ -210,22 +211,27 @@ bool veraendertBild(String grund, String? art) =>
     return (BrowserWeg.gesperrt, 'fremder Rechner');
   }
   final regel = sperrregel(uri);
-  if (regel != null)
+  if (regel != null) {
     return (BrowserWeg.gesperrt, 'Datenschutz-Sperre (Regel $regel)');
+  }
   if (dokument) {
-    if (methode == 'GET' && elementDokument(uri))
+    if (methode == 'GET' && elementDokument(uri)) {
       return (BrowserWeg.ueberApp, 'Element');
+    }
     final a = ansichtErlaubt(uri);
-    if (methode != 'GET' || a == null)
+    if (methode != 'GET' || a == null) {
       return (BrowserWeg.gesperrt, 'keine erlaubte Ansicht');
+    }
     return seiten.contains(uri.toString())
         ? (BrowserWeg.ueberApp, a)
         : (BrowserWeg.gesperrt, 'nicht die aufgenommene Seite');
   }
-  if (methode == 'GET' && _statisch.hasMatch(uri.path))
+  if (methode == 'GET' && _statisch.hasMatch(uri.path)) {
     return (BrowserWeg.ueberApp, 'Datei');
-  if (methode == 'GET' && stackSkriptDatei(uri))
+  }
+  if (methode == 'GET' && stackSkriptDatei(uri)) {
     return (BrowserWeg.ueberApp, stackSkript);
+  }
   final dienst = RegExp(r'^/lib/ajax/service(-nologin)?\.php$')
       .hasMatch(uri.path);
   if (dienst &&
@@ -233,7 +239,8 @@ bool veraendertBild(String grund, String? art) =>
       browserDienste.contains(uri.queryParameters['info'])) {
     return (BrowserWeg.ueberApp, 'Dienst ${uri.queryParameters['info']}');
   }
-  if (dienst && methode == 'POST' && _nurBrowserDienste(rumpf))
+  if (dienst && methode == 'POST' && _nurBrowserDienste(rumpf)) {
     return (BrowserWeg.ueberApp, 'Dienst');
+  }
   return (BrowserWeg.gesperrt, nichtAufDerListe);
 }

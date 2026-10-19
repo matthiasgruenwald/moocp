@@ -653,8 +653,9 @@ Future<FormularGelesen> formularLesenOhneSperre(
       final u = Uri.tryParse(roh);
       if (u == null || u.host != basis.host) continue;
       if (!u.path.startsWith('/draftfile.php/') &&
-          !u.path.startsWith('/pluginfile.php/'))
+          !u.path.startsWith('/pluginfile.php/')) {
         continue;
+      }
       adressen.putIfAbsent(roh, () => <String>{}).add(f.feld);
     }
   }

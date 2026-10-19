@@ -137,8 +137,9 @@ class _Cdp {
       onDone: () {
         _zu = true;
         for (final c in _offen.values) {
-          if (!c.isCompleted)
+          if (!c.isCompleted) {
             c.completeError(MoodleFehler('Browser: Verbindung beendet.'));
+          }
         }
         _offen.clear();
       },
@@ -256,10 +257,11 @@ String grundPruefen(String? grund) {
       'Infoblatt 2 gesetzt werden".',
     );
   }
-  if (g.length > 200)
+  if (g.length > 200) {
     throw MoodleFehler(
       'Der Grund hat ${g.length} Zeichen, höchstens 200 -- ein Satz genügt.',
     );
+  }
   return g;
 }
 
@@ -599,8 +601,9 @@ Future<_Aufnahme> _aufnehmen(
     }
 
     final abo = cdp.ereignisse.listen((e) {
-      if (e['method'] == 'Page.loadEventFired' && !geladen.isCompleted)
+      if (e['method'] == 'Page.loadEventFired' && !geladen.isCompleted) {
         geladen.complete();
+      }
     });
     final aboNetz = netz.ereignisse.listen((e) {
       if (e['method'] == 'Fetch.requestPaused') {
@@ -684,10 +687,11 @@ Future<_Aufnahme> _aufnehmen(
         // Ohne Druckaufbereitung: der Inhalt mit den Druck-Stylesheets.
       }
       final b = jsonDecode(await _auswerten(cdp, _bereich(inhalt))) as Map?;
-      if (b == null)
+      if (b == null) {
         throw MoodleFehler(
           'Der Inhalt (${inhalt.$1}) ist auf der Seite nicht zu finden -- kein Bild.',
         );
+      }
       final x = (b['x'] as num).floorToDouble(),
           y = (b['y'] as num).floorToDouble();
       final w = (b['w'] as num).ceilToDouble(),
@@ -807,18 +811,20 @@ Future<void> _beenden(
   }
   if (await _profilLoeschen(profil, 10)) return;
   final n = await plattformBrowser.prozesseBeenden(profil, programm);
-  if (n != 0)
+  if (n != 0) {
     protokoll.eintrag(
       Art.info,
       'Browser hart beendet: ${n < 0 ? 'Zahl unbekannt' : '$n Prozess(e)'}',
     );
+  }
   // Der gestartete Prozess selbst, falls er noch läuft.
   if (await proz.exitCode.timeout(
         const Duration(seconds: 2),
         onTimeout: () => -1,
       ) ==
-      -1)
+      -1) {
     proz.kill();
+  }
   if (await _profilLoeschen(profil, 20)) return;
   protokoll.eintrag(
     Art.fehler,
@@ -832,8 +838,9 @@ Future<String> _auswerten(_Cdp cdp, String js) async {
     'awaitPromise': true,
     'returnByValue': true,
   });
-  if (r['exceptionDetails'] != null)
+  if (r['exceptionDetails'] != null) {
     throw MoodleFehler('Browser: Skript in der Seite gescheitert.');
+  }
   return '${(r['result'] as Map?)?['value']}';
 }
 
@@ -857,16 +864,18 @@ Future<String> bildschirmfoto(
   final String pfad, seite, ansicht;
   final int? kurs;
   if (frage != null) {
-    if (sammlung == null)
+    if (sammlung == null) {
       throw MoodleFehler(
         'Zur Frage gehört die Sammlung (cmid der Fragensammlung).',
       );
+    }
     // Der Druck nimmt den ganzen Inhaltsbereich (_aufnehmen), in der
     // Vorschau also auch Kommentare unter der Frage.
-    if (druck)
+    if (druck) {
       throw MoodleFehler(
         'Wie gedruckt gibt es Textseite, Buch und Wiki, keine Fragenvorschau.',
       );
+    }
     final f = await formularHolen(
       moodle,
       '/course/modedit.php?update=$sammlung',

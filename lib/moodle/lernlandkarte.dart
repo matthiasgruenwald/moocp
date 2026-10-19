@@ -57,21 +57,25 @@ Future<String> lernlandkarteVerknuepfungenSetzen(
   required String name,
   required List<Map<String, Object?>> zuordnungen,
 }) async {
-  if (zuordnungen.isEmpty)
+  if (zuordnungen.isEmpty) {
     throw MoodleFehler('Mindestens eine Ortszuordnung angeben.');
+  }
   final ziel = Formularziel.aktivitaet(cmid);
   final vorher = await formularHolen(moodle, ziel.adresse);
-  if (vorher.modul != 'learningmap')
+  if (vorher.modul != 'learningmap') {
     throw MoodleFehler('Die Aktivität ist keine Lernlandkarte.');
+  }
   nameBestaetigen(name, vorher.name, 'Lernlandkarte');
   final kurs = vorher.kurs;
-  if (kurs == null)
+  if (kurs == null) {
     throw MoodleFehler('Das Formular nennt keinen Kurs; nichts geändert.');
+  }
   final raw = wertIn(vorher.felder, 'placestore');
-  if (raw == null)
+  if (raw == null) {
     throw MoodleFehler(
       'Das Lernlandkarten-Formular enthält kein placestore-Feld.',
     );
+  }
   final daten = jsonDecode(raw);
   if (daten is! Map<String, dynamic> ||
       daten['places'] is! List ||
@@ -137,8 +141,9 @@ Future<String> lernlandkarteVerknuepfungenSetzen(
       vergleich: const [],
     ),
   );
-  if (!ja)
+  if (!ja) {
     return 'Nicht gespeichert: Die Ortszuordnung wurde nicht freigegeben.';
+  }
 
   final aktuell = await formularHolen(moodle, ziel.adresse);
   if (aktuell.modul != 'learningmap' ||

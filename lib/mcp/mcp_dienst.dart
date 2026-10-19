@@ -177,8 +177,9 @@ class McpDienst {
         .listen((zeile) {
           final n = jsonDecode(zeile);
           final c = n is Map ? antworten[n['id']] : null;
-          if (c != null && !c.isCompleted)
+          if (c != null && !c.isCompleted) {
             c.complete((n as Map).cast<String, dynamic>());
+          }
         });
     void senden(Map<String, Object?> n) =>
         hin.add(utf8.encode('${jsonEncode(n)}\n'));
@@ -236,11 +237,12 @@ class McpDienst {
     final req = anfrage as HttpRequest;
     final kopf = req.headers.value(HttpHeaders.authorizationHeader) ?? '';
     final ok = kopf == 'Bearer ${einstellungen.schluessel}';
-    if (!ok)
+    if (!ok) {
       protokoll.eintrag(
         Art.gesperrt,
         'MCP-Anfrage ohne gültigen Schlüssel abgewiesen',
       );
+    }
     return ok;
   }
 
@@ -411,8 +413,9 @@ class McpDienst {
           },
         );
       } on MoodleFehler catch (e) {
-        if (vid == null)
+        if (vid == null) {
           return ZielErgebnis(ZielStand.fehlgeschlagen, text: e.meldung);
+        }
         text = e.meldung;
       }
       final id = vid;
@@ -457,10 +460,11 @@ class McpDienst {
   Map<String, Object?> _einstellungen(Map<String, dynamic> a) {
     final e = a['einstellungen'];
     if (e == null) return const {};
-    if (e is! Map)
+    if (e is! Map) {
       throw MoodleFehler(
         'einstellungen muss ein Objekt {Schlüssel: Wert} sein.',
       );
+    }
     return e.cast<String, Object?>();
   }
 
@@ -790,8 +794,9 @@ class McpDienst {
       zerstoerend: true,
       ausfuehren: (a) async {
         final o = a['ordner'];
-        if (o is! List)
+        if (o is! List) {
           throw MoodleFehler('ordner muss eine Liste von Ordnern sein.');
+        }
         return aendernMehrere(
           moodle,
           freigaben,
@@ -834,8 +839,9 @@ class McpDienst {
       zerstoerend: true,
       ausfuehren: (a) async {
         final aus = a['auslassen'] ?? const [];
-        if (aus is! List || aus.any((x) => x is! num))
+        if (aus is! List || aus.any((x) => x is! num)) {
           throw MoodleFehler('auslassen muss eine Liste von cmids sein.');
+        }
         return linksSetzen(
           moodle,
           freigaben,
@@ -1591,10 +1597,11 @@ class McpDienst {
       zerstoerend: true,
       ausfuehren: (a) async {
         final r = a['reihenfolge'];
-        if (r is! List)
+        if (r is! List) {
           throw MoodleFehler(
             'reihenfolge muss eine Liste von Kapitel-ids sein.',
           );
+        }
         return buchOrdnen(
           moodle,
           freigaben,
@@ -1614,8 +1621,9 @@ class McpDienst {
       description: 'questionid (aus fragen_lesen)',
     );
     List<Map<String, Object?>> objekte(Object? x, String n) {
-      if (x is! List)
+      if (x is! List) {
         throw MoodleFehler('$n muss eine Liste von Objekten sein.');
+      }
       return [for (final e in x) (e as Map).cast<String, Object?>()];
     }
 
@@ -2513,12 +2521,14 @@ class McpDienst {
   /// Ein Kursbezug aus einer Werkzeugangabe {profil, kurs}; die Kennung des
   /// Profils kommt aus dem Servernamen, den die KI angibt.
   Kursbezug _kursbezugAus(Object? j, String feld) {
-    if (j is! Map)
+    if (j is! Map) {
       throw MoodleFehler('$feld muss ein Objekt {profil, kurs} sein.');
+    }
     final mcp = j['profil'];
     final kurs = j['kurs'];
-    if (mcp is! String || mcp.isEmpty)
+    if (mcp is! String || mcp.isEmpty) {
       throw MoodleFehler('$feld: profil fehlt (mcpName des Profils).');
+    }
     if (kurs is! num || kurs <= 0 || kurs != kurs.toInt()) {
       throw MoodleFehler('$feld: kurs muss eine Kurs-ID sein (Zahl).');
     }
