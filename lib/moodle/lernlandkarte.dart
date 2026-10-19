@@ -85,9 +85,19 @@ Future<String> lernlandkarteVerknuepfungenSetzen(
     );
   }
   final original = raw;
+  final lesestand = await formularLesen(moodle, ziel, arbeitsordner);
   final orte = (daten['places'] as List).whereType<Map>().toList();
   final ids = orte.map((o) => '${o['id'] ?? ''}').toList();
   final struktur = await kursLesen(moodle, kurs);
+  final kartenaktivitaet = struktur.nachCmid[cmid];
+  if (kartenaktivitaet == null ||
+      kartenaktivitaet.modul != 'learningmap' ||
+      kartenaktivitaet.name != vorher.name) {
+    throw MoodleFehler(
+      'Die Lernlandkarte stimmt nicht mehr mit der Kursübersicht überein; nichts geändert.',
+    );
+  }
+  final kursText = await kursBezeichnung(moodle, kurs);
   final gesehen = <String>{};
   for (final a in zuordnungen) {
     final ort = '${a['ort'] ?? ''}';
@@ -118,6 +128,33 @@ Future<String> lernlandkarteVerknuepfungenSetzen(
       }
     }
   }
+  String zielText(int? cmid) {
+    if (cmid == null) return 'ohne Verknüpfung';
+    final aktivitaet = struktur.nachCmid[cmid];
+    return aktivitaet == null
+        ? 'ungeklärtes Ziel cm $cmid'
+        : '„${aktivitaet.name}" (cmid $cmid)';
+  }
+
+  final zielstaende = <int, (String, String, int)>{};
+  final ungeklaerteAlteZiele = <int>{};
+  for (final a in zuordnungen) {
+    final alt = (a['aktuell'] as num?)?.toInt();
+    if (alt != null && alt != 0 && struktur.nachCmid[alt] == null) {
+      ungeklaerteAlteZiele.add(alt);
+    }
+    for (final wert in [a['aktuell'], a['ziel']]) {
+      final cmid = (wert as num?)?.toInt();
+      final aktivitaet = cmid == null ? null : struktur.nachCmid[cmid];
+      if (aktivitaet != null) {
+        zielstaende[cmid!] = (
+          aktivitaet.name,
+          aktivitaet.modul,
+          aktivitaet.abschnittId,
+        );
+      }
+    }
+  }
   final details = <String>[];
   for (final a in zuordnungen) {
     final ort = '${a['ort']}';
@@ -126,15 +163,14 @@ Future<String> lernlandkarteVerknuepfungenSetzen(
     final neuesZiel = (a['ziel'] as num?)?.toInt();
     final neu = neuesZiel == 0 ? null : neuesZiel;
     details.add(
-      'Ort $ort: ${aktuell == null ? 'ohne Verknüpfung' : 'cm $aktuell'} → '
-      '${neu == null ? 'ohne Verknüpfung' : 'cm $neu'}',
+      'Ort $ort: ${zielText(aktuell)} → ${zielText(neu)}',
     );
   }
   final ja = await freigaben.anfragen(
     FreigabeAnfrage(
       titel: 'Lernlandkarte ändern?',
       punkte: [
-        'Lernlandkarte „${vorher.name}" (cmid $cmid, Kurs $kurs)',
+        'Lernlandkarte „${vorher.name}" (cmid $cmid, $kursText)',
         ...details,
         'SVG, Wege, Ortsdarstellung und andere Kartendaten bleiben erhalten.',
       ],
@@ -146,10 +182,32 @@ Future<String> lernlandkarteVerknuepfungenSetzen(
   }
 
   final aktuell = await formularHolen(moodle, ziel.adresse);
+  final aktuelleStruktur = await kursLesen(moodle, kurs);
+  final aktuellerKursText = await kursBezeichnung(moodle, kurs);
+  final aktuelleKarte = aktuelleStruktur.nachCmid[cmid];
   if (aktuell.modul != 'learningmap' ||
       aktuell.name != vorher.name ||
       aktuell.kurs != kurs ||
-      wertIn(aktuell.felder, 'placestore') != original) {
+      aktuellerKursText != kursText ||
+      aktuelleKarte == null ||
+      aktuelleKarte.modul != kartenaktivitaet.modul ||
+      aktuelleKarte.name != kartenaktivitaet.name ||
+      aktuelleKarte.abschnittId != kartenaktivitaet.abschnittId ||
+      wertIn(aktuell.felder, 'placestore') != original ||
+      !_gleicheFormularFelder(vorher, aktuell) ||
+      zielstaende.entries.any((e) {
+        final jetzt = aktuelleStruktur.nachCmid[e.key];
+        return jetzt == null ||
+            (jetzt.name, jetzt.modul, jetzt.abschnittId) != e.value;
+      }) ||
+      ungeklaerteAlteZiele.any(
+        aktuelleStruktur.nachCmid.containsKey,
+      ) ||
+      zuordnungen.any((a) {
+        final cmid = (a['ziel'] as num?)?.toInt();
+        return cmid != null && cmid != 0 &&
+            aktuelleStruktur.nachCmid[cmid] == null;
+      })) {
     throw MoodleFehler(
       'Die Lernlandkarte wurde seit der Freigabe geändert. Nichts überschrieben; '
       'neu lesen und die Entscheidung erneut prüfen.',
@@ -169,9 +227,37 @@ Future<String> lernlandkarteVerknuepfungenSetzen(
   }
   setze(aktuell.felder, 'placestore', jsonEncode(store));
   await absenden(moodle, aktuell);
+  final rueckForm = await formularHolen(moodle, ziel.adresse);
   final gelesen = await formularLesen(moodle, ziel, arbeitsordner);
   final rueck = gelesen.lernlandkarte?['placestore'];
-  final verified =
+  final karteOk = gelesen.lernlandkarte?['svgcode'] ==
+          lesestand.lernlandkarte?['svgcode'] &&
       const JsonEncoder().convert(rueck) == const JsonEncoder().convert(store);
+  final formularOk = gelesen.name == vorher.name && gelesen.kurs == kurs &&
+      _gleicheFormularFelder(aktuell, rueckForm) &&
+      _gleicheFelder(lesestand, gelesen) &&
+      _gleicheEinstellungen(lesestand, gelesen);
+  final verified = karteOk && formularOk;
   return 'Lernlandkarte „${gelesen.name}" zurückgelesen; Ortszuordnungen verified: $verified.';
+}
+
+bool _gleicheFelder(FormularGelesen vorher, FormularGelesen nachher) {
+  final a = {for (final f in vorher.felder) f.feld: f.html};
+  final b = {for (final f in nachher.felder) f.feld: f.html};
+  return const JsonEncoder().convert(a) == const JsonEncoder().convert(b);
+}
+
+bool _gleicheFormularFelder(Formular vorher, Formular nachher) {
+  List<List<String>> stand(Formular f) => [
+    for (final e in f.felder)
+      if (e.key != 'sesskey') [e.key, e.value],
+  ];
+  return const JsonEncoder().convert(stand(vorher)) ==
+      const JsonEncoder().convert(stand(nachher));
+}
+
+bool _gleicheEinstellungen(FormularGelesen vorher, FormularGelesen nachher) {
+  final a = {for (final e in vorher.einstellungen) e.schluessel: e.wert};
+  final b = {for (final e in nachher.einstellungen) e.schluessel: e.wert};
+  return const JsonEncoder().convert(a) == const JsonEncoder().convert(b);
 }

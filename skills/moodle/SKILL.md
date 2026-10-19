@@ -406,7 +406,7 @@ diese Nummern gehören in deine Antwort an den Nutzer.
 - Meldet das Werkzeug, dass der Browser nicht steuerbar ist, gibt es auf diesem Rechner keine Bildschirmfotos. Weich nicht aus; die Lehrkraft sieht selbst nach.
 - Kleine Abweichungen sind keine Befunde: Schriften von fremden Servern (etwa Google Fonts) fehlen, dort steht eine Ersatzschrift, und Formeln wirken etwas kräftiger.
 
-Nur im ausdrücklich gebundenen Debug-Testbetrieb kann die App Bilder eigener verborgener ZZ-Textseiten in freigegebenen Testkursen automatisch freigeben. Das Werkzeug meldet diese Ausnahme ausdrücklich. Schalte sie nicht selbst ein und übertrage sie nicht auf andere Inhalte: Im normalen Betrieb bleibt jedes Bild persönlich freizugeben. Auch ein automatisch ausgegebenes PNG öffnest du selbst und vergleichst es mit dem zurückgelesenen Soll; eine ausgegebene Datei allein belegt keine Sichtprüfung.
+Nur im ausdrücklich gebundenen Debug-Testbetrieb kann die App Bilder eigener verborgener ZZ-Textseiten und ZZ-Lernlandkarten in freigegebenen Testkursen automatisch freigeben. Eine Lernlandkarte muss in derselben App-Sitzung angelegt und zurückgelesen worden sein; zusätzlich müssen Profilkennung, tatsächliche Instanzadresse und Kurs passen. Lernlandkarten-Bilder brauchen außerdem `screenshots: true`. Das Werkzeug meldet diese Ausnahme ausdrücklich. Schalte sie nicht selbst ein und übertrage sie nicht auf andere Inhalte: Im normalen Betrieb bleibt jedes Bild persönlich freizugeben. Auch ein automatisch ausgegebenes PNG öffnest du selbst und vergleichst es mit dem zurückgelesenen Soll; eine ausgegebene Datei allein belegt keine Sichtprüfung.
 <!-- >>> gemeinsam/bildschirmfoto.md -->
 
 ## Schritt 0: Orientierung

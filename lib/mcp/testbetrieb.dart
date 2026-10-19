@@ -11,7 +11,7 @@ import '../moodle/moodle_zugang.dart';
 import '../profil.dart';
 import '../testzugang.dart';
 
-typedef _Probe = ({int kurs, String name, String hash});
+typedef _Probe = ({int kurs, String name, String modul, String hash});
 
 class Testbetrieb {
   Testbetrieb(this.moodle, this.freigaben, this.arbeitsordner);
@@ -24,7 +24,11 @@ class Testbetrieb {
       .convert(
         utf8.encode(
           jsonEncode({
-            for (final e in f.editoren) e: normalisiert(f.text(e) ?? ''),
+            'felder': [
+              for (final e in f.felder)
+                if (!const {'sesskey', 'submitbutton', 'cancel'}.contains(e.key))
+                  [e.key, e.value],
+            ],
           }),
         ),
       )
@@ -32,12 +36,18 @@ class Testbetrieb {
 
   Future<_Probe?> _probe(int cmid) async {
     final f = await formularHolen(moodle, '/course/modedit.php?update=$cmid');
-    if (f.modul != 'page' || f.kurs == null || !f.name.startsWith('ZZ')) {
+    if (!const {'page', 'learningmap'}.contains(f.modul) ||
+        f.kurs == null ||
+        !f.name.startsWith('ZZ')) {
       return null;
     }
     final struktur = await kursLesen(moodle, f.kurs!);
-    if (struktur.nachCmid[cmid]?.sichtbar != false) return null;
-    return (kurs: f.kurs!, name: f.name, hash: _hash(f));
+    final aktivitaet = struktur.nachCmid[cmid];
+    if (aktivitaet?.sichtbar != false || aktivitaet?.modul != f.modul ||
+        aktivitaet?.name != f.name) {
+      return null;
+    }
+    return (kurs: f.kurs!, name: f.name, modul: f.modul!, hash: _hash(f));
   }
 
   bool _bindungPasst(Profil profil, Testzugang? zugang) =>
@@ -107,14 +117,19 @@ class Testbetrieb {
         args['kapitel'] == null &&
         args['wikiseite'] == null) {
       cmid = args['cmid'] as int?;
+    } else if (werkzeug == 'lernlandkarte_verknuepfungen_setzen') {
+      cmid = args['cmid'] as int?;
     }
     final eigene = _proben[cmid];
     if (cmid == null ||
         eigene == null ||
         !moodle.selbstAngelegt.contains(cmid) ||
         !zugang.kurse.contains(eigene.kurs) ||
-        (werkzeug == 'loeschen' &&
-            (args['kurs'] != eigene.kurs || args['name'] != eigene.name))) {
+        ((werkzeug == 'loeschen' &&
+                (args['kurs'] != eigene.kurs || args['name'] != eigene.name)) ||
+            (werkzeug == 'lernlandkarte_verknuepfungen_setzen' &&
+                (eigene.modul != 'learningmap' ||
+                    args['name'] != eigene.name)))) {
       return aufruf();
     }
     final frisch = await _probe(cmid);
@@ -126,7 +141,8 @@ class Testbetrieb {
     if (text.contains('verified: true')) {
       if (werkzeug == 'loeschen') {
         _proben.remove(cmid);
-      } else if (werkzeug == 'aendern') {
+      } else if (werkzeug == 'aendern' ||
+          werkzeug == 'lernlandkarte_verknuepfungen_setzen') {
         final probe = await _probe(cmid);
         if (probe != null && probe.kurs == eigene.kurs) _proben[cmid] = probe;
       }
