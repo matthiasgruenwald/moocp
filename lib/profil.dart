@@ -21,6 +21,7 @@
 import 'dart:math';
 
 import 'einstellungen_ort.dart';
+import 'freigabe.dart';
 
 /// Rolle eines Profils für die Übertragung von Kursen (Issue #5). Die Rolle
 /// ist eine lokale App-Einstellung; Moodle wird dadurch nicht geändert. Gespeichert
@@ -51,6 +52,7 @@ class Profil {
     required this.adresse,
     required this.port,
     required this.mcpName,
+    this.bestaetigungen = Bestaetigungen.vorgabe,
     this.rolle,
   });
 
@@ -74,6 +76,9 @@ class Profil {
   /// Umbenennen die Einrichtung in den Werkzeugen nicht still verstellt.
   final String mcpName;
 
+  /// Freigabestufe für Schreibvorgänge auf dieser Moodle-Instanz (E20, E31).
+  final Bestaetigungen bestaetigungen;
+
   /// Rolle in der Übertragung, null = keine. Wirkt nur auf die Richtung
   /// einer Übertragung, nie auf Rechte oder die Werkzeuge der Instanz.
   final Rolle? rolle;
@@ -83,12 +88,13 @@ class Profil {
   /// Ändert nur den Anzeigenamen, der Servername bleibt (siehe [mcpName]).
   /// Ohne [rolle] bleibt die Rolle; eine Rolle wegnehmen geht über
   /// [mitRolle] (Einstellungen.rolleSetzen).
-  Profil copyWith({String? name, String? adresse, Rolle? rolle, int? port}) => Profil(
+  Profil copyWith({String? name, String? adresse, String? mcpName, Rolle? rolle, int? port}) => Profil(
         kennung: kennung,
         name: name ?? this.name,
         adresse: adresse ?? this.adresse,
         port: port ?? this.port,
-        mcpName: mcpName,
+        mcpName: mcpName ?? this.mcpName,
+        bestaetigungen: bestaetigungen,
         rolle: rolle ?? this.rolle,
       );
 
@@ -99,7 +105,18 @@ class Profil {
         adresse: adresse,
         port: port,
         mcpName: mcpName,
+        bestaetigungen: bestaetigungen,
         rolle: neu,
+      );
+
+  Profil mitBestaetigungen(Bestaetigungen neu) => Profil(
+        kennung: kennung,
+        name: name,
+        adresse: adresse,
+        port: port,
+        mcpName: mcpName,
+        bestaetigungen: neu,
+        rolle: rolle,
       );
 
   Map<String, Object?> toJson() => {
@@ -108,6 +125,7 @@ class Profil {
         'adresse': adresse,
         'port': port,
         'mcpName': mcpName,
+        'bestaetigungen': bestaetigungen.text,
         if (rolle != null) 'rolle': rolle!.name,
       };
 
@@ -131,6 +149,7 @@ class Profil {
       adresse: adresse,
       port: port is int && port > 0 ? port : 0,
       mcpName: mcpName is String && mcpNameGueltig(mcpName) ? mcpName : mcpNameFuer(name, kennung),
+      bestaetigungen: Bestaetigungen.ausText(j['bestaetigungen'] as String?),
       rolle: Rolle.ausText(rolle),
     );
   }

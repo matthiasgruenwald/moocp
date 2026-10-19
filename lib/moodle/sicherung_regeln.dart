@@ -345,6 +345,57 @@ enum SicherungStand {
   }
 }
 
+/// Frist für den Stillstandshinweis (Ticket #18, Spec #17): so lange ohne neuen
+/// Fortschrittswert gilt ein laufender Vorgang als möglicherweise hängend. Die
+/// Lehrkraft hat 15 Minuten bestätigt. Ungemessen ist, wie lange Moodle für eine
+/// Sicherung oder Wiederherstellung braucht; 15 Minuten sind ein Vielfaches des
+/// 60-Sekunden-Zeitlimits des Werkzeugs und geben Cron oder einer Ad-hoc-Aufgabe
+/// Zeit, weiterzulaufen, bevor die Lehrkraft die Administration bittet zu prüfen.
+const Duration stillstandsFrist = Duration(minutes: 15);
+
+/// Gilt ein laufender Vorgang als Stillstand: seit [seit] kein neuer Fortschritt,
+/// mindestens [stillstandsFrist] lang. Ohne bekannten Zeitpunkt nie.
+bool istStillstand(DateTime jetzt, DateTime? seit) =>
+    seit != null && jetzt.difference(seit) >= stillstandsFrist;
+
+/// Muss der Zeitpunkt der letzten Beobachtung neu gesetzt werden: bei geändertem Wert
+/// und bei der ersten Beobachtung, auch ohne Fortschrittswert (null, und war schon null).
+/// Sonst bliebe [seit] leer und ein Stillstand würde nie erkannt.
+bool fortschrittNeuBeobachtet(double? alt, double? neu, DateTime? seit) => neu != alt || seit == null;
+
+/// Der Hinweistext bei Stillstand (Ticket #18). Feste Worte und Kennzahlen, keine
+/// Moodle-Inhalte. Stillstand ist keine Aussage über Erfolg oder Fehler: Die letzte
+/// Abfrage nannte weder Ende noch Fehler (oder die Angaben fehlten), und ob der
+/// Vorgang hängt, ist nicht belegt.
+String stillstandText({
+  required String nummer,
+  required String werkzeug,
+  required double? fortschritt,
+  required Duration seit,
+  required String ursachen,
+}) {
+  final prozent = fortschritt == null ? 'unbekannt' : '${(fortschritt * 100).round()} %';
+  return 'Stillstand (Nummer $nummer): Seit ${seit.inMinutes} Minuten kein neuer Fortschritt, '
+      'letzte Beobachtung $prozent. Die letzte Abfrage nannte kein Ende und keinen Fehler; ob der Vorgang '
+      'hängt, ist nicht belegt. Mögliche Ursachen: $ursachen '
+      'Mit $werkzeug später erneut prüfen.';
+}
+
+/// Der Fortschrittswert (0 bis 1) des Vorgangs [backupid] aus der Antwort, oder null.
+double? fortschrittswert(Object? antwort, String backupid) {
+  final p = _eintrag(antwort, backupid)?['progress'];
+  return p is num ? p.toDouble() : null;
+}
+
+Map? _eintrag(Object? antwort, String backupid) {
+  Map? eintrag;
+  final kandidaten = antwort is List ? antwort : [antwort];
+  for (final x in kandidaten) {
+    if (x is Map && '${x['backupid']}' == backupid) eintrag = x;
+  }
+  return eintrag;
+}
+
 /// Liest den Eintrag der Sicherung [backupid] aus der Antwort von
 /// core_backup_get_async_backup_progress.
 ///
@@ -354,11 +405,7 @@ enum SicherungStand {
 /// fehlgeschlagen. Alles andere, das nicht eindeutig läuft oder endet, ist
 /// unklar.
 SicherungStand bewerteFortschritt(Object? antwort, String backupid) {
-  Map? eintrag;
-  final kandidaten = antwort is List ? antwort : [antwort];
-  for (final x in kandidaten) {
-    if (x is Map && '${x['backupid']}' == backupid) eintrag = x;
-  }
+  final eintrag = _eintrag(antwort, backupid);
   if (eintrag == null) return SicherungStand.unklar;
   if (eintrag['error'] != null || eintrag['errorcode'] != null) return SicherungStand.fehlgeschlagen;
   final p = eintrag['progress'];
@@ -366,6 +413,26 @@ SicherungStand bewerteFortschritt(Object? antwort, String backupid) {
   if (p is num && s is num && p >= 1 && s == 1000) return SicherungStand.fertig;
   if (p is num && p < 1) return SicherungStand.laufend;
   return SicherungStand.unklar;
+}
+
+/// Ob Moodle den Vorgang als beendet mit Fehler führt (Status 800, `backup::STATUS_FINISHED_ERR`;
+/// ungemessen). Ein Fehlerfeld allein belegt das Ende nicht: Ohne diesen Status kann der
+/// Hintergrundauftrag noch laufen oder hängen.
+bool fehlerBeendet(Object? antwort, String backupid) {
+  final s = _eintrag(antwort, backupid)?['status'];
+  return s is num && s == 800;
+}
+
+/// Die Art des gemeldeten Fehlers, nur als kurzer Bezeichner (Fehlercode, sonst das Fehlerfeld,
+/// wenn es ein solcher ist). Freitext kann Inhalte tragen (E11) und wird nie übernommen.
+String fehlerArt(Object? antwort, String backupid) {
+  final eintrag = _eintrag(antwort, backupid);
+  final bezeichner = RegExp(r'^[A-Za-z0-9_.\-]{1,80}$');
+  for (final feld in ['errorcode', 'error']) {
+    final w = eintrag?[feld];
+    if (w is String && bezeichner.hasMatch(w)) return w;
+  }
+  return 'nicht benannt';
 }
 
 /// Die Downloadpfade (von /pluginfile.php an, mit Query) der Sicherung
@@ -418,3 +485,11 @@ String? zielOrdnerPruefen(String? ordner) {
   if (!teile.every((s) => RegExp(r'^[A-Za-z0-9_ äöüÄÖÜß-]+$').hasMatch(s))) return null;
   return teile.join('/');
 }
+
+/// Der Text, den ein Werkzeug bei Zeitlimit zurückgibt (Befund 9). Ist die
+/// Nummer schon vergeben, nennt er sie und genau einen Folgeaufruf. Ist sie es
+/// nicht, sagt er das, und es gibt keinen Folgeaufruf mit einer Nummer, die es
+/// noch nicht gibt. In beiden Fällen ist nichts neu gestartet.
+String laufText(String was, String? nummer, String werkzeug) => nummer == null
+    ? '$was läuft noch. Die Nummer steht noch nicht fest; es ist noch nichts gestartet.'
+    : '$was läuft weiter (Nummer $nummer). Mit $werkzeug und der Nummer $nummer später prüfen.';

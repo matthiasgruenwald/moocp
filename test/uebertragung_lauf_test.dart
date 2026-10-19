@@ -117,17 +117,17 @@ void main() {
     test('dieselbe Datei und dasselbe Ziel: Rückfrage', () {
       final protokoll = [eintrag('a.mbz', 12, vorgang: '7')];
       final r = wiederholungsRueckfrage(protokoll,
-          profil: 'zielprofil', kurs: 12, datei: 'a.mbz', erneut: false);
+          profil: 'zielprofil', kurs: 12, datei: 'a.mbz');
       expect(r, isNotNull);
       expect(r, contains('Nichts wird erneut importiert'));
       expect(r, contains('Nummer 7'));
-      expect(r, contains('erneut: true'));
+      expect(r, contains('wiederherstellen_datei mit wiederholung_von=7'));
     });
 
     test('andere Datei: keine Rückfrage', () {
       final protokoll = [eintrag('a.mbz', 12)];
       expect(
-        wiederholungsRueckfrage(protokoll, profil: 'zielprofil', kurs: 12, datei: 'b.mbz', erneut: false),
+        wiederholungsRueckfrage(protokoll, profil: 'zielprofil', kurs: 12, datei: 'b.mbz'),
         isNull,
       );
     });
@@ -135,7 +135,7 @@ void main() {
     test('anderes Profil: keine Rückfrage', () {
       final protokoll = [eintrag('a.mbz', 12, profil: 'anderes')];
       expect(
-        wiederholungsRueckfrage(protokoll, profil: 'zielprofil', kurs: 12, datei: 'a.mbz', erneut: false),
+        wiederholungsRueckfrage(protokoll, profil: 'zielprofil', kurs: 12, datei: 'a.mbz'),
         isNull,
       );
     });
@@ -143,15 +143,7 @@ void main() {
     test('abgelehnte Versuche zählen nicht', () {
       final protokoll = [eintrag('a.mbz', 12, stand: ZielStand.abgelehnt)];
       expect(
-        wiederholungsRueckfrage(protokoll, profil: 'zielprofil', kurs: 12, datei: 'a.mbz', erneut: false),
-        isNull,
-      );
-    });
-
-    test('erneut: true hebt den Schutz auf', () {
-      final protokoll = [eintrag('a.mbz', 12)];
-      expect(
-        wiederholungsRueckfrage(protokoll, profil: 'zielprofil', kurs: 12, datei: 'a.mbz', erneut: true),
+        wiederholungsRueckfrage(protokoll, profil: 'zielprofil', kurs: 12, datei: 'a.mbz'),
         isNull,
       );
     });
@@ -160,12 +152,12 @@ void main() {
       final protokoll = [eintrag('neu1.mbz', 12, quellkurs: 56)];
       expect(
         wiederholungsRueckfrage(protokoll,
-            profil: 'zielprofil', kurs: 12, quellkurs: 56, erneut: false),
+            profil: 'zielprofil', kurs: 12, quellkurs: 56),
         isNotNull,
       );
       expect(
         wiederholungsRueckfrage(protokoll,
-            profil: 'zielprofil', kurs: 12, quellkurs: 34, erneut: false),
+            profil: 'zielprofil', kurs: 12, quellkurs: 34),
         isNull,
       );
     });
@@ -200,6 +192,31 @@ void main() {
       expect(neu.eintraege.first.vorgang, '7');
       expect(neu.eintraege.last.stand, ZielStand.fehlgeschlagen);
       expect(neu.eintraege.first.zeit, DateTime(2026, 10, 18, 9));
+    });
+
+    test('zwei vorab geladene Sitzungen erhalten beide Einträge', () async {
+      final pfad = '${ordner.path}/uebertragungen.json';
+      final a = await Uebertragungsprotokoll.laden(pfad);
+      final b = await Uebertragungsprotokoll.laden(pfad);
+      await a.eintragen(eintrag('a.mbz', 12));
+      await b.eintragen(eintrag('b.mbz', 34));
+      expect((await Uebertragungsprotokoll.laden(pfad)).eintraege.map((e) => e.kurs), [12, 34]);
+    });
+
+    test('gleichzeitige Sitzungen verlieren keine Einträge', () async {
+      final pfad = '${ordner.path}/uebertragungen.json';
+      final a = await Uebertragungsprotokoll.laden(pfad);
+      final b = await Uebertragungsprotokoll.laden(pfad);
+      await Future.wait([a.eintragen(eintrag('a.mbz', 12)), b.eintragen(eintrag('b.mbz', 34))]);
+      expect((await Uebertragungsprotokoll.laden(pfad)).eintraege.map((e) => e.kurs), unorderedEquals([12, 34]));
+    });
+
+    test('nach Laden beschädigtes Protokoll bleibt beim Eintragen unverändert', () async {
+      final pfad = '${ordner.path}/uebertragungen.json';
+      final a = await Uebertragungsprotokoll.laden(pfad);
+      File(pfad).writeAsStringSync('{kaputt');
+      await expectLater(a.eintragen(eintrag('a.mbz', 12)), throwsA(isA<StateError>()));
+      expect(File(pfad).readAsStringSync(), '{kaputt');
     });
 
     test('beschädigte Datei wirft und wird nicht überschrieben', () async {
@@ -266,7 +283,7 @@ void main() {
       // Ein späterer Versuch für das erfolgreiche Ziel braucht eine Rückfrage.
       expect(
         wiederholungsRueckfrage(protokoll.eintraege,
-            profil: 'zielprofil', kurs: 12, datei: 'a.mbz', erneut: false),
+            profil: 'zielprofil', kurs: 12, datei: 'a.mbz'),
         isNotNull,
       );
     });
@@ -339,6 +356,16 @@ void main() {
       expect(text, contains('Ein Aktualisieren bestehender Inhalte ist nicht zugesagt'));
       expect(text, contains('Nicht erneut gesendet'));
     });
+  });
+
+  test('Bericht erhält Prüfprobleme auch bei fertigen Zielen', () {
+    final text = uebertragungsBericht([
+      ZielBericht(ziel(12), ZielStand.fertig, '7', 'Fehlend: ZZ Frage. Fragenherkunft nicht bestätigt.'),
+      ZielBericht(ziel(34), ZielStand.fertig, '8', 'Anhang fehlt im Ziel; nicht verifiziert.'),
+    ]);
+    expect(text, contains('Fehlend: ZZ Frage'));
+    expect(text, contains('Fragenherkunft nicht bestätigt'));
+    expect(text, contains('Anhang fehlt im Ziel; nicht verifiziert'));
   });
 
   group('ZielStand', () {

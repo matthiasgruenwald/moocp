@@ -39,6 +39,7 @@
 // Beschriftungen, Verweise mit dem Titel des Ziels, Befunde nach den Regeln
 // der Skills. So muss für einen Auftrag nur geöffnet werden, was er betrifft.
 
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -194,6 +195,19 @@ class FormularGelesen {
         if (kurs != null) 'Kurs $kurs'
       ].join(', ')})')
       ..writeln('Ordner: $ordner');
+    // Ticket #23, E3: Ein Typ außerhalb der Positivliste wird gelesen, aber nicht
+    // geändert. Die Lücke steht im Ergebnis, damit eine Auswertung ohne Verweise
+    // nicht wie ein stiller Erfolg aussieht.
+    if (ziel.art == Zielart.aktivitaet &&
+        modul != null &&
+        !MoodleZugang.schreibbareModule.contains(modul)) {
+      b.writeln('Prüflücke: Typ „$modul" ist nicht schreibbar -- gelesen, nicht geändert (aendern lehnt ab). '
+          'Die Verweisprüfung erfasst nur Textfelder; Auswahlfelder werden nicht geprüft.');
+      if (modul == 'learningmap') {
+        b.writeln('Prüflücke: SVG im Feld svgcode und Ortsziele im verborgenen placestore-JSON werden nicht ausgewertet. '
+            'Die Zuordnung der Lernlandkartenorte zu Aktivitäten ist damit nicht vollständig geprüft.');
+      }
+    }
     if (fehlend.isNotEmpty) {
       b.writeln('NICHT gelesen (${fehlend.length}): ${fehlend.join(", ")}');
     }
@@ -410,7 +424,35 @@ String? _nameIn(dom.Element form) {
   return null;
 }
 
-Future<FormularGelesen> formularLesen(MoodleZugang moodle, Formularziel ziel, String arbeitsordner) async {
+/// Ticket #22: Je Zielordner läuft im Prozess höchstens ein Lesen gleichzeitig.
+/// Ohne das löscht ein Lesen den Ordner, während ein anderes ihn gerade füllt;
+/// dann schlägt das Löschen oder Schreiben fehl. Die Sperre gilt je Pfad, nicht
+/// global: verschiedene Fragen lesen weiter parallel.
+final _ordnerSperren = <String, Future<void>>{};
+
+/// Der Schlüssel der Sperre: der absolute Ordner des Ziels im Arbeitsordner.
+String ordnerSchluessel(Formularziel ziel, String arbeitsordner) =>
+    p.normalize(p.absolute(p.join(arbeitsordner, ziel.ordnerName)));
+
+Future<T> ordnerSperre<T>(String pfad, Future<T> Function() tu) {
+  final vorher = _ordnerSperren[pfad] ?? Future<void>.value();
+  final fertig = Completer<void>();
+  final ende = fertig.future;
+  _ordnerSperren[pfad] = ende;
+  return vorher.then((_) => tu()).whenComplete(() {
+    fertig.complete();
+    if (identical(_ordnerSperren[pfad], ende)) _ordnerSperren.remove(pfad);
+  });
+}
+
+Future<FormularGelesen> formularLesen(MoodleZugang moodle, Formularziel ziel, String arbeitsordner) {
+  return ordnerSperre(ordnerSchluessel(ziel, arbeitsordner),
+      () => formularLesenOhneSperre(moodle, ziel, arbeitsordner));
+}
+
+/// Nur innerhalb einer [ordnerSperre] aufrufen, sonst wartet der Aufruf auf sich selbst.
+Future<FormularGelesen> formularLesenOhneSperre(
+    MoodleZugang moodle, Formularziel ziel, String arbeitsordner) async {
   final r = await moodle.lesen(ziel.adresse);
   if (r.status != 200) {
     throw MoodleFehler('Das Bearbeitungsformular von ${ziel.bezeichnung} ist nicht abrufbar (HTTP ${r.status}).');

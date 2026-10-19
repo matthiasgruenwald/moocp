@@ -10,9 +10,12 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:crypto/crypto.dart';
 import 'package:xml/xml.dart';
 
+import 'moodle_zugang.dart' show MoodleZugang;
 import 'sicherung_regeln.dart' show nutzerdatenOptionen;
+import 'wiederherstellung_fragen.dart' show QuizFrage, quizFragenAusXml;
 
 /// Obergrenze für eine hochgeladene Sicherung. Fest 200 MB; der Wert aus dem
 /// Upload-Formular (maxbytes) wird nicht gelesen (TODO.md).
@@ -83,15 +86,50 @@ bool erlaubterUebergang(WiederherstellungStand von, WiederherstellungStand nach)
 /// Eine Aktivität aus dem Archiv, für die Freigabe: Art und Titel.
 typedef ArchivAktivitaet = ({String modul, String titel});
 
+typedef WiederhergestellteAktivitaet = ({int cmid, String modul, String titel});
+
+/// Liefert cmids nur bei einer eindeutigen 1:1-Zuordnung zum geprüften Archiv.
+List<int>? importierteCmidsEindeutig({required List<ArchivAktivitaet> erwartet, required Set<int> vorher,
+  required List<WiederhergestellteAktivitaet> aktuell}) {
+  if (erwartet.isEmpty) return null;
+  final neu = aktuell.where((a) => !vorher.contains(a.cmid)).toList();
+  if (neu.length != erwartet.length) return null;
+  final erwartete = erwartet.map((a) => '${a.modul}\u0000${a.titel}').toSet();
+  final aktuelle = neu.map((a) => '${a.modul}\u0000${a.titel}').toList();
+  if (erwartete.length != erwartet.length || aktuelle.toSet().length != aktuelle.length ||
+      !erwartete.containsAll(aktuelle) || !aktuelle.toSet().containsAll(erwartete)) {
+    return null;
+  }
+  return [for (final a in neu) a.cmid];
+}
+
 /// Ergebnis der Prüfung. [grund] ist null, wenn das Archiv angenommen ist.
 class ArchivBefund {
-  const ArchivBefund({this.grund, this.moodleVersion, this.typ, this.aktivitaeten = const []});
+  const ArchivBefund({
+    this.grund,
+    this.moodleVersion,
+    this.typ,
+    this.aktivitaeten = const [],
+    this.quizFragen = const {},
+    this.quizUnlesbar = const {},
+    this.quizTitel = const {},
+  });
   final String? grund;
   final String? moodleVersion;
 
   /// „activity" oder „course", wie Moodle es im Archiv nennt.
   final String? typ;
   final List<ArchivAktivitaet> aktivitaeten;
+
+  /// Fragen je Quiz (Ordnername wie quiz_21), aus quiz.xml und questions.xml (Issue #20).
+  final Map<String, List<QuizFrage>> quizFragen;
+
+  /// Quizze, deren quiz.xml oder questions.xml nicht lesbar ist (Befund 7): kein Abbruch
+  /// des Archivs, sondern eine Prüflücke bei der Herkunft.
+  final Set<String> quizUnlesbar;
+
+  /// Titel je Quiz-Ordner (quiz_21), aus moodle_backup.xml. Fehlt der Ordner dort, fehlt der Eintrag.
+  final Map<String, String> quizTitel;
 
   bool get ok => grund == null;
 }
@@ -209,13 +247,37 @@ Future<ArchivBefund> archivPruefen(
   }
 
   final aktivitaeten = <ArchivAktivitaet>[
-    for (final a in doc.findAllElements('activity'))
+    for (final a in archivAktivitaetsElemente(doc))
       (modul: a.getElement('modulename')?.innerText.trim() ?? '', titel: a.getElement('title')?.innerText.trim() ?? ''),
   ];
+
+  final quizTitel = <String, String>{
+    for (final a in archivAktivitaetsElemente(doc))
+      if (a.getElement('modulename')?.innerText.trim() == 'quiz' &&
+          (a.getElement('directory')?.innerText.trim() ?? '').isNotEmpty)
+        a.getElement('directory')!.innerText.trim().split('/').last: a.getElement('title')?.innerText.trim() ?? '',
+  };
+
+  // Fragen der Quizze (Issue #20). Lesbar nur, wenn beide Dateien es sind.
+  final fragenXml = dateien['questions.xml'] == null ? null : utf8.decode(dateien['questions.xml']!, allowMalformed: true);
+  final quizFragen = <String, List<QuizFrage>>{};
+  final quizUnlesbar = <String>{};
+  for (final e in dateien.entries) {
+    final ordner = _quizOrdner(e.key);
+    if (ordner == null) continue;
+    try {
+      quizFragen[ordner] = quizFragenAusXml(utf8.decode(e.value, allowMalformed: true), fragenXml);
+    } on XmlException {
+      quizUnlesbar.add(ordner);
+    }
+  }
   return ArchivBefund(
     moodleVersion: _text1(doc, 'moodle_version'),
     typ: typ,
     aktivitaeten: aktivitaeten,
+    quizFragen: quizFragen,
+    quizUnlesbar: quizUnlesbar,
+    quizTitel: quizTitel,
   );
 }
 
@@ -243,7 +305,11 @@ bool nutzerdatenPfad(String pfad) =>
 
 /// Nur diese Dateien liest die Prüfung inhaltlich.
 bool _braucht(String pfad) =>
-    pfad == 'moodle_backup.xml' || pfad == 'grades.xml' || pfad == 'grade_history.xml' || pfad == 'roles.xml';
+    pfad == 'moodle_backup.xml' || pfad == 'grades.xml' || pfad == 'grade_history.xml' || pfad == 'roles.xml' ||
+    pfad == 'questions.xml' || _quizOrdner(pfad) != null;
+
+/// Der Ordnername eines Quiz (quiz_21) aus activities/quiz_21/quiz.xml, sonst null.
+String? _quizOrdner(String pfad) => RegExp(r'^activities/(quiz_[^/]+)/quiz\.xml$').firstMatch(pfad)?.group(1);
 
 bool _kopfOk(Uint8List kopf) {
   final soll = _oktal(kopf, 148, 156);
@@ -377,3 +443,108 @@ enum Zielweg {
   }
   return (weg: gewaehlt, rueckfrage: null);
 }
+
+/// Doppelstart-Schutz. Der Fingerabdruck hängt am Inhalt der
+/// Datei, nie am Namen: umbenannt bleibt es dieselbe Wiederherstellung. Kurs (0 bei
+/// neuem Kurs) und Zielweg gehören dazu, damit ein anderer Ziel-Lauf nicht gesperrt wird.
+/// Das Profil ([instanz]) gehört ebenfalls dazu: Dieselbe Datei auf zwei Instanzen
+/// sperrt sich nicht gegenseitig.
+String fingerabdruck(List<int> bytes, {required String instanz, required int kurs, required Zielweg weg}) =>
+    '${sha256.convert(bytes)}|$instanz|$kurs|${weg.name}';
+
+/// Was die Doppelstart-Prüfung von einem Vorgang braucht. Ohne Dateien und Texte.
+typedef DoppelstartEintrag = ({
+  String id,
+  String? fingerabdruck,
+  String? wiederholungVon,
+  WiederherstellungStand? stand,
+  int kurs,
+});
+
+/// Die Nummer des offenen Vorgangs, der die neue Wiederherstellung sperrt, sonst null.
+///
+/// Offen heißt: anstehend, hochgeladen, laufend, unklar oder fertig (Moodle kann die
+/// Wiederherstellung schon ausgeführt haben, oder sie ist noch nicht gegengelesen).
+/// Fehlgeschlagen heißt nur noch: vor dem Start abgebrochen, oder Prozess beendet und im
+/// Zielkurs nachweislich nichts Neues (siehe [fehlerBeendet]); das sperrt nicht, außer bei
+/// neuem Kurs (kurs 0), weil dort ein Platzhalterkurs bleiben kann. Ein von Moodle gemeldeter
+/// Fehler allein macht keinen Vorgang fehlgeschlagen: Er bleibt unklar (gesperrt), bis der
+/// Zielkurs geprüft ist. Nur der Kopf zählt: Ein Vorgang, auf den ein anderer mit
+/// wiederholungVon zeigt, ist nur durch einen weiterhin sperrenden Nachfolger überholt. Eine Wiederholung ist nur zulässig, wenn sie
+/// genau den sperrenden Kopf nennt.
+String? doppelstartSperre(
+  Iterable<DoppelstartEintrag> alle, {
+  required String fingerabdruck,
+  required String? wiederholungVon,
+  required int kurs,
+}) {
+  final gleiche = [for (final e in alle) if (e.fingerabdruck == fingerabdruck) e];
+  final nachId = {for (final e in gleiche) e.id: e};
+  final ueberholt = <String>{};
+  for (final e in gleiche.where((e) => _sperrt(e, kurs))) {
+    // Gescheiterte Versuche lassen den Vorgänger gesperrt. Ein später gestarteter
+    // Nachfolger überholt die ganze Kette, auch über solche Zwischenversuche hinweg.
+    var von = e.wiederholungVon;
+    final besucht = <String>{e.id};
+    while (von != null && besucht.add(von)) {
+      ueberholt.add(von);
+      von = nachId[von]?.wiederholungVon;
+    }
+  }
+  final sperrend = [
+    for (final e in gleiche)
+      if (!ueberholt.contains(e.id) && _sperrt(e, kurs)) e.id,
+  ];
+  if (sperrend.isEmpty) return null;
+  if (wiederholungVon != null && sperrend.contains(wiederholungVon)) return null;
+  return sperrend.first;
+}
+
+bool _sperrt(DoppelstartEintrag e, int kurs) => switch (e.stand) {
+      WiederherstellungStand.anstehend ||
+      WiederherstellungStand.hochgeladen ||
+      WiederherstellungStand.laufend ||
+      WiederherstellungStand.unklar ||
+      WiederherstellungStand.fertig =>
+        true,
+      WiederherstellungStand.fehlgeschlagen => e.kurs == 0 && kurs == 0,
+      null => false,
+    };
+
+/// Befund 8: Typen außerhalb der Positivliste (nicht schreibbar) werden nicht
+/// verifiziert. Liefert den Prüflücke-Text oder null, wenn alle schreibbar sind.
+String? nichtSchreibbarePruefluecke(Iterable<String> moduln) {
+  final nein = {for (final m in moduln) if (!MoodleZugang.schreibbareModule.contains(m)) m}.toList()..sort();
+  if (nein.isEmpty) return null;
+  return 'Prüflücke: Inhalt und Anhänge von ${nein.map((m) => 'Typ „$m"').join(', ')} sind nicht gegengeprüft '
+      '(der Typ ist nicht schreibbar, sein Formular wird nicht gelesen); nicht verifiziert.';
+}
+
+/// Die Nachfrage an die Verwaltung der Moodle-Instanz, wenn der Hintergrundauftrag nach einem
+/// gemeldeten Fehler noch hängen könnte. Die Lehrkraft gibt sie weiter; die App betritt den
+/// Adminbereich nie (A9). Nur Nummer, Zeiten, Kursnummer und Fehlerart: keine Kursnamen, keine
+/// Inhalte, keine Personen (E11).
+String verwaltungsNachfrage({
+  required String nummer,
+  required DateTime start,
+  required DateTime? letzteBeobachtung,
+  required int? zielkurs,
+  required String fehlerart,
+  required double? fortschritt,
+}) {
+  String uhr(DateTime t) => '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+  final ziel = zielkurs == null ? 'in einem neuen Kurs (Nummer noch nicht bekannt)' : 'im Kurs $zielkurs';
+  final prozent = fortschritt == null ? 'unbekannt' : '${(fortschritt * 100).round()} %';
+  return 'Guten Tag, über die Lehrkraft-App wurde $ziel um ${uhr(start)} Uhr eine Wiederherstellung '
+      'angestoßen (Vorgang $nummer). Moodle meldet dazu den Fehler „$fehlerart"; die letzte Beobachtung '
+      '${letzteBeobachtung == null ? 'liegt nicht vor' : 'war um ${uhr(letzteBeobachtung)} Uhr'} (Fortschritt: $prozent). '
+      'Die Wiederherstellung wurde angestoßen und soll nicht wiederholt werden, damit keine Dubletten '
+      'entstehen. Was ist mit dem Hintergrundauftrag (Ad-hoc-Aufgabe, Cron) los: läuft er noch, ist er '
+      'abgebrochen oder hängt er?';
+}
+
+/// Die Aktivitäten, die `moodle_backup.xml` auflistet. Dasselbe Element `activity` steht auch
+/// in den Einstellungen als bloße Kennung (`<activity>quiz_1941</activity>`); diese haben weder
+/// Typ noch Titel und sind keine Aktivitäten des Archivs.
+Iterable<XmlElement> archivAktivitaetsElemente(XmlDocument doc) =>
+    doc.findAllElements('activity').where((a) => a.getElement('modulename') != null);

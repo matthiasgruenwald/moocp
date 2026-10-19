@@ -1,4 +1,4 @@
-// Übertragung in einem Auftrag (Issue #10): Prüfung der Ziele, Wiederholungsschutz,
+// Übertragung in einem Auftrag: Prüfung der Ziele, Wiederholungsschutz,
 // das Übertragungsprotokoll uebertragungen.json und der Ablauf je Ziel.
 //
 // Reine Logik: Moodle wird nur über die übergebene Funktion [ZielLauf]
@@ -11,6 +11,8 @@
 
 import 'dart:convert';
 import 'dart:io';
+
+import 'package:path/path.dart' as p;
 
 import 'moodle/wiederherstellung_regeln.dart';
 
@@ -193,17 +195,16 @@ class UebertragungsEintrag {
 /// Der Wiederholungsschutz: Ist für dieses Ziel schon etwas übertragen oder
 /// versucht worden, gibt es eine Rückfrage statt eines erneuten Imports.
 /// Trifft die Datei den Eintrag, sonst der Quellkurs (bei frischer Sicherung).
-/// Abgelehnte Versuche zählen nicht: nichts wurde geschrieben. [erneut] hebt
-/// den Schutz für den ganzen Aufruf auf.
+/// Abgelehnte Versuche zählen nicht: nichts wurde geschrieben. Eine bewusste
+/// Wiederholung geht nicht über uebertragen, sondern über wiederherstellen_datei
+/// mit wiederholung_von.
 String? wiederholungsRueckfrage(
   List<UebertragungsEintrag> protokoll, {
   required String profil,
   required int kurs,
   String? datei,
   int? quellkurs,
-  required bool erneut,
 }) {
-  if (erneut) return null;
   final treffer = [
     for (final e in protokoll)
       if (e.profil == profil &&
@@ -217,7 +218,8 @@ String? wiederholungsRueckfrage(
   final nummer = e.vorgang == null ? '' : ' (Nummer ${e.vorgang})';
   return 'Für Kurs $kurs ist schon einmal übertragen worden: Stand „${e.stand.text}", '
       'am ${e.zeit.toIso8601String()}$nummer. Nichts wird erneut importiert. Erst den Stand klären '
-      '(wiederherstellung_status mit der Nummer). Will die Lehrkraft die Übertragung trotzdem, uebertragen mit erneut: true.';
+      '(wiederherstellung_status mit der Nummer). Will die Lehrkraft die Wiederholung trotzdem, für diesen Kurs '
+      'wiederherstellen_datei mit wiederholung_von=${e.vorgang ?? '<Nummer>'} und nach Freigabe.';
 }
 
 /// Das Übertragungsprotokoll uebertragungen.json im Einstellungsordner. Jeder
@@ -248,13 +250,29 @@ class Uebertragungsprotokoll {
     return Uebertragungsprotokoll._(datei, liste);
   }
 
-  Future<void> eintragen(UebertragungsEintrag e) async {
-    eintraege.add(e);
-    await _datei.parent.create(recursive: true);
-    final tmp = File('${_datei.path}.tmp');
-    await tmp.writeAsString(jsonEncode([for (final x in eintraege) x.toJson()]), flush: true);
-    await tmp.rename(_datei.path);
+  // Alle Sitzungen teilen diese Datei; ein alter Snapshot darf neuere Einträge nicht ersetzen.
+  static final Map<String, Future<void>> _schreibend = {};
+
+  Future<void> eintragen(UebertragungsEintrag e) {
+    final schluessel = p.normalize(p.absolute(_datei.path));
+    final vorher = _schreibend[schluessel] ?? Future<void>.value();
+    final schreiben = vorher.catchError((Object _) {
+      // Der frühere Aufruf meldet seinen Fehler selbst; frisch lesen prüft die Datei erneut.
+    }).then((_) async {
+      final aktuell = await laden(_datei.path);
+      final liste = [...aktuell.eintraege, e];
+      await _datei.parent.create(recursive: true);
+      final tmp = File('${_datei.path}.tmp');
+      await tmp.writeAsString(jsonEncode([for (final x in liste) x.toJson()]), flush: true);
+      await tmp.rename(_datei.path);
+      eintraege
+        ..clear()
+        ..addAll(liste);
+    });
+    _schreibend[schluessel] = schreiben;
+    return schreiben;
   }
+
 }
 
 /// Das Ergebnis eines Ziels aus [ZielLauf]: Stand, Nummer des Vorgangs (wenn
@@ -322,15 +340,15 @@ Future<List<ZielBericht>> uebertragungAusfuehren(
   return berichte;
 }
 
-/// Der Bericht an die KI: je Ziel der Stand, dazu die Nummer und, wenn nicht
-/// fertig, der Text. Die Hinweise sagen, was nicht zugesagt ist.
+/// Der Bericht an die KI: je Ziel der Stand, die Nummer und der Prüfbericht.
+/// Auch ein abgeschlossener Lauf kann unverifizierte Inhalte enthalten. Die Hinweise sagen, was nicht zugesagt ist.
 String uebertragungsBericht(List<ZielBericht> berichte) {
   final zeilen = <String>[];
   final anzahl = {for (final s in ZielStand.values) s: 0};
   for (final b in berichte) {
     anzahl[b.stand] = anzahl[b.stand]! + 1;
     final nummer = b.vorgang == null ? '' : ', Nummer ${b.vorgang}';
-    final text = b.stand == ZielStand.fertig || b.text.isEmpty ? '' : ' ${b.text}';
+    final text = b.text.isEmpty ? '' : ' ${b.text}';
     zeilen.add('„${b.ziel.name}" (Kurs ${b.ziel.kurs}): ${b.stand.text}$nummer.$text');
   }
   final kopf = 'Übertragung: ${anzahl[ZielStand.fertig]} fertig, '

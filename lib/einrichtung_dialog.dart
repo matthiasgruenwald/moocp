@@ -35,6 +35,7 @@ class EinrichtungDialog extends StatefulWidget {
     required this.protokoll,
     required this.port,
     this.servername = mcpName,
+    this.profilname = 'Moodle',
     super.key,
   });
 
@@ -51,6 +52,7 @@ class EinrichtungDialog extends StatefulWidget {
   /// Port und Servername des Profils, für das die Einrichtung gilt (E31).
   final int port;
   final String servername;
+  final String profilname;
 
   @override
   State<EinrichtungDialog> createState() => _EinrichtungDialogState();
@@ -360,7 +362,7 @@ class _EinrichtungDialogState extends State<EinrichtungDialog> {
       ];
     }
     return AlertDialog(
-      title: const Text('KI-Werkzeuge einrichten'),
+      title: Text('${widget.profilname} (${widget.servername}) — KI-Werkzeuge einrichten'),
       content: SizedBox(
         width: 560,
         child: SingleChildScrollView(

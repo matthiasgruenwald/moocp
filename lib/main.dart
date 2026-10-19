@@ -25,6 +25,7 @@ import 'einstellungen_dialog.dart';
 import 'einstellungen_ort.dart';
 import 'einzelstart.dart';
 import 'freigabe.dart';
+import 'profile_dialog.dart';
 import 'log.dart';
 import 'mcp/mcp_dienst.dart';
 import 'moodle/instanzen.dart';
@@ -104,6 +105,14 @@ Future<void> main(List<String> argumente) async {
         mehrere: profile.length > 1,
       ),
   ];
+  Instanz instanzErstellen(Profil pr) => _instanzFuer(
+    pr,
+    einstellungen,
+    register,
+    protokoll,
+    arbeitsordner,
+    mehrere: true,
+  );
   // Reste früherer Updates im Temp-Verzeichnis; der Installer, der die App
   // gerade neu gestartet hat, läuft noch und bleibt bis zum nächsten Start.
   resteWegraeumen();
@@ -119,6 +128,7 @@ Future<void> main(List<String> argumente) async {
       haupt.freigaben,
       arbeitsordner,
       weitere: instanzen.sublist(1),
+      instanzErstellen: instanzErstellen,
       updatefaehig: updateMoeglich(argumente, Platform.environment),
       fokus: einzel.fokus,
     ),
@@ -140,26 +150,19 @@ Instanz _instanzFuer(
   final ansicht = protokoll.fuer(pr.name);
   final zugang = register.zugang(pr);
   final ordner = mehrere
-      ? (Directory(p.join(arbeitsordner.pfad, pr.kennung))
-              ..createSync(recursive: true))
-            .path
+      ? (Directory(
+          p.join(arbeitsordner.pfad, pr.kennung),
+        )..createSync(recursive: true)).path
       : arbeitsordner.pfad;
   final freigaben = Freigaben(
     ansicht,
-    stufe: einstellungen.bestaetigungen,
-    testmodus: Anmeldedaten.testzugangAktiv,
+    stufe: pr.bestaetigungen,
+    testmodus: Anmeldedaten.testzugangAktivFuer(pr),
   );
   return Instanz(
     zugang,
     freigaben,
-    McpDienst(
-      einstellungen,
-      zugang,
-      ansicht,
-      freigaben,
-      ordner,
-      profil: pr,
-    ),
+    McpDienst(einstellungen, zugang, ansicht, freigaben, ordner, profil: pr),
   );
 }
 
@@ -169,6 +172,31 @@ class Instanz {
   final MoodleZugang moodle;
   final Freigaben freigaben;
   final McpDienst dienst;
+}
+
+/// Eingaben einer Anmeldung, festgehalten bevor sie asynchron beginnt.
+class AnmeldeAuftrag {
+  const AnmeldeAuftrag({required this.instanz, required this.profil, required this.adresse,
+    required this.benutzer, required this.passwort, required this.merken});
+  final Instanz instanz;
+  final Profil profil;
+  final String adresse;
+  final String benutzer;
+  final String passwort;
+  final bool merken;
+}
+
+/// Gibt gespeicherte Zugangsdaten nur zurück, wenn das Profil nach dem Laden
+/// noch ausgewählt ist.
+Future<Anmeldedaten?> gespeicherteAnmeldedatenVerwenden({
+  required Future<Anmeldedaten> Function() laden,
+  required bool Function() zielIstAktiv,
+  required void Function(Anmeldedaten) anwenden,
+}) async {
+  final daten = await laden();
+  if (!zielIstAktiv()) return null;
+  anwenden(daten);
+  return daten;
 }
 
 /// Aufruf durch die Deinstallation (installer/moocp.nsi): die
@@ -248,6 +276,7 @@ class MoocpApp extends StatelessWidget {
     this.freigaben,
     this.arbeitsordner, {
     this.weitere = const [],
+    this.instanzErstellen,
     this.einrichtungsstand,
     this.updatefaehig = false,
     this.fokus,
@@ -262,6 +291,7 @@ class MoocpApp extends StatelessWidget {
 
   /// Die weiteren Profile neben dem Hauptprofil (moodle, dienst, freigaben).
   final List<Instanz> weitere;
+  final Instanz Function(Profil profil)? instanzErstellen;
 
   /// Ob diese App sich selbst aktualisieren kann (update.dart,
   /// updateMoeglich). Nur dann wird geprüft und überhaupt gefragt.
@@ -296,6 +326,7 @@ class MoocpApp extends StatelessWidget {
         freigaben,
         arbeitsordner,
         weitere: weitere,
+        instanzErstellen: instanzErstellen,
         einrichtungsstand: einrichtungsstand,
         updatefaehig: updatefaehig,
         fokus: fokus,
@@ -313,6 +344,7 @@ class Hauptseite extends StatefulWidget {
     this.freigaben,
     this.arbeitsordner, {
     this.weitere = const [],
+    this.instanzErstellen,
     this.einrichtungsstand,
     this.updatefaehig = false,
     this.fokus,
@@ -325,6 +357,7 @@ class Hauptseite extends StatefulWidget {
   final Freigaben freigaben;
   final Arbeitsordner arbeitsordner;
   final List<Instanz> weitere;
+  final Instanz Function(Profil profil)? instanzErstellen;
   final Future<Einrichtungsstand> Function()? einrichtungsstand;
   final bool updatefaehig;
   final Stream<void>? fokus;
@@ -334,6 +367,25 @@ class Hauptseite extends StatefulWidget {
 }
 
 class _HauptseiteState extends State<Hauptseite> with WindowListener {
+  late final List<Instanz> _instanzen = [
+    Instanz(widget.moodle, widget.freigaben, widget.dienst),
+    ...widget.weitere,
+  ];
+  int _profilIndex = 0;
+  Instanz get _aktiv => _instanzen[_profilIndex];
+  Profil _profilFuer(Instanz instanz) {
+    for (final profil in widget.einstellungen.profile) {
+      if (profil.kennung == instanz.dienst.profil.kennung) return profil;
+    }
+    return instanz.dienst.profil;
+  }
+
+  Profil get _profil => _profilFuer(_aktiv);
+
+  MoodleZugang get _moodle => _aktiv.moodle;
+  Freigaben get _freigaben => _aktiv.freigaben;
+  McpDienst get _dienst => _aktiv.dienst;
+
   late final TextEditingController _adresse = TextEditingController(
     text: widget.einstellungen.moodleAdresse,
   );
@@ -403,12 +455,10 @@ class _HauptseiteState extends State<Hauptseite> with WindowListener {
   Future<void> _starten() async {
     // Eine Stufe, die Rückfragen abschaltet, soll nicht unbemerkt weitergelten:
     // Sie steht beim Start im Protokoll und dauerhaft rot in der Titelzeile.
-    if (widget.freigaben.stufe != Bestaetigungen.mittel) {
+    if (_freigaben.stufe != Bestaetigungen.mittel) {
       widget.protokoll.eintrag(
-        widget.freigaben.stufe == Bestaetigungen.keine
-            ? Art.gesperrt
-            : Art.info,
-        'Bestätigungen: ${widget.freigaben.stufe.text} -- ${_stufeKurz[widget.freigaben.stufe]!}',
+        _freigaben.stufe == Bestaetigungen.keine ? Art.gesperrt : Art.info,
+        'Bestätigungen: ${_freigaben.stufe.text} -- ${_stufeKurz[_freigaben.stufe]!}',
       );
     }
     _version = await _eigeneVersion();
@@ -458,7 +508,9 @@ class _HauptseiteState extends State<Hauptseite> with WindowListener {
         protokoll: widget.protokoll,
         eigene: _version,
         updateMoeglich: widget.updatefaehig,
-        sitzungLaeuft: widget.dienst.laeuft,
+        sitzungLaeuft: _dienst.laeuft,
+        profilname: _profil.name,
+        mcpName: _profil.mcpName,
       ),
     );
     if (!mounted) return;
@@ -476,9 +528,23 @@ class _HauptseiteState extends State<Hauptseite> with WindowListener {
   /// Gespeichert heißt: gleich anmelden. Wer den Haken setzt, will sich
   /// nicht bei jedem Start erneut anmelden.
   Future<void> _gespeichertAnmelden() async {
+    final instanz = _aktiv;
+    final profil = _profil;
+    bool zielIstAktiv() =>
+        mounted && identical(_aktiv, instanz) && identical(_profil, profil);
     final Anmeldedaten d;
     try {
-      d = await Anmeldedaten.laden();
+      final geladen = await gespeicherteAnmeldedatenVerwenden(
+        laden: () => Anmeldedaten.laden(kennung: profil.kennung, adresse: profil.adresse),
+        zielIstAktiv: zielIstAktiv,
+        anwenden: (daten) => setState(() {
+          _merken = daten.merken;
+          if (daten.benutzer != null) _benutzer.text = daten.benutzer!;
+          if (daten.passwort != null) _passwort.text = daten.passwort!;
+        }),
+      );
+      if (geladen == null) return;
+      d = geladen;
     } catch (e) {
       widget.protokoll.eintrag(
         Art.fehler,
@@ -486,13 +552,7 @@ class _HauptseiteState extends State<Hauptseite> with WindowListener {
       );
       return;
     }
-    if (!mounted) return;
-    setState(() {
-      _merken = d.merken;
-      if (d.benutzer != null) _benutzer.text = d.benutzer!;
-      if (d.passwort != null) _passwort.text = d.passwort!;
-    });
-    if (!d.merken || d.benutzer == null || widget.moodle.angemeldet) return;
+    if (!d.merken || d.benutzer == null || instanz.moodle.angemeldet) return;
     if (d.passwort == null) {
       // Etwa unter einem anderen Windows-Konto: DPAPI entschlüsselt nicht.
       // Ohne Eintrag bliebe die App still abgemeldet.
@@ -514,12 +574,9 @@ class _HauptseiteState extends State<Hauptseite> with WindowListener {
   /// Sitzungen der KI-Werkzeuge die Verbindung ab; die Werkzeuge melden dann „Nicht
   /// angemeldet".
   Future<void> _mcpStarten() async {
-    if (!_eingerichtet || !widget.moodle.angemeldet) return;
+    if (!_eingerichtet) return;
     // Jedes Profil startet seinen Server, sobald es angemeldet ist (E31).
-    for (final i in [
-      Instanz(widget.moodle, widget.freigaben, widget.dienst),
-      ...widget.weitere,
-    ]) {
+    for (final i in [..._instanzen]) {
       if (!i.moodle.angemeldet || i.dienst.laeuft) continue;
       try {
         await i.dienst.starten();
@@ -572,8 +629,9 @@ class _HauptseiteState extends State<Hauptseite> with WindowListener {
         pruefen: _einrichtungsstand,
         einstellungen: widget.einstellungen,
         protokoll: widget.protokoll,
-        port: widget.dienst.profil.port,
-        servername: widget.dienst.profil.mcpName,
+        port: _dienst.profil.port,
+        servername: _dienst.profil.mcpName,
+        profilname: _profil.name,
       ),
     );
     if (bereit != true) await _beenden();
@@ -594,8 +652,8 @@ class _HauptseiteState extends State<Hauptseite> with WindowListener {
     ];
     return einrichtungPruefen(
       umgebung: Platform.environment,
-      port: widget.dienst.profil.port,
-      name: widget.dienst.profil.mcpName,
+      port: _dienst.profil.port,
+      name: _dienst.profil.mcpName,
       schluessel: widget.einstellungen.schluessel,
       skills: pakete,
       abgewaehlt: widget.einstellungen.werkzeugeAbgewaehlt,
@@ -645,10 +703,18 @@ class _HauptseiteState extends State<Hauptseite> with WindowListener {
 
   /// Die Stufe der Bestätigungen umstellen (Feld in der Titelzeile).
   Future<void> _stufeAendern(Bestaetigungen s) async {
-    if (s == widget.freigaben.stufe) return;
+    if (s == _freigaben.stufe) return;
     setState(() {
-      widget.freigaben.stufe = s;
+      _freigaben.stufe = s;
       widget.einstellungen.bestaetigungen = s;
+      final index = widget.einstellungen.profile.indexWhere(
+        (p) => p.kennung == _profil.kennung,
+      );
+      if (index >= 0) {
+        widget.einstellungen.profile[index] = _profil.mitBestaetigungen(s);
+      } else {
+        widget.einstellungen.profile = [_profil.mitBestaetigungen(s)];
+      }
     });
     widget.protokoll.eintrag(
       s == Bestaetigungen.keine ? Art.gesperrt : Art.info,
@@ -667,7 +733,7 @@ class _HauptseiteState extends State<Hauptseite> with WindowListener {
   Future<void> _merkenAendern(bool an) async {
     setState(() => _merken = an);
     try {
-      await Anmeldedaten.merkenSetzen(an);
+      await Anmeldedaten.merkenSetzen(an, kennung: _profil.kennung, adresse: _profil.adresse);
       widget.protokoll.eintrag(
         Art.anmeldung,
         an
@@ -679,6 +745,117 @@ class _HauptseiteState extends State<Hauptseite> with WindowListener {
         Art.fehler,
         'Anmeldedaten: Speicher nicht erreichbar (${e.runtimeType})',
       );
+    }
+  }
+
+  Future<void> _profilWaehlen(int index) async {
+    setState(() {
+      _profilIndex = index;
+      _adresse.text = _profil.adresse;
+      _benutzer.clear();
+      _passwort.clear();
+      _meldung = null;
+      _merken = false;
+    });
+    final instanz = _aktiv;
+    final profil = _profil;
+    bool zielIstAktiv() => mounted && index == _profilIndex &&
+        identical(_aktiv, instanz) && identical(_profil, profil);
+    if (!await _einrichtungPruefen()) return;
+    if (!zielIstAktiv()) return;
+    final Anmeldedaten d;
+    try {
+      final geladen = await gespeicherteAnmeldedatenVerwenden(
+        laden: () => Anmeldedaten.laden(kennung: profil.kennung, adresse: profil.adresse),
+        zielIstAktiv: zielIstAktiv,
+        anwenden: (daten) => setState(() {
+          _merken = daten.merken;
+          _benutzer.text = daten.benutzer ?? '';
+          _passwort.text = daten.passwort ?? '';
+        }),
+      );
+      if (geladen == null) return;
+      d = geladen;
+    } catch (e) {
+      if (mounted) {
+        widget.protokoll.eintrag(
+          Art.fehler,
+          'Anmeldedaten: Speicher nicht erreichbar (${e.runtimeType})',
+        );
+      }
+      return;
+    }
+    if (d.merken &&
+        d.benutzer != null &&
+        d.passwort != null &&
+        !instanz.moodle.angemeldet) {
+      await _anmelden();
+    }
+  }
+
+  Future<void> _profilBearbeiten({bool neu = false}) async {
+    if (_beschaeftigt) return;
+    final aktuell = neu ? null : _profil;
+    var port = standardPort;
+    while (_instanzen.any((i) => i.dienst.profil.port == port) ||
+        widget.einstellungen.profile.any((p) => p.port == port)) {
+      port++;
+    }
+    final geaendert = await showDialog<Profil>(
+      context: context,
+      builder: (_) => ProfileDialog(profil: aktuell, port: port),
+    );
+    if (geaendert == null || !mounted) return;
+    final profile = widget.einstellungen.profile.isEmpty
+        ? <Profil>[_profil]
+        : List<Profil>.of(widget.einstellungen.profile);
+    final index = profile.indexWhere((p) => p.kennung == geaendert.kennung);
+    var hinzugefuegt = false;
+    if (index < 0) {
+      var name = geaendert.mcpName;
+      var zaehler = 2;
+      while (profile.any((p) => p.mcpName == name)) {
+        name = '${geaendert.mcpName}-${zaehler++}';
+      }
+      var naechsterPort = standardPort;
+      while (_instanzen.any((i) => i.dienst.profil.port == naechsterPort) ||
+          profile.any((p) => p.port == naechsterPort)) {
+        naechsterPort++;
+      }
+      final neuProfil = geaendert.copyWith(mcpName: name, port: naechsterPort);
+      profile.add(neuProfil);
+      final instanz = widget.instanzErstellen?.call(neuProfil);
+      if (instanz == null) return;
+      _instanzen.add(instanz);
+      _profilIndex = _instanzen.length - 1;
+      hinzugefuegt = true;
+    } else {
+      final laufend = _instanzen.firstWhere((i) => i.dienst.profil.kennung == geaendert.kennung);
+      if (laufend.moodle.angemeldet && laufend.dienst.profil.adresse != geaendert.adresse) {
+        setState(() => _meldung = 'Die Moodle-Adresse kann während einer Anmeldung nicht geändert werden.');
+        return;
+      }
+      profile[index] = geaendert;
+      laufend.dienst.profil = geaendert;
+      laufend.freigaben.testmodus = Anmeldedaten.testzugangAktivFuer(geaendert);
+    }
+    widget.einstellungen.profile = profile;
+    try {
+      await widget.einstellungen.speichern();
+    } catch (e) {
+      widget.protokoll.eintrag(
+        Art.fehler,
+        'Einstellungen nicht gespeichert (${e.runtimeType})',
+      );
+    }
+    setState(() {
+      _adresse.text = _profil.adresse;
+      _meldung = null;
+    });
+    if (hinzugefuegt && _eingerichtet) {
+      if (await _einrichtungPruefen(immer: true) && mounted) {
+        await _profilWaehlen(_profilIndex);
+      }
     }
   }
 
@@ -708,24 +885,49 @@ class _HauptseiteState extends State<Hauptseite> with WindowListener {
   }
 
   Future<void> _anmelden() async {
+    if (_beschaeftigt) return;
+    final auftrag = AnmeldeAuftrag(instanz: _aktiv, profil: _profil, adresse: _adresse.text.trim(),
+        benutzer: _benutzer.text.trim(), passwort: _passwort.text, merken: _merken);
+    final moodle = auftrag.instanz.moodle;
+    final dienst = auftrag.instanz.dienst;
+    final freigaben = auftrag.instanz.freigaben;
+    final profil = auftrag.profil;
+    final adresse = auftrag.adresse;
+    final benutzer = auftrag.benutzer;
+    final passwort = auftrag.passwort;
+    final merken = auftrag.merken;
+    freigaben.testmodus = Anmeldedaten.testzugangAktivFuer(profil.copyWith(adresse: adresse));
     setState(() {
       _beschaeftigt = true;
       _meldung = null;
     });
-    final benutzer = _benutzer.text.trim();
-    final passwort = _passwort.text;
     var feldLeeren = true;
     try {
-      widget.einstellungen.moodleAdresse = _adresse.text.trim();
+      final profile = widget.einstellungen.profile.isEmpty
+          ? <Profil>[profil]
+          : List<Profil>.of(widget.einstellungen.profile);
+      final index = profile.indexWhere((p) => p.kennung == profil.kennung);
+      if (index < 0) {
+        profile.add(profil.copyWith(adresse: adresse));
+      } else {
+        profile[index] = profile[index].copyWith(adresse: adresse);
+      }
+      widget.einstellungen.profile = profile;
       await widget.einstellungen.speichern();
-      await widget.moodle.anmelden(_adresse.text, benutzer, passwort);
+      dienst.profil = profil.copyWith(adresse: adresse);
+      await moodle.anmelden(adresse, benutzer, passwort);
       _meldung = 'Angemeldet.';
-      if (_merken) {
+      if (merken) {
         try {
-          await Anmeldedaten.speichern(benutzer, passwort);
+          await Anmeldedaten.speichern(
+            benutzer,
+            passwort,
+            kennung: profil.kennung,
+            adresse: adresse,
+          );
           widget.protokoll.eintrag(
             Art.anmeldung,
-            Anmeldedaten.testzugangAktiv
+            Anmeldedaten.testzugangAktivFuer(profil.copyWith(adresse: adresse))
                 // Testzugang aus einer Datei: das Passwort liegt nirgends
                 // gespeichert, der Eintrag soll nicht den Schlüsselbund nennen.
                 ? 'Anmeldedaten gespeichert (Testzugang aus Datei, nicht im Schlüsselbund)'
@@ -758,7 +960,7 @@ class _HauptseiteState extends State<Hauptseite> with WindowListener {
   }
 
   void _abmelden() {
-    widget.moodle.abmelden();
+    _moodle.abmelden();
     setState(() => _meldung = 'Abgemeldet.');
   }
 
@@ -766,36 +968,38 @@ class _HauptseiteState extends State<Hauptseite> with WindowListener {
   Widget build(BuildContext context) {
     // Je Profil ein Freigabe-Dialog: Anfragen eines weiteren Profils erscheinen
     // sonst bei niemandem und liefen nur bis zur Frist.
-    Widget seite = _seite(context);
-    for (final i in widget.weitere) {
-      seite = FreigabeDialoge(
-        freigaben: i.freigaben,
-        nachVorn: _nachVorn,
-        child: seite,
-      );
-    }
-    return FreigabeDialoge(
-      freigaben: widget.freigaben,
-      nachVorn: _nachVorn,
-      child: seite,
+    return Stack(
+      children: [
+        for (final i in _instanzen)
+          FreigabeDialoge(
+            key: ValueKey(i.dienst.profil.kennung),
+            freigaben: i.freigaben,
+            profilname: _profilFuer(i).name,
+            mcpName: _profilFuer(i).mcpName,
+            nachVorn: _nachVorn,
+            child: const SizedBox.shrink(),
+          ),
+        _seite(context),
+      ],
     );
   }
 
   Widget _seite(BuildContext context) {
-    final angemeldet = widget.moodle.angemeldet;
+    final angemeldet = _moodle.angemeldet;
     final klein = Theme.of(context).textTheme.bodySmall;
     return Scaffold(
       appBar: AppBar(
-        title: const Text(appName),
+        title: Text('$appName — ${_profil.name} (${_profil.mcpName})'),
         actions: [
-          BestaetigungenFeld(
-            stufe: widget.freigaben.stufe,
-            aendern: _stufeAendern,
-          ),
+          BestaetigungenFeld(stufe: _freigaben.stufe, aendern: _stufeAendern),
           IconButton(
             icon: const Icon(Icons.help_outline),
             tooltip: 'Was die Stufen bedeuten',
-            onPressed: () => bestaetigungenHilfe(context),
+            onPressed: () => bestaetigungenHilfe(
+              context,
+              profilname: _profil.name,
+              mcpName: _profil.mcpName,
+            ),
           ),
           // Die beiden Anzeigen dürfen schrumpfen: Sonst läuft die Titelzeile
           // über, sobald jemand das Fenster schmaler zieht als die 1280 px,
@@ -806,15 +1010,15 @@ class _HauptseiteState extends State<Hauptseite> with WindowListener {
               padding: const EdgeInsets.symmetric(horizontal: 12),
               child: _anzeige(
                 Icon(
-                  widget.dienst.laeuft
+                  _dienst.laeuft
                       ? Icons.lan
                       : _mcpVersucht
                       ? Icons.error_outline
                       : Icons.hourglass_empty,
                   size: 18,
                 ),
-                widget.dienst.laeuft
-                    ? 'MCP auf 127.0.0.1:${widget.dienst.profil.port}'
+                _dienst.laeuft
+                    ? 'MCP ${_profil.mcpName} auf 127.0.0.1:${_profil.port}'
                     : _mcpVersucht
                     ? 'MCP-Server läuft nicht'
                     : 'MCP startet nach der Anmeldung',
@@ -857,9 +1061,48 @@ class _HauptseiteState extends State<Hauptseite> with WindowListener {
             child: ListView(
               padding: const EdgeInsets.all(16),
               children: [
+                if (_instanzen.length > 1 || widget.instanzErstellen != null)
+                  _karte('Moodle-Profil', [
+                    DropdownButtonFormField<int>(
+                      initialValue: _profilIndex,
+                      decoration: const InputDecoration(labelText: 'Instanz'),
+                      items: [
+                        for (var i = 0; i < _instanzen.length; i++)
+                          DropdownMenuItem(
+                            value: i,
+                            child: Text(
+                              '${_profilFuer(_instanzen[i]).name} (${_profilFuer(_instanzen[i]).mcpName})',
+                            ),
+                          ),
+                      ],
+                      onChanged: _beschaeftigt
+                          ? null
+                          : (i) {
+                              if (i != null) _profilWaehlen(i);
+                            },
+                    ),
+                    Wrap(
+                      spacing: 8,
+                      children: [
+                        OutlinedButton.icon(
+                          onPressed: _beschaeftigt || widget.instanzErstellen == null
+                              ? null
+                              : () => _profilBearbeiten(neu: true),
+                          icon: const Icon(Icons.add),
+                          label: const Text('Profil hinzufügen'),
+                        ),
+                        OutlinedButton.icon(
+                          onPressed: _beschaeftigt ? null : () => _profilBearbeiten(),
+                          icon: const Icon(Icons.edit_outlined),
+                          label: const Text('Profil bearbeiten'),
+                        ),
+                      ],
+                    ),
+                  ]),
                 _karte('Moodle-Anmeldung', [
                   TextField(
                     controller: _adresse,
+                    enabled: !_beschaeftigt && !_moodle.angemeldet,
                     decoration: const InputDecoration(
                       labelText: 'Moodle-Adresse',
                       hintText: 'https://…',
@@ -878,7 +1121,7 @@ class _HauptseiteState extends State<Hauptseite> with WindowListener {
                     onSubmitted: (_) {
                       if (_eingerichtet &&
                           !_beschaeftigt &&
-                          !widget.moodle.angemeldet) {
+                          !_moodle.angemeldet) {
                         _anmelden();
                       }
                     },
@@ -890,7 +1133,7 @@ class _HauptseiteState extends State<Hauptseite> with WindowListener {
                     crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       InkWell(
-                        onTap: () => _merkenAendern(!_merken),
+                        onTap: _beschaeftigt ? null : () => _merkenAendern(!_merken),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
@@ -917,7 +1160,7 @@ class _HauptseiteState extends State<Hauptseite> with WindowListener {
                       if (kDebugMode)
                         TextButton(
                           onPressed: angemeldet
-                              ? widget.moodle.sitzungVerwerfen
+                              ? _moodle.sitzungVerwerfen
                               : null,
                           child: const Text('Sitzung verwerfen (Test)'),
                         ),
@@ -1091,7 +1334,11 @@ class BestaetigungenFeld extends StatelessWidget {
 }
 
 /// Der Hilfe-Dialog hinter dem Fragezeichen neben dem Feld.
-Future<void> bestaetigungenHilfe(BuildContext context) => showDialog<void>(
+Future<void> bestaetigungenHilfe(
+  BuildContext context, {
+  String profilname = 'Moodle',
+  String mcpName = 'moodle',
+}) => showDialog<void>(
   context: context,
   builder: (context) {
     final klein = Theme.of(context).textTheme.bodySmall;
@@ -1113,7 +1360,7 @@ Future<void> bestaetigungenHilfe(BuildContext context) => showDialog<void>(
       ),
     );
     return AlertDialog(
-      title: const Text('Bestätigungen vor Änderungen'),
+      title: Text('$profilname ($mcpName) — Bestätigungen vor Änderungen'),
       content: SizedBox(
         width: 620,
         child: SingleChildScrollView(
@@ -1183,8 +1430,17 @@ Future<void> bestaetigungenHilfe(BuildContext context) => showDialog<void>(
 /// selbst (Frist, Abbruch), schließt sich der Dialog, und die nächste
 /// wartende Anfrage öffnet ihren.
 class FreigabeDialoge extends StatefulWidget {
-  const FreigabeDialoge({super.key, required this.freigaben, required this.nachVorn, required this.child});
+  const FreigabeDialoge({
+    super.key,
+    required this.freigaben,
+    required this.nachVorn,
+    required this.child,
+    this.profilname = 'Moodle',
+    this.mcpName = 'moodle',
+  });
   final Freigaben freigaben;
+  final String profilname;
+  final String mcpName;
 
   /// Nach vorn und dort bleiben, solange ein Dialog offen ist -- ein Dialog
   /// hinter anderen Fenstern wird übersehen, und dann läuft nur die Frist ab.
@@ -1204,6 +1460,26 @@ class _FreigabeDialogeState extends State<FreigabeDialoge> {
   void initState() {
     super.initState();
     widget.freigaben.addListener(_zeigen);
+  }
+
+  @override
+  void didUpdateWidget(covariant FreigabeDialoge oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final freigabenGewechselt = oldWidget.freigaben != widget.freigaben;
+    final profilGewechselt = oldWidget.profilname != widget.profilname || oldWidget.mcpName != widget.mcpName;
+    if (!freigabenGewechselt && !profilGewechselt) return;
+    if (freigabenGewechselt) {
+      oldWidget.freigaben.removeListener(_zeigen);
+      widget.freigaben.addListener(_zeigen);
+    }
+    _gezeigt = null;
+    final alt = _dialog;
+    _dialog = null;
+    if (alt != null && alt.isActive) {
+      alt.navigator!.removeRoute(alt);
+      widget.nachVorn(false);
+    }
+    _zeigen();
   }
 
   @override
@@ -1234,7 +1510,12 @@ class _FreigabeDialogeState extends State<FreigabeDialoge> {
     final navigator = Navigator.of(context, rootNavigator: true);
     final route = DialogRoute<bool>(
       context: context,
-      builder: (_) => FreigabeDialog(a, widget.freigaben),
+      builder: (_) => FreigabeDialog(
+        a,
+        widget.freigaben,
+        profilname: widget.profilname,
+        mcpName: widget.mcpName,
+      ),
       barrierDismissible: false,
       themes: InheritedTheme.capture(from: context, to: navigator.context),
       traversalEdgeBehavior: TraversalEdgeBehavior.closedLoop,
@@ -1257,8 +1538,16 @@ class _FreigabeDialogeState extends State<FreigabeDialoge> {
 }
 
 class FreigabeDialog extends StatelessWidget {
-  const FreigabeDialog(this.anfrage, this.freigaben, {super.key});
+  const FreigabeDialog(
+    this.anfrage,
+    this.freigaben, {
+    this.profilname = 'Moodle',
+    this.mcpName = 'moodle',
+    super.key,
+  });
   final FreigabeAnfrage anfrage;
+  final String profilname;
+  final String mcpName;
 
   /// Für die Frist und den Zähler der wartenden Anfragen, der sich ändert,
   /// während der Dialog offen ist.
@@ -1297,7 +1586,17 @@ class FreigabeDialog extends StatelessWidget {
 
     final gross = anfrage.vergleich.isNotEmpty || anfrage.bilder.isNotEmpty;
     return AlertDialog(
-      title: Text(anfrage.titel),
+      title: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(anfrage.titel),
+          Text(
+            '$profilname ($mcpName)',
+            style: Theme.of(context).textTheme.titleSmall,
+          ),
+        ],
+      ),
       // Der kleine Dialog braucht Platz für eine volle Liste, den Satz zur
       // Frist und den Zähler darunter, auch bei 125 % Schriftgröße
       // (freigabe_test.dart); die großen fangen den Zähler im Zeilenvergleich
@@ -1392,8 +1691,11 @@ class FreigabeDialog extends StatelessWidget {
               builder: (context, _) => switch (freigaben.wartend) {
                 0 => const SizedBox.shrink(),
                 final n => Text(
-                  n == 1 ? '1 weitere Anfrage wartet.' : '$n weitere Anfragen warten.',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold),
+                  n == 1
+                      ? '1 weitere Anfrage wartet.'
+                      : '$n weitere Anfragen warten.',
+                  style: Theme.of(context).textTheme.bodySmall
+                      ?.copyWith(fontWeight: FontWeight.bold),
                 ),
               },
             ),

@@ -1,10 +1,29 @@
 # Changelog
 
 ## 0.9.23
+- Übertragung: Prüfprobleme bleiben auch bei abgeschlossenen Zielen sichtbar; Zeitlimitantworten nennen den laufenden Vorgang und das passende Statuswerkzeug.
+- Wiederholungsschutz: Gescheiterte Wiederholungsversuche geben unklare Vorgänger nicht frei; parallele Übertragungen erhalten gegenseitig ihre Protokolleinträge.
+- Wiederherstellung: Geteilte Fragensammlungen werden vor dem Start mit ihren Risiken genannt; unbestätigte Herkunft wird auch ohne Freigabedialog erklärt.
+- Wiederherstellung: Die Freigabe nennt nur noch die Aktivitäten, die im Archiv wirklich stehen; leere Zeilen „„“ ()“ aus den Einstellungen des Archivs entfallen, und ein Quiz scheitert nicht mehr an einem angeblich unlesbaren Typ.
+- Wiederherstellung: Dateien, die nur im Dateimanager einer Aktivität liegen, meldet die App als nicht lesbar (Prüflücke) statt als „fehlend im Ziel".
+- Wiederherstellung: Enthält das Archiv mehrere Tests, vergleicht die App die Fragen je Test; ein Test, den sie nicht zuordnen kann, steht einzeln als Prüflücke. Liegen alle Fragen im Test selbst, gilt ihre Herkunft auch ohne angegebene Sammlung als eigen, auch bei späteren Statusabfragen.
+- Wiederherstellung: Meldet Moodle einen Fehler, urteilt die App nicht danach, sondern liest den Zielkurs zurück: vollständig und gleich gilt als verifiziert, Abweichungen werden genannt, und ist das Ende des Hintergrundauftrags nicht belegt, bleibt der Vorgang gesperrt und die Antwort enthält eine fertige Nachfrage an die Verwaltung; „fehlgeschlagen" steht nur noch mit Beleg.
+- Wiederherstellung: Fragenvergleiche bleiben nach Neustarts erhalten; unklare Versionen und eine nicht belegte Quellherkunft bleiben ausdrücklich Prüflücken.
+- Formulare lesen: Ein Aktivitätstyp, den die App nicht ändern kann, steht mit „Prüflücke" im Ergebnis; die Verweise darin sind geprüft oder ausdrücklich als nicht geprüft benannt.
+- Sicherung und Wiederherstellung: Bleibt der Fortschritt 15 Minuten stehen, meldet die App einen Stillstand mit der letzten Beobachtung, nicht einen Fehler und nicht einen Erfolg.
+- Fragen lesen: Dasselbe Lesen mehrfach oder gleichzeitig bricht nicht mehr mit einem Ordnerfehler ab; der Ordner einer Frage gehört jeweils nur einem Lesen.
+- Moodle-Profile: Mehrere Instanzen lassen sich in einem Fenster verwalten; Anmeldung, Freigabestufe und KI-Werkzeug-Einrichtung gelten je Profil.
+- Moodle-Profile: Freigaben bleiben dem richtigen Profil zugeordnet; eine aktive Moodle-Adresse lässt sich erst nach der Abmeldung ändern.
+- Testmodus: Automatische Freigaben gelten nur für ausdrücklich zugeordnete Testprofile und deren Moodle-Adresse.
+- Wiederherstellung: Bilder und Anhänge werden gegen die ursprüngliche Sicherung geprüft; ein zwischenzeitlich ausgetauschtes Archiv, fehlende Dateien oder Unterschiede bleiben ausdrücklich unverifiziert.
+- Wiederherstellung: Nur eindeutig zugeordnete Aktivitäten aus der Sicherung werden verborgen; parallele oder mehrdeutige Neuanlagen bleiben unberührt und werden zur Prüfung gemeldet.
+- Sicherung und Wiederherstellung: Vorgänge bleiben bei mehreren KI-Sitzungen erhalten und bleiben an Profil und tatsächliche Moodle-Adresse gebunden; Umbenennen umgeht keine Wiederholungssperre, und vor einer bewussten Wiederholung zeigt die Freigabe den aktuellen Stand und das Dublettenrisiko.
+- MCP-Aufrufe: Ungültige Antworten und Transportfehler melden einen Fehlerstatus statt Erfolg.
 - macOS: Bildschirmfotos finden Edge, Chrome oder Chromium im Programmordner; eine Richtlinie, die die Fernsteuerung abschaltet, nennt die App.
 - macOS: Die App darf Verbindungen aufbauen (Netzwerkrechte im Entwicklungsbau). Fehlt der Benutzerordner, bricht die App mit einem Fehler ab, statt einen falschen Ort zu nehmen.
 - macOS: Der Einstellungsdialog sagt ausdrücklich, dass sich die Version auf dem Mac nicht selbst aktualisiert und nichts bei GitHub prüft.
 - macOS: Die Einrichtung findet `python3`, wenn kein `python` da ist.
+- macOS: MCP-Aufrufe im Entwicklungsbau können ein Moodle-Profil gezielt wählen; ohne Auswahl gilt das erste.
 - Wiederherstellung: Eine Sicherungsdatei lässt sich in einen bestehenden Kurs einfügen, ohne etwas zu ersetzen; die Freigabe nennt Kurs, Datei und was neu angelegt wird, und die Datei wird vor dem Hochladen geprüft.
 - Wiederherstellung: Fünf Ziele statt einem – als neuer Kurs (verborgen angelegt), in den aktuellen oder einen anderen Kurs, jeweils einfügen oder vorhandene Inhalte ersetzen. Ersetzen braucht eine eigene Bestätigung, die den Kurs nennt. Bei unklarer Angabe fragt die KI nach.
 - Sicherung: Eine einzelne Aktivität lässt sich als Datei ohne Nutzerdaten in den Sicherungsordner der App sichern; nach der Freigabe läuft sie in Moodle und die Datei wird geprüft.

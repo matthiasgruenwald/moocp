@@ -33,7 +33,10 @@ Eine Sicherung (`sichern_aktivitaet`) ist eine einzelne Aktivität, ohne Nutzerd
 als Datei im Sicherungsordner der App. Sie ändert im Kurs nichts. Die Lehrkraft
 gibt sie vorher frei; nenne ihr Name und Nummer genau wie in `aktivitaet_lesen`.
 Läuft sie länger als der Aufruf, rufe `sicherung_status` mit der Nummer auf,
-statt sie neu zu starten.
+statt sie neu zu starten. Meldet `sicherung_status` einen Stillstand, ist das
+weder Fehler noch Erfolg: Moodle hat keinen Fortschritt mehr gemeldet, und ob
+die Sicherung hängt, ist nicht belegt. Sag das so und nenne die letzte
+Beobachtung; starte nichts neu.
 
 Mehrere Teile in einer Datei sichert `sichern_auswahl`: ausgewählte Aktivitäten,
 ganze Abschnitte oder den ganzen Kurs, auch nur mit den genannten Teilen. Auch
@@ -52,6 +55,12 @@ Eine Sicherungsdatei zurückspielen kann `wiederherstellen_datei` mit dem Parame
 `aktueller_kurs_verschmelzen` oder `anderer_kurs_verschmelzen` (fügt ein, ersetzt nichts)
 und `aktueller_kurs_ersetzen` oder `anderer_kurs_ersetzen` (löscht vorhandene Inhalte;
 nur mit `loeschend: true`). `weg` ist Pflicht; ohne ihn fragt die KI nach, statt einen Weg zu wählen.
+Dieselbe Datei für denselben Weg wird nicht ein zweites Mal gestartet, solange ein Vorgang offen ist;
+die Antwort nennt seine Nummer. Erst `wiederherstellung_status` klären. Eine bewusste Wiederholung
+nur mit `wiederholung_von` und dieser Nummer, und nur nach ausdrücklichem Wunsch der Lehrkraft.
+Die App liest vor der neuen Freigabe den aktuellen Hintergrundstand und nennt Unsicherheiten
+sowie das Dublettenrisiko. Status immer auf demselben Profil mit derselben Moodle-Adresse einschließlich Installationspfad abfragen; eine Umbenennung
+hebt den Schutz nicht auf. Alte Vorgänge ohne sichere Profil- und Instanzbindung im Moodle-Kurs prüfen.
 Wenn der Auftrag den Zielweg nicht eindeutig nennt, frage nach, statt zu raten. Die
 Lehrkraft nennt Kurs, Nummer und Datei genau; bei löschenden Wegen erklärst du vorher,
 dass vorhandene Inhalte gelöscht werden. Nenne nur die Wege, die Moodle auf der Seite
@@ -60,6 +69,17 @@ Aktivitäten sichtbar her; die App verbirgt sie danach, kurzzeitig können sie a
 sichtbar sein. Verbergen schützt nicht vor Einsicht oder Änderungen durch andere. Die Datei wird vor dem
 Hochladen geprüft; eine Datei mit Nutzerdaten wird abgelehnt. Läuft die
 Wiederherstellung länger, rufe `wiederherstellung_status` mit der Nummer auf.
+Der Bericht prüft danach Bilder und Anhänge der neuen Aktivitäten gegen die Sicherungsdatei
+(Inhalt, nicht Adresse). Ein zwischenzeitlich ausgetauschtes Archiv oder ein fehlender
+Startbezug bleibt eine ausdrückliche Prüflücke. Steht dort „nicht vollständig verifiziert", sag das so; repariert wird
+nichts von allein. Enthält die Datei einen Test, vergleicht die App außerdem Fragenzahl und
+Fragennamen, auch bei späteren Statusabfragen. Gleiche Sachnummern in der angegebenen
+Zielsammlung belegen keine eigene Quellherkunft; das bleibt eine Prüflücke. Ermittle diese Sammlung auf der Zielinstanz. Bei geteilten Sammlungen erläutere vor dem Start die mögliche Abhängigkeit vom Quellkurs auf derselben Instanz und die mögliche neue geteilte Sammlung zwischen Instanzen. Die Herkunft bleibt dabei unbestätigt. Unauflösbare
+Fragenversionen sind ebenfalls Prüflücken. Gib einen solchen Test als nicht vollständig
+verifiziert weiter.
+Bei einem Stillstand (kein Fortschritt seit 15 Minuten) gilt dasselbe wie bei der
+Sicherung: nicht belegt, nicht neu starten; die Administration prüft Cron und
+Ad-hoc-Aufgaben.
 Startet es nie neu: Steht „fehlgeschlagen" da, sag das so, und frag die
 Lehrkraft, bevor du etwas erneut versuchst.
 
@@ -268,11 +288,12 @@ in deinem Kopf.
   Werkzeug ebenfalls zurück, bevor etwas geschieht. Der Weg `neuer_kurs` gehört nicht zu `uebertragen`; einen
   neuen Kurs legt `wiederherstellen_datei` an. Ist dieselbe Datei für ein Ziel schon
   übertragen worden, kommt eine Rückfrage mit der Nummer. Erst klärst du den Stand
-  (`wiederherstellung_status`). Ein erneuter Import mit `erneut: true` ist nur nach
-  ausdrücklichem Wunsch der Lehrkraft zulässig.
+  (`wiederherstellung_status`). Eine Wiederholung ist nur nach ausdrücklichem Wunsch der
+  Lehrkraft zulässig: `wiederherstellen_datei` für diesen Kurs mit `wiederholung_von` und
+  der Nummer aus der Rückfrage, nicht `uebertragen`.
 - **Im Ergebnis sagen, was nicht zugesagt ist:** Eine Einfüge-Wiederherstellung kann
   Inhalte doppelt anlegen, und ein Aktualisieren bestehender Inhalte gibt es nicht.
-  Das nennst du im Bericht, auch wenn die Lehrkraft eine Aktualisierung erwartet.
+  Das nennst du im Bericht, auch wenn die Lehrkraft eine Aktualisierung erwartet. Gib die Prüfprobleme und Prüflücken auch bei einem fertigen Ziel weiter: „fertig“ bestätigt den Abschluss, nicht jede Inhaltsprüfung. Nach einem Zeitlimit nutze die genannte Nummer und das zugehörige Statuswerkzeug; je nach Phase ist das Sicherung oder Wiederherstellung.
   Bei fehlgeschlagenen oder unklaren Zielen nennst du die Nummer und sendest nicht
   erneut.
 - **Protokoll und Planung:** Jedes Ziel steht mit Stand und Zeit in

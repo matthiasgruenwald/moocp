@@ -1,6 +1,6 @@
 # E31 Ein MCP-Server je Moodle-Instanz, Namen Moodle und Moodle Test
 
-Seit 2026-10-17. Status: umgesetzt mit Issue #4 (Instanzprofile): je Profil Port, Servername, Zugang, Freigaben und MCP-Server; das Einlesen eines zweiten Profils über die Oberfläche fehlt noch (TODO.md). Ergänzt [E1](0001-werkzeugschicht-und-skills.md) und [E13](0013-ki-werkzeuge-einrichten.md) um die Trennung der Instanzen. Die Kurzfassung steht im Index der [CLAUDE.md](../../CLAUDE.md).
+Seit 2026-10-17. Status: umgesetzt mit Issues #4 und #14: je Profil Port, Servername, Zugang, Freigabestufe und MCP-Server; Profile werden in der Oberfläche verwaltet. Ergänzt [E1](0001-werkzeugschicht-und-skills.md) und [E13](0013-ki-werkzeuge-einrichten.md) um die Trennung der Instanzen. Die Oberfläche bleibt ein gemeinsames Fenster (E32). Die Kurzfassung steht im Index der [CLAUDE.md](../../CLAUDE.md).
 
 ## Entscheidung
 

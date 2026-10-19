@@ -82,6 +82,18 @@ void main() {
       expect(b.aktivitaeten.single.titel, 'ZZ Testseite');
     });
 
+    test('Kennungen in den Einstellungen sind keine Aktivitäten des Archivs', () async {
+      final xml = _sicherungXml().replaceFirst('</moodle_backup>',
+          '<settings><setting><level>activity</level><activity>page_1</activity><name>page_1_included</name><value>1</value></setting></settings></moodle_backup>');
+      final b = await archivPruefen(_mbz([
+        _eintrag('moodle_backup.xml', _xml(xml)),
+        _eintrag('activities/page_1/page.xml', _xml('<activity/>')),
+      ]));
+      expect(b.ok, isTrue, reason: b.grund);
+      expect(b.aktivitaeten, hasLength(1));
+      expect(b.aktivitaeten.single.titel, 'ZZ Testseite');
+    });
+
     test('gültiger Kurs ohne Nutzerdaten wird angenommen', () async {
       final b = await archivPruefen(_mbz([
         _eintrag('moodle_backup.xml', _xml(_sicherungXml(typ: 'course'))),
@@ -218,6 +230,34 @@ void main() {
       expect(nutzerdatenPfad('activities/page_1/page.xml'), isFalse);
     });
 
+  });
+
+  group('Archividentität beim Gegenlesen', () {
+    const erwartet = [(modul: 'page', titel: 'Infoblatt')];
+
+    test('ordnet die einzelne passende neue Aktivität zu', () {
+      expect(importierteCmidsEindeutig(erwartet: erwartet, vorher: {4}, aktuell: const [
+        (cmid: 4, modul: 'page', titel: 'Alt'),
+        (cmid: 9, modul: 'page', titel: 'Infoblatt'),
+      ]), [9]);
+    });
+
+    test('lässt parallele und mehrdeutige Neuanlagen unzugeordnet', () {
+      expect(importierteCmidsEindeutig(erwartet: erwartet, vorher: {4}, aktuell: const [
+        (cmid: 9, modul: 'page', titel: 'Infoblatt'),
+        (cmid: 10, modul: 'forum', titel: 'Lehrkraft-Beitrag'),
+      ]), isNull);
+      expect(importierteCmidsEindeutig(erwartet: erwartet, vorher: {}, aktuell: const [
+        (cmid: 9, modul: 'page', titel: 'Infoblatt'),
+        (cmid: 10, modul: 'page', titel: 'Infoblatt'),
+      ]), isNull);
+      expect(importierteCmidsEindeutig(erwartet: const [
+        (modul: 'page', titel: 'Infoblatt'), (modul: 'page', titel: 'Infoblatt')
+      ], vorher: {}, aktuell: const [
+        (cmid: 9, modul: 'page', titel: 'Infoblatt'),
+        (cmid: 10, modul: 'page', titel: 'Infoblatt'),
+      ]), isNull);
+    });
   });
 
   group('Zustandsfolge', () {
@@ -379,6 +419,19 @@ void main() {
       expect(get('https://m.example/backup/restore.php?contextid=5&filename=kurs-12.mbz'), isTrue);
       expect(get('https://m.example/backup/restore.php?contextid=5&filename=../x'), isFalse);
       expect(get('https://m.example/backup/restore.php?contextid=5&filename=k.mbz&extra=1'), isFalse);
+    });
+  });
+
+  // Befund 8: ein nicht schreibbarer Typ darf nie verifiziert werden.
+  group('nichtSchreibbarePruefluecke', () {
+    test('nur schreibbare Typen: keine Prüflücke', () {
+      expect(nichtSchreibbarePruefluecke(['page', 'quiz', 'resource']), isNull);
+    });
+
+    test('nicht schreibbarer Typ: Prüflücke nennt den Typ', () {
+      final t = nichtSchreibbarePruefluecke(['page', 'lernlandkarte']);
+      expect(t, isNotNull);
+      expect(t, contains('lernlandkarte'));
     });
   });
 }

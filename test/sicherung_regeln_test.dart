@@ -8,6 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:moocp/moodle/moodle_zugang.dart';
 import 'package:moocp/moodle/sicherung.dart';
 import 'package:moocp/moodle/sicherung_regeln.dart';
+import 'package:moocp/moodle/wiederherstellung_regeln.dart';
 import 'package:moocp/moodle/sperrliste.dart';
 import 'package:moocp/protokoll.dart';
 
@@ -213,6 +214,17 @@ void main() {
       expect(neu.backupid, '42');
       expect(neu.kontext, 99);
       expect(File('${ordner.path}/vorgaenge.json.tmp').existsSync(), isFalse);
+    });
+
+    test('Wiederherstellungsidentität bleibt für spätere Statusabfragen erhalten', () async {
+      final v = Vorgaenge(ordner.path);
+      final vg = await v.neuWiederherstellung(kurs: 12, datei: 'kurs.mbz');
+      const aktivitaeten = [(modul: 'page', titel: 'Infoblatt')];
+      await v.aktualisieren(vg, wiederherstellung: WiederherstellungStand.laufend,
+          vorherCmids: [4], wiederherstellungAktivitaeten: aktivitaeten);
+      final neu = await Vorgaenge(ordner.path).finde(vg.id);
+      expect(neu!.vorherCmids, [4]);
+      expect(neu.wiederherstellungAktivitaeten, aktivitaeten);
     });
 
     test('beschädigte Datei: Fehler, nichts überschrieben', () async {

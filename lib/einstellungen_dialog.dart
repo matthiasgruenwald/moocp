@@ -35,6 +35,8 @@ class EinstellungenDialog extends StatefulWidget {
     required this.eigene,
     required this.updateMoeglich,
     required this.sitzungLaeuft,
+    this.profilname = 'Moodle',
+    this.mcpName = 'moodle',
     super.key,
   });
 
@@ -50,6 +52,8 @@ class EinstellungenDialog extends StatefulWidget {
   /// Ob der MCP-Server läuft; dann hängt womöglich eine Sitzung eines KI-Werkzeugs
   /// daran, die ein Update verlöre.
   final bool sitzungLaeuft;
+  final String profilname;
+  final String mcpName;
 
   @override
   State<EinstellungenDialog> createState() => _EinstellungenDialogState();
@@ -93,7 +97,7 @@ class _EinstellungenDialogState extends State<EinstellungenDialog> {
     final e = widget.einstellungen;
     final an = e.updatePruefen == true;
     return AlertDialog(
-      title: const Text('Einstellungen'),
+      title: Text('Einstellungen — ${widget.profilname} (${widget.mcpName})'),
       content: SizedBox(
         width: 560,
         child: SingleChildScrollView(

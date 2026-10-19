@@ -60,8 +60,8 @@ const _stufenText = {
 
 /// Wartet höchstens [z] auf [f]. Danach kommt [weiter] als Text zurück, und
 /// [f] läuft im Hintergrund weiter: Eine Sicherung verliert sich nicht, nur weil
-/// der Client nicht mehr wartet. Ein Fehler von [f] geht an den Aufrufer, auch
-/// wenn er nach dem Zeitlimit kommt.
+/// der Client nicht mehr wartet. Nach dem Zeitlimit liefern die Statuswerkzeuge
+/// den vom Hintergrundvorgang gespeicherten Stand und mögliche Fehler.
 Future<String> _zeitlimit(Future<String> f, Duration z, String Function() weiter) {
   final c = Completer<String>();
   f.then(
@@ -80,18 +80,25 @@ Future<String> _zeitlimit(Future<String> f, Duration z, String Function() weiter
 
 class McpDienst {
   McpDienst(this.einstellungen, this.moodle, this.protokoll, this.freigaben, this.arbeitsordner,
-      {required this.profil});
+      {required this.profil, this.sicherungsordner, this.uebertragungsprotokollPfad, this.antwortfrist = const Duration(minutes: 1)});
 
   final Einstellungen einstellungen;
 
   /// Das Instanzprofil dieses Servers (E31): Port, Name und Adresse kommen von dort.
-  final Profil profil;
+  Profil profil;
   final MoodleZugang moodle;
   final Protokoll protokoll;
   final Freigaben freigaben;
 
   /// Pfad des Arbeitsordners (arbeitsordner.dart).
   final String arbeitsordner;
+
+  /// Speicherort und Antwortfrist des Servers; Hintergrundvorgänge laufen danach weiter.
+  final String? sicherungsordner;
+  final Duration antwortfrist;
+
+  /// Abweichender Protokollpfad für isolierte MCP-Vertragstests.
+  final String? uebertragungsprotokollPfad;
 
   StreamableMcpServer? _server;
   bool get laeuft => _server != null;
@@ -259,7 +266,8 @@ class McpDienst {
   /// uebertragung_lauf.dart; hier nur die Verdrahtung mit Moodle und Freigabe.
   /// Reihenfolge: prüfen, Wiederholungsschutz, eine Freigabe mit der
   /// Zusammenfassung, sichern (nur ohne datei), dann je Ziel wiederherstellen.
-  Future<String> _uebertragen(Vorgaenge vorgaenge, Map<String, dynamic> a) async {
+  Future<String> _uebertragen(Vorgaenge vorgaenge, Map<String, dynamic> a,
+      {required void Function(String werkzeug, String? id) beiVorgang}) async {
     final ziele = <ZielAngabe>[];
     for (final x in (a['ziele'] as List?) ?? const []) {
       final m = _karte(x);
@@ -270,7 +278,6 @@ class McpDienst {
           loeschend: m['loeschend'] == true));
     }
     final angegeben = a['datei'] as String?;
-    final erneut = a['erneut'] == true;
     final quellkurs = angegeben == null ? _zahlOder(a, 'kurs') : null;
     if (angegeben == null && (quellkurs == null || a['name_des_kurses'] == null)) {
       return 'Ohne datei braucht es kurs (Quellkurs) und name_des_kurses. Nichts geschehen.';
@@ -280,11 +287,11 @@ class McpDienst {
     if (planung case PlanungRueckfrage(:final text)) return text;
     final geprueft = (planung as PlanungOk).ziele;
 
-    final protokoll = await Uebertragungsprotokoll.laden(p.join(einstellungenOrdner, 'uebertragungen.json'));
+    final protokoll = await Uebertragungsprotokoll.laden(uebertragungsprotokollPfad ?? p.join(einstellungenOrdner, 'uebertragungen.json'));
     final rueckfragen = <String>[];
     for (final z in geprueft) {
       final r = wiederholungsRueckfrage(protokoll.eintraege,
-          profil: profil.kennung, kurs: z.kurs, datei: angegeben, quellkurs: quellkurs, erneut: erneut);
+          profil: profil.kennung, kurs: z.kurs, datei: angegeben, quellkurs: quellkurs);
       if (r != null) rueckfragen.add('Kurs ${z.kurs} („${z.name}"): $r');
     }
     if (rueckfragen.isNotEmpty) return rueckfragen.join('\n\n');
@@ -335,6 +342,7 @@ class McpDienst {
       datei = angegeben;
     } else {
       String? sicherungVid;
+      beiVorgang('sicherung_status', null);
       final sicherungText = await auswahlSichern(moodle, freigaben, vorgaenge,
           kurs: quellkurs!,
           name: _text(a, 'name_des_kurses'),
@@ -350,6 +358,7 @@ class McpDienst {
           zielOrdner: a['ziel_ordner'] as String?,
           beiVorgang: (id) {
             sicherungVid = id;
+            beiVorgang('sicherung_status', id);
           });
       final id = sicherungVid;
       if (id == null) return sicherungText;
@@ -364,18 +373,21 @@ class McpDienst {
     // Ein Ziel: eigener Vorgang, Stand aus dem Vorgang. Ohne Vorgangsnummer hat die
     // App abgelehnt (wiederherstellen legt den Vorgang erst nach der Freigabe an).
     Future<ZielErgebnis> lauf(PlanZiel z) async {
+      beiVorgang('wiederherstellung_status', null);
       String? vid;
       String text = '';
       try {
         text = await wiederherstellen(moodle, freigaben, vorgaenge,
             datei: datei,
             instanz: profil.name,
+            profilKennung: profil.kennung,
             weg: z.weg.nennung,
             kurs: z.kurs,
             name: z.name,
             loeschend: z.weg.loescht,
             beiVorgang: (id) {
               vid = id;
+              beiVorgang('wiederherstellung_status', id);
             });
       } on MoodleFehler catch (e) {
         if (vid == null) return ZielErgebnis(ZielStand.fehlgeschlagen, text: e.meldung);
@@ -463,7 +475,8 @@ class McpDienst {
       server.server.oninitialized = () => protokoll.eintrag(Art.info, 'KI-Werkzeug verbunden: ${_client(server)}');
     }
     final ao = arbeitsordner;
-    final vorgaenge = Vorgaenge(sicherungenOrdner);
+    final vorgaenge = Vorgaenge(sicherungsordner ?? sicherungenOrdner, profilKennung: profil.kennung,
+        instanzBasis: () => moodle.angemeldet ? moodle.basis : null);
 
     _werkzeug(server, 'status',
         titel: 'Status',
@@ -822,32 +835,39 @@ class McpDienst {
                   'kein Laufwerk).'),
         },
         pflicht: ['kurs', 'cmid', 'name'],
-        ausfuehren: (a) => _zeitlimit(
-              aktivitaetSichern(moodle, freigaben, vorgaenge,
-                  kurs: _zahl(a, 'kurs'),
-                  cmid: _zahl(a, 'cmid'),
-                  name: _text(a, 'name'),
-                  zielOrdner: a['ziel_ordner'] as String?),
-              const Duration(minutes: 1),
-              () => 'Die Sicherung läuft weiter. Mit sicherung_status und der Nummer später prüfen, '
-                  'ob sie fertig ist.',
-            ));
+        ausfuehren: (a) {
+          String? vid;
+          return _zeitlimit(
+            aktivitaetSichern(moodle, freigaben, vorgaenge,
+                kurs: _zahl(a, 'kurs'),
+                cmid: _zahl(a, 'cmid'),
+                name: _text(a, 'name'),
+                zielOrdner: a['ziel_ordner'] as String?,
+                beiVorgang: (id) => vid = id),
+            antwortfrist,
+            () => laufText('Die Sicherung', vid, 'sicherung_status'),
+          );
+        });
 
     _werkzeug(server, 'sicherung_status',
         titel: 'Sicherung prüfen',
         beschreibung: 'Zeigt den Stand einer Sicherung (anstehend, laufend, fertig, fehlgeschlagen, unklar) und '
             'fragt laufende bei Moodle nach. Ohne Nummer: die letzten Sicherungen. Nur lesen, außer wenn eine '
-            'Sicherung noch bei Moodle läuft.',
+            'Sicherung noch bei Moodle läuft. Nur Vorgänge dieses Profils; ungebundene Altvorgänge '
+            'werden nicht bei Moodle fortgesetzt. Die tatsächliche Moodle-Adresse einschließlich Installationspfad '
+            'muss mit der gespeicherten Instanzbindung übereinstimmen.',
         parameter: {'id': JsonSchema.string(description: 'Nummer der Sicherung, wie sichern_aktivitaet sie nennt')},
         nurLesen: true,
         ausfuehren: (a) => _zeitlimit(
               sicherungStatus(moodle, vorgaenge, id: a['id'] as String?),
-              const Duration(minutes: 1),
-              () => 'Die Sicherung läuft noch. Bitte später erneut prüfen.',
+              antwortfrist,
+              () => laufText('Die Sicherung', a['id'] as String?, 'sicherung_status'),
             ));
 
     // ---- Wiederherstellen einer Sicherungsdatei in einen bestehenden Kurs (E29, moodle/wiederherstellung.dart)
+    // MCP kennzeichnet das ganze Werkzeug, nicht den gewählten Zielweg: Ersetzen kann löschen.
     _werkzeug(server, 'wiederherstellen_datei',
+        zerstoerend: true,
         titel: 'Datei in Kurs wiederherstellen',
         beschreibung: 'Stellt eine Sicherungsdatei (.mbz) aus dem Sicherungsordner wieder her. Der Zielweg steht im '
             'Parameter weg: neuer_kurs (neuer Kurs, braucht neuer_kurs_name und kurzname, optional kategorie_id), '
@@ -859,11 +879,19 @@ class McpDienst {
             'zu der Nummer passen. Vor dem Start fragt die App nach einer Freigabe, die Kurs, Datei, Modus und die '
             'neuen Aktivitäten zeigt; bei löschenden Wegen steht dort, dass vorhandene Inhalte gelöscht werden. '
             'Neue Aktivitäten werden danach verborgen (kurzzeitig können sie sichtbar sein). Verborgen ist kein Schutz. '
+            'Ein nach dem Start ausgetauschtes Quellarchiv oder fehlender Inhalts-Hash bleibt bei der Anhangprüfung eine Prüflücke. '
             'Dauert es länger als eine Minute, läuft es weiter: dann wiederherstellung_status mit der Nummer aufrufen. '
-            'Nach dem Start wird nie neu gesendet.',
+            'Nach dem Start wird nie neu gesendet. Dieselbe Datei für denselben Zielweg wird nicht ein zweites Mal '
+            'gestartet, solange dafür ein Vorgang offen oder fertig ist (ein zweiter Lauf legt Dubletten an; auch nach dem Zeitlimit oder einem Neustart); ein vor dem Start abgebrochener oder belegt fehlgeschlagener Vorgang sperrt nicht. Meldet Moodle einen Fehler, entscheidet die App nicht aus dem Fehlerfeld, sondern liest den Zielkurs zurück: Ist alles Prüfbare vollständig und gleich, gilt der Vorgang als verifiziert (Prüflücken bleiben genannt); weicht der Zielkurs ab, nennt die Antwort das Fehlende und die Optionen (bewusste Wiederholung mit wiederholung_von oder das Fehlende einzeln anlegen), der Vorgang bleibt gesperrt; ist das Prozessende nicht belegt, bleibt er gesperrt und die Antwort enthält einen Nachfragetext an die Verwaltung. Fehlgeschlagen gilt nur, wenn der Prozess beendet ist und im Zielkurs nachweislich nichts Neues steht. Die App wiederholt nie selbst. Bei einer Sperre nennt die Antwort '
+            'die Nummer des Vorgangs, auch wenn das Profil umbenannt wurde. Eine bewusste Wiederholung nur mit wiederholung_von '
+            'und dieser Nummer: Der aktuelle Hintergrundstand wird vor der Freigabe gelesen und mit Unsicherheiten '
+            'und Dublettenrisiko angezeigt.',
         parameter: {
           'datei': JsonSchema.string(
               description: 'Dateiname der .mbz relativ zum Sicherungsordner, wie sichern_aktivitaet ihn nennt.'),
+          'wiederholung_von': JsonSchema.string(
+              description: 'Nur bei einer bewussten Wiederholung: Nummer des offenen Vorgangs, den die Antwort '
+                  'vorher genannt hat. Ohne Angabe wird eine Wiederholung abgewiesen.'),
           'weg': JsonSchema.string(
               enumValues: [for (final z in Zielweg.values) z.nennung],
               description: 'Zielweg, Pflicht. Die Optionen stehen in enumValues.'),
@@ -878,34 +906,46 @@ class McpDienst {
               description: 'Nur bei neuer_kurs: Kurzname des neuen Kurses.'),
           'kategorie_id': JsonSchema.integer(
               description: 'Nur bei neuer_kurs, optional: Kategorie-Nummer. Ohne Angabe die Vorgabe des Kursformulars.'),
+          'sammlung': JsonSchema.integer(
+              description: 'Optional: cmid einer Zielsammlung auf dieser Zielinstanz für den Sachnummernvergleich (fragensammlungen hier aufrufen). '
+                  'Gleiche Nummern belegen keine eigene Quellherkunft; diese bleibt eine Prüflücke.'),
         },
         pflicht: ['datei', 'weg'],
-        ausfuehren: (a) => _zeitlimit(
-              wiederherstellen(moodle, freigaben, vorgaenge,
-                  datei: _text(a, 'datei'),
-                  weg: a['weg'] as String?,
-                  loeschend: a['loeschend'] == true,
-                  kurs: _zahlOder(a, 'kurs'),
-                  name: a['name'] as String?,
-                  neuerKursName: a['neuer_kurs_name'] as String?,
-                  kurzname: a['kurzname'] as String?,
-                  kategorieId: _zahlOder(a, 'kategorie_id'),
-                  instanz: profil.name),
-              const Duration(minutes: 1),
-              () => 'Die Wiederherstellung läuft weiter. Mit wiederherstellung_status und der Nummer später prüfen.',
-            ));
+        ausfuehren: (a) {
+          String? vid;
+          return _zeitlimit(
+            wiederherstellen(moodle, freigaben, vorgaenge,
+                datei: _text(a, 'datei'),
+                weg: a['weg'] as String?,
+                loeschend: a['loeschend'] == true,
+                kurs: _zahlOder(a, 'kurs'),
+                name: a['name'] as String?,
+                neuerKursName: a['neuer_kurs_name'] as String?,
+                kurzname: a['kurzname'] as String?,
+                kategorieId: _zahlOder(a, 'kategorie_id'),
+                sammlung: _zahlOder(a, 'sammlung'),
+                wiederholungVon: a['wiederholung_von'] as String?,
+                instanz: profil.name,
+                profilKennung: profil.kennung,
+                beiVorgang: (id) => vid = id),
+            antwortfrist,
+            () => laufText('Die Wiederherstellung', vid, 'wiederherstellung_status'),
+          );
+        });
 
     _werkzeug(server, 'wiederherstellung_status',
         titel: 'Wiederherstellung prüfen',
         beschreibung: 'Zeigt den Stand einer Wiederherstellung (anstehend, hochgeladen, laufend, fertig, '
             'fehlgeschlagen, unklar) und fragt eine laufende bei Moodle nach. Startet nie neu. Ein Vorgang, der nie bei '
-            'Moodle begonnen hat, wird als fehlgeschlagen vermerkt.',
+            'Moodle begonnen hat, wird als fehlgeschlagen vermerkt. Nur Vorgänge dieses Profils; ungebundene Altvorgänge '
+            'werden nicht bei Moodle fortgesetzt. Die tatsächliche Moodle-Adresse einschließlich Installationspfad '
+            'muss mit der gespeicherten Instanzbindung übereinstimmen.',
         parameter: {'id': JsonSchema.string(description: 'Nummer der Wiederherstellung, wie wiederherstellen_datei sie nennt')},
         pflicht: ['id'],
         ausfuehren: (a) => _zeitlimit(
               wiederherstellungStatus(moodle, vorgaenge, id: _text(a, 'id')),
-              const Duration(minutes: 1),
-              () => 'Die Wiederherstellung läuft noch. Bitte später erneut prüfen.',
+              antwortfrist,
+              () => laufText('Die Wiederherstellung', _text(a, 'id'), 'wiederherstellung_status'),
             ));
 
     _werkzeug(server, 'sichern_auswahl',
@@ -948,6 +988,7 @@ class McpDienst {
           List<Map<String, dynamic>> liste(String n) => [
                 for (final x in (a[n] as List?) ?? const []) (x as Map).cast<String, dynamic>(),
               ];
+          String? vid;
           return _zeitlimit(
             auswahlSichern(moodle, freigaben, vorgaenge,
                 kurs: _zahl(a, 'kurs'),
@@ -955,10 +996,10 @@ class McpDienst {
                 aktivitaeten: [for (final x in liste('aktivitaeten')) (cmid: _zahl(x, 'cmid'), name: _text(x, 'name'))],
                 abschnitte: [for (final x in liste('abschnitte')) (id: _zahl(x, 'id'), name: _text(x, 'name'))],
                 ganzerKurs: a['ganzer_kurs'] == true,
-                zielOrdner: a['ziel_ordner'] as String?),
-            const Duration(minutes: 1),
-            () => 'Die Sicherung läuft weiter. Mit sicherung_status und der Nummer später prüfen, '
-                'ob sie fertig ist.',
+                zielOrdner: a['ziel_ordner'] as String?,
+                beiVorgang: (id) => vid = id),
+            antwortfrist,
+            () => laufText('Die Sicherung', vid, 'sicherung_status'),
           );
         });
 
@@ -973,7 +1014,7 @@ class McpDienst {
             'es hier nicht: dafür auf der Quellinstanz sichern_auswahl und auf der Zielinstanz wiederherstellen_datei '
             '(zwei Aufrufe). Vor dem ersten Schreiben zeigt die App eine Zusammenfassung; jeder Schritt fragt danach '
             'noch einmal. Ist dieselbe Datei für ein Ziel schon übertragen worden, kommt eine Rückfrage statt eines '
-            'erneuten Imports; erneut: true hebt das für diesen Aufruf auf. Eine Einfüge-Wiederherstellung kann Dubletten '
+            'erneuten Imports; eine bewusste Wiederholung geht über wiederherstellen_datei mit wiederholung_von. Eine Einfüge-Wiederherstellung kann Dubletten '
             'erzeugen. Das Protokoll je Ziel steht in uebertragungen.json im Einstellungsordner.',
         zerstoerend: true,
         parameter: {
@@ -994,8 +1035,6 @@ class McpDienst {
               description: 'Die Zielkurse in dieser Instanz, je {kurs, name, weg}.'),
           'datei': JsonSchema.string(
               description: 'Optional: eine vorhandene .mbz im Sicherungsordner, relativ. Ohne Angabe wird zuerst gesichert.'),
-          'erneut': JsonSchema.boolean(
-              description: 'true hebt den Wiederholungsschutz für diesen Aufruf auf. Nur nach ausdrücklichem Wunsch der Lehrkraft.'),
           'kurs': JsonSchema.integer(description: 'Quellkurs (Kurs-ID), nur ohne datei.'),
           'name_des_kurses': JsonSchema.string(
               description: 'Der Name des Quellkurses, wie er jetzt in Moodle steht. Nur ohne datei.'),
@@ -1019,12 +1058,21 @@ class McpDienst {
               description: 'Nur ohne datei: Unterordner im Sicherungsordner, wie bei sichern_auswahl.'),
         },
         pflicht: ['ziele'],
-        ausfuehren: (a) => _zeitlimit(
-              _uebertragen(vorgaenge, a),
-              const Duration(minutes: 4),
-              () => 'Die Übertragung läuft weiter. Mit wiederherstellung_status und den Nummern prüfen; '
-                  'uebertragungen.json zeigt den Stand je Ziel.',
-            ));
+        ausfuehren: (a) {
+          String? nummer;
+          var werkzeug = 'sicherung_status';
+          return _zeitlimit(
+            _uebertragen(vorgaenge, a, beiVorgang: (w, id) {
+              werkzeug = w;
+              nummer = id;
+            }),
+            antwortfrist * 4,
+            () => nummer == null
+                ? 'Die Übertragung wartet noch vor dem nächsten Start, etwa auf eine Freigabe. '
+                    'Für diesen Schritt gibt es noch keine Vorgangsnummer. Den Auftrag nicht erneut senden.'
+                : laufText('Die Übertragung', nummer, werkzeug),
+          );
+        });
 
     // ---- Bücher
     final buchCmid =JsonSchema.integer(description: 'cmid des Buchs, die Zahl hinter mod/book/view.php?id=');
