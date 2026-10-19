@@ -240,6 +240,9 @@ Future<String> wiederherstellen(
       vergleich: const [],
       knopf: zielweg.loescht ? 'Löschen und wiederherstellen' : 'Wiederherstellen',
       ohneEntscheidung: 'wird nichts wiederhergestellt',
+      // Die Rückfrage vor einer Wiederholung gilt bei jeder Stufe (E29): Sonst entschiede
+      // allein der Parameter wiederholung_von, den die KI selbst setzt.
+      ab: wiederholungVon != null ? Bestaetigungen.keine : Bestaetigungen.mittel,
     ));
     if (!ja) {
       return 'Nicht wiederhergestellt: in der App abgelehnt oder nicht innerhalb von '

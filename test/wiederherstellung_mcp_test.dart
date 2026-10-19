@@ -375,7 +375,7 @@ void main() {
     final reads = external.progressReads;
     external.progress = {'progress': 1, 'status': 1000};
     external.completed = true;
-    approvals.stufe = Bestaetigungen.mittel;
+    // Stufe bleibt „keine": Die Rückfrage vor einer Wiederholung gilt trotzdem (E29).
     String? approval;
     approvals.addListener(() {
       final current = approvals.aktuell;
