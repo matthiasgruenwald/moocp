@@ -214,6 +214,10 @@ Umgesetzt (`wiederherstellen_datei`, `wiederherstellung_status`, `lib/moodle/wie
 - Abbruch oder verlorene Antwort nach dem Absenden von Schritt 16: Die App liest den Stand nach und wiederholt nie blind. Ob Moodle den Lauf nach einem Abbruch der Sitzung tatsächlich weiterführt, ist ungemessen.
 - Freigabe-Test „Die Stufe steht in den Einstellungen …" schlug einmal im Gesamtlauf fehl und lief beim Wiederholen durch (Flake, nicht durch diese Änderung verursacht). Beobachten.
 
+## Freigabe ohne Zeitlimit des KI-Aufrufs
+
+Die Freigabe wartet bis zu 30 Minuten, aber nur, solange die KI auf den Werkzeugaufruf wartet: Das Zeitlimit des MCP-Clients (vermutlich 60 Sekunden) schließt den Dialog (E4, `Freigaben.mitAbbruch`). Wer nicht am Fenster sitzt, verpasst die Frist, auch bei den Rückfragen, die bei jeder Stufe gelten (Wiederholung, E29). Lösung: Das Werkzeug kehrt sofort mit einer Nummer zurück („Freigabe liegt in der App“), der Dialog bleibt offen, und ein Statuswerkzeug meldet, ob geschrieben wurde, so wie bei Sicherung und Wiederherstellung. Offen: welche Werkzeuge es betrifft, wie ein später abgelehnter oder verfallener Vorgang gemeldet wird, damit die KI nie einen Lauf für gescheitert hält, der noch freigegeben werden kann (E4), und ein Test über den öffentlichen MCP-Aufruf.
+
 ## Doppelstart-Schutz (Ticket #19): offene Punkte
 - Die Ende-zu-Ende-Prüfung fehlt: Die Reihenfolge (Doppelstart-Prüfung vor der Freigabe) ist nur im Code; ein Test braucht eine gültige .mbz-Vorlage (Testfixture) und einen Moodle-Doppel.
 - `wiederherstellung_status` setzt einen Vorgang „anstehend" oder „hochgeladen" ohne laufende Sitzung auf „fehlgeschlagen". Das gibt die Sperre frei, obwohl das Senden vor dem Absturz geschehen sein kann. Bisheriges Verhalten, nicht geändert; prüfen.
