@@ -87,9 +87,16 @@ typedef Teil = ({double oben, double hoehe, bool zerschnitten});
 /// durchschnitten, mit Überlappung. Ein Modell setzt eine zerschnittene
 /// Zeile oder Formel nicht zuverlässig zusammen und hielte sie für kaputt;
 /// ein einziges hohes Bild dagegen verkleinert es, bis nichts mehr lesbar ist.
-List<Teil> teilen(double hoehe, List<(double, double)> sperren,
-    {double hoechstens = _teilhoehe, double ueberlappung = _ueberlappung}) {
-  final s = [for (final x in sperren) if (x.$2 > x.$1) x]..sort((a, b) => a.$1.compareTo(b.$1));
+List<Teil> teilen(
+  double hoehe,
+  List<(double, double)> sperren, {
+  double hoechstens = _teilhoehe,
+  double ueberlappung = _ueberlappung,
+}) {
+  final s = [
+    for (final x in sperren)
+      if (x.$2 > x.$1) x,
+  ]..sort((a, b) => a.$1.compareTo(b.$1));
   // Was sich überlappt, wird eine Sperre; was sich nur berührt, nicht --
   // zwischen zwei Zeilen darf geschnitten werden.
   final gesperrt = <(double, double)>[];
@@ -108,7 +115,8 @@ List<Teil> teilen(double hoehe, List<(double, double)> sperren,
     if (m == null) {
       teile.add((oben: oben, hoehe: hoechstens, zerschnitten: false));
       oben = grenze;
-    } else if (m.$1 - oben >= 1 && (m.$2 - m.$1 <= hoechstens || m.$1 - oben >= hoechstens / 2)) {
+    } else if (m.$1 - oben >= 1 &&
+        (m.$2 - m.$1 <= hoechstens || m.$1 - oben >= hoechstens / 2)) {
       // Vor dem Element schneiden: Es passt ganz in den nächsten Teil, oder
       // es ist ohnehin zu hoch und beginnt erst in der unteren Hälfte.
       teile.add((oben: oben, hoehe: m.$1 - oben, zerschnitten: false));
@@ -129,7 +137,9 @@ class _Cdp {
       onDone: () {
         _zu = true;
         for (final c in _offen.values) {
-          if (!c.isCompleted) c.completeError(MoodleFehler('Browser: Verbindung beendet.'));
+          if (!c.isCompleted) {
+            c.completeError(MoodleFehler('Browser: Verbindung beendet.'));
+          }
         }
         _offen.clear();
       },
@@ -147,7 +157,10 @@ class _Cdp {
   /// Beenden noch unterwegs sind, kommen so in die gewöhnliche Fehlerbehandlung.
   var _zu = false;
 
-  Future<Map<String, dynamic>> senden(String methode, [Map<String, Object?> params = const {}]) {
+  Future<Map<String, dynamic>> senden(
+    String methode, [
+    Map<String, Object?> params = const {},
+  ]) {
     if (_zu) return Future.error(MoodleFehler('Browser: Verbindung beendet.'));
     final id = ++_id;
     final c = Completer<Map<String, dynamic>>();
@@ -161,7 +174,8 @@ class _Cdp {
     }
     return c.future.timeout(
       const Duration(seconds: 90),
-      onTimeout: () => throw MoodleFehler('Browser antwortet nicht ($methode).'),
+      onTimeout: () =>
+          throw MoodleFehler('Browser antwortet nicht ($methode).'),
     );
   }
 
@@ -192,7 +206,8 @@ class _Cdp {
 /// Name und Pfad des ersten Browsers in der Suchreihenfolge der Plattform,
 /// der da ist und dessen Fernsteuerung die Verwaltung nicht abgeschaltet hat.
 /// Fehlt einer nur wegen der Richtlinie, sagt der Fehler das.
-Future<(String, String)> _browser({PlattformBrowser? plattform}) => browserWaehlen(plattform ?? plattformBrowser);
+Future<(String, String)> _browser({PlattformBrowser? plattform}) =>
+    browserWaehlen(plattform ?? plattformBrowser);
 
 /// Die Auswahl selbst, ohne Betriebssystem: [plattform] liefert Pfade und
 /// Richtlinien, die Tests als Fakes geben.
@@ -208,15 +223,19 @@ Future<(String, String)> browserWaehlen(PlattformBrowser plattform) async {
     return (art.anzeige, pfad);
   }
   if (verboten.isNotEmpty) {
-    throw MoodleFehler('Auf diesem Rechner ist die Fernsteuerung von ${verboten.join(' und ')} per Richtlinie abgeschaltet '
-        '(RemoteDebuggingAllowed) -- ohne sie gibt es keine Bildschirmfotos. Das entscheidet die Verwaltung des '
-        'Rechners; die App umgeht es nicht.');
+    throw MoodleFehler(
+      'Auf diesem Rechner ist die Fernsteuerung von ${verboten.join(' und ')} per Richtlinie abgeschaltet '
+      '(RemoteDebuggingAllowed) -- ohne sie gibt es keine Bildschirmfotos. Das entscheidet die Verwaltung des '
+      'Rechners; die App umgeht es nicht.',
+    );
   }
   final namen = [for (final a in plattform.arten) a.anzeige];
   final weder = namen.length == 1
       ? namen.single
       : '${namen.sublist(0, namen.length - 1).join(', ')} noch ${namen.last}';
-  throw MoodleFehler('Weder $weder ist zu finden -- ohne einen davon gibt es keine Bildschirmfotos.');
+  throw MoodleFehler(
+    'Weder $weder ist zu finden -- ohne einen davon gibt es keine Bildschirmfotos.',
+  );
 }
 
 /// Der Grund, den die Lehrkraft im Dialog liest: ein Satz, was das Bild
@@ -224,17 +243,25 @@ Future<(String, String)> browserWaehlen(PlattformBrowser plattform) async {
 String grundPruefen(String? grund) {
   final g = (grund ?? '').replaceAll(RegExp(r'\s+'), ' ').trim();
   if (g.isEmpty) {
-    throw MoodleFehler('Ohne Grund kein Bildschirmfoto: in einem Satz angeben, was das Bild prüfen soll (grund).');
+    throw MoodleFehler(
+      'Ohne Grund kein Bildschirmfoto: in einem Satz angeben, was das Bild prüfen soll (grund).',
+    );
   }
   // Ein Wort wie „Testlauf" sagt der Lehrkraft nicht, wozu das Bild dient.
   // Die Meldung sagt, dass er zu knapp ist -- nicht „ohne Grund", das läse
   // das Modell als fehlenden Parameter.
   if (g.length < 10) {
-    throw MoodleFehler('Der Grund „$g" ist zu knapp; die Lehrkraft entscheidet danach, ob das Bild an dich geht. '
-        'In einem Satz angeben, was das Bild prüfen soll (grund, ab 10 Zeichen), etwa „Prüfen, ob die Formeln auf '
-        'Infoblatt 2 gesetzt werden".');
+    throw MoodleFehler(
+      'Der Grund „$g" ist zu knapp; die Lehrkraft entscheidet danach, ob das Bild an dich geht. '
+      'In einem Satz angeben, was das Bild prüfen soll (grund, ab 10 Zeichen), etwa „Prüfen, ob die Formeln auf '
+      'Infoblatt 2 gesetzt werden".',
+    );
   }
-  if (g.length > 200) throw MoodleFehler('Der Grund hat ${g.length} Zeichen, höchstens 200 -- ein Satz genügt.');
+  if (g.length > 200) {
+    throw MoodleFehler(
+      'Der Grund hat ${g.length} Zeichen, höchstens 200 -- ein Satz genügt.',
+    );
+  }
   return g;
 }
 
@@ -313,6 +340,7 @@ const String _druckAusloesen = r'''
 ///          Angaben und Kommentare unter ihr
 const Map<String, (String, String?)> _inhalt = {
   'page': ('#region-main .generalbox.center', null),
+  'learningmap': ('.learningmap-render-container', null),
   'book': ('#mod_book-chapter', null),
   'wiki': ('#region-main .generalbox .no-overflow', '.generalbox'),
   'frage': ('#region-main .que', null),
@@ -324,7 +352,8 @@ const Map<String, (String, String?)> _inhalt = {
 /// [oben, unten] vom oberen Rand des Inhalts. Bei Formeln zählt jedes Teil:
 /// Die Hülle (MathJax 3 `mjx-container`) ist nur so hoch wie die Textzeile,
 /// ein Bruch ragt darüber hinaus (gemessen: Schnitt durch den Zähler).
-String _bereich((String, String?) inhalt) => '''
+String _bereich((String, String?) inhalt) =>
+    '''
 (() => {
   const e = document.querySelector(${jsonEncode(inhalt.$1)});
   const z = e && ${inhalt.$2 == null ? 'e' : 'e.closest(${jsonEncode(inhalt.$2)})'};
@@ -373,11 +402,18 @@ class _Aufnahme {
 }
 
 Future<_Aufnahme> _aufnehmen(
-    MoodleZugang moodle, Protokoll protokoll, Uri adresse, (String, String?) inhalt, String arbeitsordner,
-    {bool druck = false}) async {
+  MoodleZugang moodle,
+  Protokoll protokoll,
+  Uri adresse,
+  (String, String?) inhalt,
+  String arbeitsordner, {
+  bool druck = false,
+}) async {
   final basis = moodle.basis!;
   final (browser, programm) = await _browser();
-  final profil = Directory(p.join(arbeitsordner, '.browser-${DateTime.now().millisecondsSinceEpoch}'));
+  final profil = Directory(
+    p.join(arbeitsordner, '.browser-${DateTime.now().millisecondsSinceEpoch}'),
+  );
   await profil.create(recursive: true);
   final proz = await Process.start(programm, [
     '--headless=new',
@@ -409,8 +445,10 @@ Future<_Aufnahme> _aufnehmen(
     final bis = DateTime.now().add(const Duration(seconds: 30));
     while (port == null) {
       if (DateTime.now().isAfter(bis)) {
-        throw MoodleFehler('$browser startet nicht (kein DevTools-Port nach 30 s). Möglich: Eine Richtlinie oder '
-            'der Virenschutz verbietet die Fernsteuerung des Browsers.');
+        throw MoodleFehler(
+          '$browser startet nicht (kein DevTools-Port nach 30 s). Möglich: Eine Richtlinie oder '
+          'der Virenschutz verbietet die Fernsteuerung des Browsers.',
+        );
       }
       await Future<void>.delayed(const Duration(milliseconds: 200));
       if (await portDatei.exists()) {
@@ -423,13 +461,19 @@ Future<_Aufnahme> _aufnehmen(
     final http = HttpClient();
     final List ziele;
     try {
-      final req = await http.getUrl(Uri.parse('http://127.0.0.1:$port/json/list'));
-      ziele = jsonDecode(await (await req.close()).transform(utf8.decoder).join()) as List;
+      final req = await http.getUrl(
+        Uri.parse('http://127.0.0.1:$port/json/list'),
+      );
+      ziele = jsonDecode(
+        await (await req.close()).transform(utf8.decoder).join(),
+      ) as List;
     } finally {
       http.close(force: true);
     }
-    final seite = ziele.cast<Map>().firstWhere((z) => z['type'] == 'page',
-        orElse: () => throw MoodleFehler('$browser zeigt keine Seite.'));
+    final seite = ziele.cast<Map>().firstWhere(
+      (z) => z['type'] == 'page',
+      orElse: () => throw MoodleFehler('$browser zeigt keine Seite.'),
+    );
     cdp = _Cdp(await WebSocket.connect('${seite['webSocketDebuggerUrl']}'));
     // Die Anfragen hält die App auf der Ebene des Browsers an (siehe oben).
     netz = _Cdp(await WebSocket.connect('ws://127.0.0.1:$port$browserPfad'));
@@ -453,31 +497,57 @@ Future<_Aufnahme> _aufnehmen(
       final dokument = e['resourceType'] == 'Document';
       final rumpf = req['postData'] as String?;
       try {
-        final (weg, grund) = browserPruefen(methode, uri,
-            basis: basis, seiten: seiten, dokument: dokument, rumpf: rumpf, mathjax: mathjax);
+        final (weg, grund) = browserPruefen(
+          methode,
+          uri,
+          basis: basis,
+          seiten: seiten,
+          dokument: dokument,
+          rumpf: rumpf,
+          mathjax: mathjax,
+        );
         switch (weg) {
           case BrowserWeg.direkt:
             if (grund != 'eingebettet') {
               a.direkt++;
-              protokoll.eintrag(Art.moodle, 'Browser direkt: $methode ${uri.host}${uri.path} ($grund)');
+              protokoll.eintrag(
+                Art.moodle,
+                'Browser direkt: $methode ${uri.host}${uri.path} ($grund)',
+              );
             }
             await netz!.senden('Fetch.continueRequest', {'requestId': id});
           case BrowserWeg.gesperrt:
-            final wo = uri.host == basis.host ? adresseOhneWerte(uri) : '${uri.host}${uri.path}';
+            final wo = uri.host == basis.host
+                ? adresseOhneWerte(uri)
+                : '${uri.host}${uri.path}';
             final zaehlt = veraendertBild(grund, e['resourceType'] as String?);
             if (zaehlt) a.gesperrt.add('$methode $wo ($grund)');
             // Ein Treffer der Sperrliste ist ein Schutzfall und steht so da.
             // Alles andere ist nur nicht geladen; als Sperre gemeldet sähe es
             // aus wie ein Fehler.
             if (grund.startsWith('Datenschutz-Sperre')) {
-              protokoll.eintrag(Art.gesperrt, 'Browser gesperrt: $methode $wo ($grund)');
+              protokoll.eintrag(
+                Art.gesperrt,
+                'Browser gesperrt: $methode $wo ($grund)',
+              );
             } else {
               protokoll.eintrag(
-                  Art.info, 'Browser: nicht geladen${zaehlt ? '' : ' (fürs Bild nicht nötig)'}: $methode $wo ($grund)');
+                Art.info,
+                'Browser: nicht geladen${zaehlt ? '' : ' (fürs Bild nicht nötig)'}: $methode $wo ($grund)',
+              );
             }
-            await netz!.senden('Fetch.failRequest', {'requestId': id, 'errorReason': 'BlockedByClient'});
+            await netz!.senden('Fetch.failRequest', {
+              'requestId': id,
+              'errorReason': 'BlockedByClient',
+            });
           case BrowserWeg.ueberApp:
-            final r = await moodle.fuerBrowser(methode, uri, seiten: seiten, rumpf: rumpf, dokument: dokument);
+            final r = await moodle.fuerBrowser(
+              methode,
+              uri,
+              seiten: seiten,
+              rumpf: rumpf,
+              dokument: dokument,
+            );
             a.ueberApp++;
             if (dokument) {
               mathjax ??= mathjaxQuelle(r.text);
@@ -485,16 +555,23 @@ Future<_Aufnahme> _aufnehmen(
               if (r.ort != null) seiten.add(uri.resolve(r.ort!).toString());
             }
             final typ = r.inhaltstyp ?? 'application/octet-stream';
-            final text = typ.startsWith('text/') || typ.contains('javascript') || typ.contains('json');
+            final text =
+                typ.startsWith('text/') ||
+                typ.contains('javascript') ||
+                typ.contains('json');
             await netz!.senden('Fetch.fulfillRequest', {
               'requestId': id,
               'responseCode': r.status,
               'responseHeaders': [
-                {'name': 'Content-Type', 'value': text ? '$typ; charset=utf-8' : typ},
+                {
+                  'name': 'Content-Type',
+                  'value': text ? '$typ; charset=utf-8' : typ,
+                },
                 if (r.ort != null) {'name': 'Location', 'value': r.ort},
                 // Der Rahmen einer STACK-Zeichnung hat keine Herkunft; seine
                 // Module lädt er nur mit dieser Kopfzeile (browserliste.dart).
-                if (grund == stackSkript) {'name': 'Access-Control-Allow-Origin', 'value': '*'},
+                if (grund == stackSkript)
+                  {'name': 'Access-Control-Allow-Origin', 'value': '*'},
               ],
               'body': base64Encode(r.bytes),
             });
@@ -510,7 +587,10 @@ Future<_Aufnahme> _aufnehmen(
           a.gesperrt.add('$methode ${adresseOhneWerte(uri)} ($grund)');
         }
         try {
-          await netz!.senden('Fetch.failRequest', {'requestId': id, 'errorReason': 'Failed'});
+          await netz!.senden('Fetch.failRequest', {
+            'requestId': id,
+            'errorReason': 'Failed',
+          });
         } on MoodleFehler {
           // Die Seite ist schon weiter; nichts mehr zu tun.
         }
@@ -521,33 +601,50 @@ Future<_Aufnahme> _aufnehmen(
     }
 
     final abo = cdp.ereignisse.listen((e) {
-      if (e['method'] == 'Page.loadEventFired' && !geladen.isCompleted) geladen.complete();
+      if (e['method'] == 'Page.loadEventFired' && !geladen.isCompleted) {
+        geladen.complete();
+      }
     });
     final aboNetz = netz.ereignisse.listen((e) {
       if (e['method'] == 'Fetch.requestPaused') {
-        unawaited(anfrage((e['params'] as Map?)?.cast<String, dynamic>() ?? const {}));
+        unawaited(
+          anfrage((e['params'] as Map?)?.cast<String, dynamic>() ?? const {}),
+        );
       }
     });
     try {
       await cdp.senden('Page.enable');
-      await cdp.senden('Emulation.setDeviceMetricsOverride',
-          {'width': _breite, 'height': 900, 'deviceScaleFactor': 1, 'mobile': false});
+      await cdp.senden('Emulation.setDeviceMetricsOverride', {
+        'width': _breite,
+        'height': 900,
+        'deviceScaleFactor': 1,
+        'mobile': false,
+      });
       await netz.senden('Fetch.enable', {
         'patterns': [
-          {'urlPattern': '*', 'requestStage': 'Request'}
-        ]
+          {'urlPattern': '*', 'requestStage': 'Request'},
+        ],
       });
-      await cdp.senden('Page.addScriptToEvaluateOnNewDocument', {'source': _elementFehlerSammeln});
+      await cdp.senden('Page.addScriptToEvaluateOnNewDocument', {
+        'source': _elementFehlerSammeln,
+      });
       await cdp.senden('Page.navigate', {'url': adresse.toString()});
-      await geladen.future.timeout(const Duration(seconds: 90),
-          onTimeout: () => throw MoodleFehler('Die Seite lädt nicht zu Ende (90 s).'));
+      await geladen.future.timeout(
+        const Duration(seconds: 90),
+        onTimeout: () =>
+            throw MoodleFehler('Die Seite lädt nicht zu Ende (90 s).'),
+      );
       // Ruhe: 1,5 s ohne neue Anfrage, höchstens 30 s.
       final ende = DateTime.now().add(const Duration(seconds: 30));
       while (DateTime.now().isBefore(ende) &&
-          (laufend > 0 || DateTime.now().difference(zuletzt) < const Duration(milliseconds: 1500))) {
+          (laufend > 0 ||
+              DateTime.now().difference(zuletzt) <
+                  const Duration(milliseconds: 1500))) {
         await Future<void>.delayed(const Duration(milliseconds: 200));
       }
-      final fehler = jsonDecode(await _auswerten(cdp, 'JSON.stringify(window.__moocpFehler || [])')) as List;
+      final fehler = jsonDecode(
+        await _auswerten(cdp, 'JSON.stringify(window.__moocpFehler || [])'),
+      ) as List;
       a.elementFehler.addAll(fehler.map((e) => kurz('$e', 300)));
       final f = await _auswerten(cdp, _warteAufFormeln);
       final fz = jsonDecode(f) as Map;
@@ -560,10 +657,14 @@ Future<_Aufnahme> _aufnehmen(
         // Inhaltsbereich der Seite. Deshalb gibt es den Druck nur für Ansichten,
         // deren Inhaltsbereich keine Personen zeigt (bildschirmfoto).
         await cdp.senden('Emulation.setEmulatedMedia', {'media': 'print'});
-        final blaetter = (jsonDecode(await _auswerten(cdp, _druckAusloesen)) as List).cast<Map>();
+        final blaetter = (jsonDecode(
+          await _auswerten(cdp, _druckAusloesen),
+        ) as List).cast<Map>();
         if (blaetter.isNotEmpty) {
           if (blaetter.length > _hoechstensTeile) {
-            throw MoodleFehler('Der Ausdruck hat ${blaetter.length} Seiten, mehr als $_hoechstensTeile.');
+            throw MoodleFehler(
+              'Der Ausdruck hat ${blaetter.length} Seiten, mehr als $_hoechstensTeile.',
+            );
           }
           for (final s in blaetter) {
             final r = await cdp.senden('Page.captureScreenshot', {
@@ -579,35 +680,54 @@ Future<_Aufnahme> _aufnehmen(
             });
             a.bilder.add(base64Decode('${r['data']}'));
           }
-          a.ausschnitt = 'wie gedruckt mit der Druckaufbereitung, ${blaetter.length} Seite(n), je Seite ein Bild';
+          a.ausschnitt =
+              'wie gedruckt mit der Druckaufbereitung, ${blaetter.length} Seite(n), je Seite ein Bild';
           return a;
         }
         // Ohne Druckaufbereitung: der Inhalt mit den Druck-Stylesheets.
       }
       final b = jsonDecode(await _auswerten(cdp, _bereich(inhalt))) as Map?;
-      if (b == null) throw MoodleFehler('Der Inhalt (${inhalt.$1}) ist auf der Seite nicht zu finden -- kein Bild.');
-      final x = (b['x'] as num).floorToDouble(), y = (b['y'] as num).floorToDouble();
-      final w = (b['w'] as num).ceilToDouble(), h = (b['h'] as num).ceilToDouble();
+      if (b == null) {
+        throw MoodleFehler(
+          'Der Inhalt (${inhalt.$1}) ist auf der Seite nicht zu finden -- kein Bild.',
+        );
+      }
+      final x = (b['x'] as num).floorToDouble(),
+          y = (b['y'] as num).floorToDouble();
+      final w = (b['w'] as num).ceilToDouble(),
+          h = (b['h'] as num).ceilToDouble();
       if (w < 1 || h < 1) throw MoodleFehler('Der Inhalt ist leer.');
       final teile = teilen(h, [
         for (final s in (b['sperren'] as List? ?? const []).cast<List>())
           ((s[0] as num).toDouble(), (s[1] as num).toDouble()),
       ]);
       if (teile.length > _hoechstensTeile) {
-        throw MoodleFehler('Die Seite ist zu lang für Bildschirmfotos (${h.toInt()} Pixel, mehr als '
-            '$_hoechstensTeile Teile).');
+        throw MoodleFehler(
+          'Die Seite ist zu lang für Bildschirmfotos (${h.toInt()} Pixel, mehr als '
+          '$_hoechstensTeile Teile).',
+        );
       }
-      final zerschnitten = [for (var i = 0; i < teile.length; i++) if (teile[i].zerschnitten) i + 1];
-      a.ausschnitt = '${druck ? 'wie gedruckt (ohne Druckaufbereitung), ' : 'wie am Bildschirm, '}nur der Inhalt, '
+      final zerschnitten = [
+        for (var i = 0; i < teile.length; i++)
+          if (teile[i].zerschnitten) i + 1,
+      ];
+      a.ausschnitt =
+          '${druck ? 'wie gedruckt (ohne Druckaufbereitung), ' : 'wie am Bildschirm, '}nur der Inhalt, '
           '${w.toInt()} × ${h.toInt()} Pixel'
           '${teile.length < 2 ? '' : ', in ${teile.length} Teilen, geteilt zwischen Zeilen und Elementen'}'
           '${zerschnitten.isEmpty ? '' : '; Teil ${zerschnitten.join(', ')} endet mitten in einem Element, das '
-              'höher ist als ein Bild, und der nächste wiederholt ${_ueberlappung.toInt()} Pixel davon'}';
+                    'höher ist als ein Bild, und der nächste wiederholt ${_ueberlappung.toInt()} Pixel davon'}';
       for (final t in teile) {
         final r = await cdp.senden('Page.captureScreenshot', {
           'format': 'png',
           'captureBeyondViewport': true,
-          'clip': {'x': x, 'y': y + t.oben, 'width': w, 'height': t.hoehe, 'scale': 1},
+          'clip': {
+            'x': x,
+            'y': y + t.oben,
+            'width': w,
+            'height': t.hoehe,
+            'scale': 1,
+          },
         });
         a.bilder.add(base64Decode('${r['data']}'));
       }
@@ -618,7 +738,16 @@ Future<_Aufnahme> _aufnehmen(
       await aboNetz.cancel();
     }
   } finally {
-    await _beenden(cdp, netz, port, browserPfad, proz, profil, programm, protokoll);
+    await _beenden(
+      cdp,
+      netz,
+      port,
+      browserPfad,
+      proz,
+      profil,
+      programm,
+      protokoll,
+    );
   }
 }
 
@@ -645,8 +774,16 @@ Future<bool> _profilLoeschen(Directory profil, int versuche) async {
 /// das Profil ([PlattformBrowser.prozesseBeenden]). Was dabei misslingt, steht im
 /// Protokoll; ein Rest im Arbeitsordner verschwindet spätestens beim
 /// nächsten Leeren.
-Future<void> _beenden(_Cdp? cdp, _Cdp? netz, String? port, String? browserPfad, Process proz, Directory profil,
-    String programm, Protokoll protokoll) async {
+Future<void> _beenden(
+  _Cdp? cdp,
+  _Cdp? netz,
+  String? port,
+  String? browserPfad,
+  Process proz,
+  Directory profil,
+  String programm,
+  Protokoll protokoll,
+) async {
   for (final v in [cdp, netz]) {
     try {
       await v?.schliessen().timeout(const Duration(seconds: 5));
@@ -656,51 +793,96 @@ Future<void> _beenden(_Cdp? cdp, _Cdp? netz, String? port, String? browserPfad, 
   }
   if (port != null && browserPfad != null) {
     try {
-      final b = _Cdp(await WebSocket.connect('ws://127.0.0.1:$port$browserPfad').timeout(const Duration(seconds: 5)));
-      await b.senden('Browser.close').timeout(const Duration(seconds: 5)).catchError((_) => <String, dynamic>{});
-      await b.schliessen().timeout(const Duration(seconds: 5)).catchError((_) {});
+      final b = _Cdp(
+        await WebSocket.connect('ws://127.0.0.1:$port$browserPfad')
+            .timeout(const Duration(seconds: 5)),
+      );
+      await b
+          .senden('Browser.close')
+          .timeout(const Duration(seconds: 5))
+          .catchError((_) => <String, dynamic>{});
+      await b
+          .schliessen()
+          .timeout(const Duration(seconds: 5))
+          .catchError((_) {});
     } catch (_) {
       // Dann eben hart, unten.
     }
   }
   if (await _profilLoeschen(profil, 10)) return;
   final n = await plattformBrowser.prozesseBeenden(profil, programm);
-  if (n != 0) protokoll.eintrag(Art.info, 'Browser hart beendet: ${n < 0 ? 'Zahl unbekannt' : '$n Prozess(e)'}');
+  if (n != 0) {
+    protokoll.eintrag(
+      Art.info,
+      'Browser hart beendet: ${n < 0 ? 'Zahl unbekannt' : '$n Prozess(e)'}',
+    );
+  }
   // Der gestartete Prozess selbst, falls er noch läuft.
-  if (await proz.exitCode.timeout(const Duration(seconds: 2), onTimeout: () => -1) == -1) proz.kill();
+  if (await proz.exitCode.timeout(
+        const Duration(seconds: 2),
+        onTimeout: () => -1,
+      ) ==
+      -1) {
+    proz.kill();
+  }
   if (await _profilLoeschen(profil, 20)) return;
-  protokoll.eintrag(Art.fehler, 'Browserprofil nicht gelöscht: ${profil.path} -- beim nächsten Leeren des Arbeitsordners');
+  protokoll.eintrag(
+    Art.fehler,
+    'Browserprofil nicht gelöscht: ${profil.path} -- beim nächsten Leeren des Arbeitsordners',
+  );
 }
 
 Future<String> _auswerten(_Cdp cdp, String js) async {
-  final r = await cdp.senden('Runtime.evaluate', {'expression': js, 'awaitPromise': true, 'returnByValue': true});
-  if (r['exceptionDetails'] != null) throw MoodleFehler('Browser: Skript in der Seite gescheitert.');
+  final r = await cdp.senden('Runtime.evaluate', {
+    'expression': js,
+    'awaitPromise': true,
+    'returnByValue': true,
+  });
+  if (r['exceptionDetails'] != null) {
+    throw MoodleFehler('Browser: Skript in der Seite gescheitert.');
+  }
   return '${(r['result'] as Map?)?['value']}';
 }
 
 /// Nimmt eine Ansicht auf, zeigt die Bilder mit dem [grund] der Lehrkraft
 /// und legt sie nur nach ihrer Freigabe in den Arbeitsordner. Entweder [cmid] (Textseite,
 /// Buch, Wiki) oder [frage] mit [sammlung] (Fragenvorschau).
-Future<String> bildschirmfoto(MoodleZugang moodle, Freigaben freigaben, Protokoll protokoll,
-    {required String grund,
-    int? cmid,
-    int? kapitel,
-    int? wikiseite,
-    int? frage,
-    int? sammlung,
-    bool druck = false,
-    required String arbeitsordner}) async {
+Future<String> bildschirmfoto(
+  MoodleZugang moodle,
+  Freigaben freigaben,
+  Protokoll protokoll, {
+  required String grund,
+  int? cmid,
+  int? kapitel,
+  int? wikiseite,
+  int? frage,
+  int? sammlung,
+  bool druck = false,
+  required String arbeitsordner,
+}) async {
   final wozu = grundPruefen(grund);
   final String pfad, seite, ansicht;
   final int? kurs;
   if (frage != null) {
-    if (sammlung == null) throw MoodleFehler('Zur Frage gehört die Sammlung (cmid der Fragensammlung).');
+    if (sammlung == null) {
+      throw MoodleFehler(
+        'Zur Frage gehört die Sammlung (cmid der Fragensammlung).',
+      );
+    }
     // Der Druck nimmt den ganzen Inhaltsbereich (_aufnehmen), in der
     // Vorschau also auch Kommentare unter der Frage.
-    if (druck) throw MoodleFehler('Wie gedruckt gibt es Textseite, Buch und Wiki, keine Fragenvorschau.');
-    final f = await formularHolen(moodle, '/course/modedit.php?update=$sammlung');
+    if (druck) {
+      throw MoodleFehler(
+        'Wie gedruckt gibt es Textseite, Buch und Wiki, keine Fragenvorschau.',
+      );
+    }
+    final f = await formularHolen(
+      moodle,
+      '/course/modedit.php?update=$sammlung',
+    );
     kurs = f.kurs;
-    pfad = '/question/bank/previewquestion/preview.php?id=$frage&cmid=$sammlung';
+    pfad =
+        '/question/bank/previewquestion/preview.php?id=$frage&cmid=$sammlung';
     seite = 'Fragenvorschau: Frage $frage aus „${f.name}" (cmid $sammlung)';
     ansicht = 'frage';
   } else if (cmid != null) {
@@ -709,18 +891,33 @@ Future<String> bildschirmfoto(MoodleZugang moodle, Freigaben freigaben, Protokol
     ansicht = f.modul ?? '';
     pfad = switch (ansicht) {
       'page' => '/mod/page/view.php?id=$cmid',
-      'book' => '/mod/book/view.php?id=$cmid${kapitel == null ? '' : '&chapterid=$kapitel'}',
+      'learningmap' when !druck => '/mod/learningmap/view.php?id=$cmid',
+      'learningmap' => throw MoodleFehler(
+        'Lernlandkarten haben keine Druckansicht über bildschirmfoto.',
+      ),
+      'book' =>
+        '/mod/book/view.php?id=$cmid${kapitel == null ? '' : '&chapterid=$kapitel'}',
       'wiki' => await wikiAnsicht(moodle, cmid, f, seite: wikiseite),
-      _ => throw MoodleFehler('Bildschirmfotos gibt es von Textseite, Buch und Wiki, nicht von „${f.modul}".'),
+      _ => throw MoodleFehler(
+        'Bildschirmfotos gibt es von Textseite, Buch und Wiki, nicht von „${f.modul}".',
+      ),
     };
-    seite = '${typName(ansicht)} „${f.name}" (cmid $cmid'
+    seite =
+        '${typName(ansicht)} „${f.name}" (cmid $cmid'
         '${kapitel == null ? '' : ', Kapitel $kapitel'}${wikiseite == null ? '' : ', Wikiseite $wikiseite'})';
   } else {
     throw MoodleFehler('cmid oder frage mit sammlung angeben.');
   }
   protokoll.eintrag(Art.info, 'Bildschirmfoto: $seite -- Grund: $wozu');
   final adresse = moodle.basis!.resolve(pfad);
-  final a = await _aufnehmen(moodle, protokoll, adresse, _inhalt[ansicht]!, arbeitsordner, druck: druck);
+  final a = await _aufnehmen(
+    moodle,
+    protokoll,
+    adresse,
+    _inhalt[ansicht]!,
+    arbeitsordner,
+    druck: druck,
+  );
   final wo = [
     if (kurs != null) 'Kurs: ${await kursBezeichnung(moodle, kurs)}',
     'Seite: $seite',
@@ -729,34 +926,40 @@ Future<String> bildschirmfoto(MoodleZugang moodle, Freigaben freigaben, Protokol
   ];
   // Die Lehrkraft entscheidet über die Bilder; was der Browser technisch
   // tat, braucht sie nur, wenn es das Bild verfälschen kann.
-  final ja = await freigaben.anfragen(FreigabeAnfrage(
-    titel: 'Bildschirmfoto an die KI geben?',
-    grund: wozu,
-    punkte: [
-      ...wo,
-      if (a.gesperrt.isNotEmpty)
-        '${a.gesperrt.length} Anfrage(n) des Browsers nicht geladen (Datenschutz, fremde Rechner …) -- die '
-            'Darstellung kann deshalb abweichen',
-    ],
-    vergleich: const [],
-    bilder: a.bilder,
-    knopf: 'An die KI geben',
-    ablehnen: 'Verwerfen',
-    ohneEntscheidung: 'wird das Bild verworfen',
-    // Diese Freigabe kommt bei JEDER Stufe, auch bei „keine": Sie entscheidet
-    // nicht über eine Änderung in Moodle, sondern darüber, welches Bild aus
-    // dem Kurs an die KI geht (A1, E18).
-    ab: Bestaetigungen.keine,
-  ));
+  final ja = await freigaben.anfragen(
+    FreigabeAnfrage(
+      titel: 'Bildschirmfoto an die KI geben?',
+      grund: wozu,
+      punkte: [
+        ...wo,
+        if (a.gesperrt.isNotEmpty)
+          '${a.gesperrt.length} Anfrage(n) des Browsers nicht geladen (Datenschutz, fremde Rechner …) -- die '
+              'Darstellung kann deshalb abweichen',
+      ],
+      vergleich: const [],
+      bilder: a.bilder,
+      knopf: 'An die KI geben',
+      ablehnen: 'Verwerfen',
+      ohneEntscheidung: 'wird das Bild verworfen',
+      // Diese Freigabe kommt bei JEDER Stufe, auch bei „keine": Sie entscheidet
+      // nicht über eine Änderung in Moodle, sondern darüber, welches Bild aus
+      // dem Kurs an die KI geht (A1, E18).
+      ab: Bestaetigungen.keine,
+    ),
+  );
   if (!ja) {
     return 'Nicht freigegeben: Die Lehrkraft hat das Bildschirmfoto verworfen. Nichts weitergegeben.';
   }
-  final name = '${frage != null ? 'frage-$frage' : 'cm-$cmid'}${kapitel == null ? '' : '-kapitel-$kapitel'}'
+  final name =
+      '${frage != null ? 'frage-$frage' : 'cm-$cmid'}${kapitel == null ? '' : '-kapitel-$kapitel'}'
       '${wikiseite == null ? '' : '-seite-$wikiseite'}${druck ? '-druck' : ''}';
   // Ältere Bilder derselben Ansicht weg: Ein Bild zeigt den Stand beim
   // Aufnehmen, und von einer Aufnahme mit mehr Teilen bliebe sonst ein alter
   // Teil neben den neuen liegen.
-  final alt = RegExp('^bildschirmfoto-${RegExp.escape(name)}' r'(-\d+)?\.png$');
+  final alt = RegExp(
+    '^bildschirmfoto-${RegExp.escape(name)}'
+    r'(-\d+)?\.png$',
+  );
   for (final f in Directory(arbeitsordner).listSync().whereType<File>()) {
     if (!alt.hasMatch(p.basename(f.path))) continue;
     try {
@@ -767,7 +970,12 @@ Future<String> bildschirmfoto(MoodleZugang moodle, Freigaben freigaben, Protokol
   }
   final dateien = <String>[];
   for (var i = 0; i < a.bilder.length; i++) {
-    final d = File(p.join(arbeitsordner, 'bildschirmfoto-$name${a.bilder.length > 1 ? '-${i + 1}' : ''}.png'));
+    final d = File(
+      p.join(
+        arbeitsordner,
+        'bildschirmfoto-$name${a.bilder.length > 1 ? '-${i + 1}' : ''}.png',
+      ),
+    );
     await d.writeAsBytes(a.bilder[i]);
     dateien.add(d.path);
   }

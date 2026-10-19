@@ -1,7 +1,9 @@
 // Die begrenzte Testfreigabe sitzt vor dem echten Werkzeugablauf (E18/E20).
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:crypto/crypto.dart';
+import 'package:path/path.dart' as p;
 
 import '../freigabe.dart';
 import '../moodle/formular_lesen.dart';
@@ -11,7 +13,7 @@ import '../moodle/moodle_zugang.dart';
 import '../profil.dart';
 import '../testzugang.dart';
 
-typedef _Probe = ({int kurs, String name, String hash});
+typedef _Probe = ({int kurs, String name, String modul, String hash});
 
 class Testbetrieb {
   Testbetrieb(this.moodle, this.freigaben, this.arbeitsordner);
@@ -20,24 +22,75 @@ class Testbetrieb {
   final String arbeitsordner;
   final _proben = <int, _Probe>{};
 
-  String _hash(Formular f) => sha256
-      .convert(
-        utf8.encode(
-          jsonEncode({
-            for (final e in f.editoren) e: normalisiert(f.text(e) ?? ''),
-          }),
-        ),
-      )
-      .toString();
+  Future<String> _hash(Formular f, int cmid) async {
+    final inhalt = <String, Object?>{
+      'felder': [
+        for (final e in f.felder)
+          if (!const {'sesskey', 'submitbutton', 'cancel'}.contains(e.key) &&
+              !istEntwurfsId(e.key))
+            [e.key, e.value],
+      ],
+    };
+    if (f.modul == 'learningmap') {
+      // Die Karte enthält auch eine Datei außerhalb von placestore/svgcode.
+      // Nur ihren Namen zu binden ließe einen Austausch des Hintergrunds
+      // unbemerkt; die Bytes liest ausschließlich der normale Moodle-Zugang.
+      final gelesen = await formularLesen(
+        moodle,
+        Formularziel.aktivitaet(cmid),
+        arbeitsordner,
+      );
+      final wurzel = p.join(gelesen.ordner, 'bereiche', 'backgroundfile');
+      final dateien = Directory(wurzel).existsSync()
+          ? Directory(wurzel).listSync(recursive: true).whereType<File>().toList()
+          : <File>[];
+      dateien.sort((a, b) => a.path.compareTo(b.path));
+      final nativeListe = f.bereiche['backgroundfile']?['list'];
+      inhalt['backgroundfile'] = {
+        'formular': [
+          for (final e in (nativeListe as List? ?? const []).whereType<Map>())
+            {
+              'filepath': e['filepath'],
+              'filename': e['filename'],
+              'size': e['size'],
+              'datemodified': e['datemodified'],
+            },
+        ],
+        'dateien': [
+          for (final datei in dateien)
+            [
+              p.relative(datei.path, from: wurzel).replaceAll(r'\', '/'),
+              sha256.convert(datei.readAsBytesSync()).toString(),
+            ],
+        ],
+        'nichtGelesen': [
+          for (final b in gelesen.bereiche.where((b) => b.feld == 'backgroundfile'))
+            ...b.nichtGelesen,
+        ],
+      };
+    }
+    return sha256.convert(utf8.encode(jsonEncode(inhalt))).toString();
+  }
 
   Future<_Probe?> _probe(int cmid) async {
     final f = await formularHolen(moodle, '/course/modedit.php?update=$cmid');
-    if (f.modul != 'page' || f.kurs == null || !f.name.startsWith('ZZ')) {
+    if (!const {'page', 'learningmap'}.contains(f.modul) ||
+        f.kurs == null ||
+        !f.name.startsWith('ZZ')) {
       return null;
     }
     final struktur = await kursLesen(moodle, f.kurs!);
-    if (struktur.nachCmid[cmid]?.sichtbar != false) return null;
-    return (kurs: f.kurs!, name: f.name, hash: _hash(f));
+    final aktivitaet = struktur.nachCmid[cmid];
+    if (aktivitaet?.sichtbar != false || aktivitaet?.modul != f.modul ||
+        aktivitaet?.name != f.name) {
+      return null;
+    }
+    return (
+      kurs: f.kurs!,
+      name: f.name,
+      modul: f.modul!,
+      hash: await _hash(f, cmid),
+    );
   }
 
   bool _bindungPasst(Profil profil, Testzugang? zugang) =>
@@ -56,7 +109,7 @@ class Testbetrieb {
       return aufruf();
     }
     if (werkzeug == 'aktivitaet_anlegen' &&
-        args['typ'] == 'page' &&
+        const {'page', 'learningmap'}.contains(args['typ']) &&
         args['name'] is String &&
         (args['name'] as String).startsWith('ZZ') &&
         args['sichtbar'] != true &&
@@ -76,7 +129,7 @@ class Testbetrieb {
             .where(
               (c) =>
                   !vorher.contains(c.cmid) &&
-                  c.modul == 'page' &&
+                  c.modul == args['typ'] &&
                   c.name == args['name'] &&
                   !c.sichtbar,
             )
@@ -107,14 +160,19 @@ class Testbetrieb {
         args['kapitel'] == null &&
         args['wikiseite'] == null) {
       cmid = args['cmid'] as int?;
+    } else if (werkzeug == 'lernlandkarte_verknuepfungen_setzen') {
+      cmid = args['cmid'] as int?;
     }
     final eigene = _proben[cmid];
     if (cmid == null ||
         eigene == null ||
         !moodle.selbstAngelegt.contains(cmid) ||
         !zugang.kurse.contains(eigene.kurs) ||
-        (werkzeug == 'loeschen' &&
-            (args['kurs'] != eigene.kurs || args['name'] != eigene.name))) {
+        ((werkzeug == 'loeschen' &&
+                (args['kurs'] != eigene.kurs || args['name'] != eigene.name)) ||
+            (werkzeug == 'lernlandkarte_verknuepfungen_setzen' &&
+                (eigene.modul != 'learningmap' ||
+                    args['name'] != eigene.name)))) {
       return aufruf();
     }
     final frisch = await _probe(cmid);
@@ -126,7 +184,8 @@ class Testbetrieb {
     if (text.contains('verified: true')) {
       if (werkzeug == 'loeschen') {
         _proben.remove(cmid);
-      } else if (werkzeug == 'aendern') {
+      } else if (werkzeug == 'aendern' ||
+          werkzeug == 'lernlandkarte_verknuepfungen_setzen') {
         final probe = await _probe(cmid);
         if (probe != null && probe.kurs == eigene.kurs) _proben[cmid] = probe;
       }

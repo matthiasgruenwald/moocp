@@ -433,11 +433,10 @@ class _HauptseiteState extends State<Hauptseite> with WindowListener {
   }
 
   /// Der Start in fester Reihenfolge: Updates, KI-Werkzeuge einrichten,
-  /// anmelden, dann der MCP-Server (_mcpStarten). Eine Anmeldung, während der
-  /// Dialog „KI-Werkzeuge einrichten" offen ist, wäre umsonst, wenn die
-  /// Lehrkraft „Beenden" wählt. Und die KI erreicht die Werkzeuge erst, wenn
-  /// die Skills zur App passen (E13) und die Sitzung bei Moodle steht -- dann
-  /// findet schon der erste Aufruf alles bereit.
+  /// anmelden, dann der MCP-Server (_mcpStarten). Nur ausdrücklich gebundene
+  /// Debug-Testprofile melden sich vor einem wartenden Einrichtungsdialog an,
+  /// damit ihr MCP-Server für den Live-Test bereitsteht. Die Einrichtung selbst
+  /// bleibt erforderlich und wird nicht automatisch geändert.
   ///
   /// Die Update-Prüfung steht davor: Ein Update bringt auch neue Skills;
   /// würde die App vorher einrichten, installierte sie die Version, die
@@ -470,10 +469,18 @@ class _HauptseiteState extends State<Hauptseite> with WindowListener {
         if (!mounted) return;
       }
     }
-    if (!await _einrichtungPruefen()) return;
+    final testprofilGebunden = _instanzen.any(
+      (i) => Testzugang.fuer(i.dienst.profil) != null,
+    );
+    if (!await testprofilVorEinrichtungStarten(
+      gebunden: testprofilGebunden,
+      anmelden: () => testprofileStarten(_instanzen, widget.protokoll),
+      einrichtungPruefen: _einrichtungPruefen,
+    )) {
+      return;
+    }
     if (!mounted) return;
     setState(() => _eingerichtet = true);
-    await testprofileStarten(_instanzen, widget.protokoll);
     if (mounted && Testzugang.fuer(_profil) == null) {
       await _gespeichertAnmelden();
     }

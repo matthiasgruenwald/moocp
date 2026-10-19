@@ -50,6 +50,7 @@ import 'package:path/path.dart' as p;
 import 'auswertung.dart';
 import 'formular.dart';
 import 'kurs.dart';
+import 'lernlandkarte.dart';
 import 'moodle_zugang.dart';
 import 'sperrliste.dart';
 
@@ -68,35 +69,44 @@ class Formularziel {
   /// Das Buch bzw. die Fragensammlung, zu der ein Kapitel bzw. eine Frage gehört.
   final int? cmid;
 
-  factory Formularziel.aktivitaet(int cmid) => Formularziel(Zielart.aktivitaet, cmid);
-  factory Formularziel.abschnitt(int sectionid) => Formularziel(Zielart.abschnitt, sectionid);
-  factory Formularziel.buchkapitel(int buch, int kapitel) => Formularziel(Zielart.buchkapitel, kapitel, cmid: buch);
-  factory Formularziel.frage(int sammlung, int frage) => Formularziel(Zielart.frage, frage, cmid: sammlung);
+  factory Formularziel.aktivitaet(int cmid) =>
+      Formularziel(Zielart.aktivitaet, cmid);
+  factory Formularziel.abschnitt(int sectionid) =>
+      Formularziel(Zielart.abschnitt, sectionid);
+  factory Formularziel.buchkapitel(int buch, int kapitel) =>
+      Formularziel(Zielart.buchkapitel, kapitel, cmid: buch);
+  factory Formularziel.frage(int sammlung, int frage) =>
+      Formularziel(Zielart.frage, frage, cmid: sammlung);
 
   /// Wo das Formular abgerufen wird.
   String get adresse => switch (art) {
-        Zielart.aktivitaet => '/course/modedit.php?update=$id',
-        Zielart.abschnitt => '/course/editsection.php?id=$id',
-        Zielart.buchkapitel => '/mod/book/edit.php?cmid=$cmid&id=$id',
-        Zielart.frage => '/question/bank/editquestion/question.php?cmid=$cmid&id=$id',
-      };
+    Zielart.aktivitaet => '/course/modedit.php?update=$id',
+    Zielart.abschnitt => '/course/editsection.php?id=$id',
+    Zielart.buchkapitel => '/mod/book/edit.php?cmid=$cmid&id=$id',
+    Zielart.frage =>
+      '/question/bank/editquestion/question.php?cmid=$cmid&id=$id',
+  };
 
   /// Unterordner im Arbeitsordner.
   String get ordnerName => switch (art) {
-        Zielart.aktivitaet => 'cm-$id',
-        Zielart.abschnitt => 'abschnitt-$id',
-        Zielart.buchkapitel => p.join('buch-$cmid', 'kapitel-$id'),
-        Zielart.frage => 'frage-$id',
-      };
+    Zielart.aktivitaet => 'cm-$id',
+    Zielart.abschnitt => 'abschnitt-$id',
+    Zielart.buchkapitel => p.join('buch-$cmid', 'kapitel-$id'),
+    Zielart.frage => 'frage-$id',
+  };
 
   String get bezeichnung => switch (art) {
-        Zielart.aktivitaet => 'cmid $id',
-        Zielart.abschnitt => 'Abschnitt (id $id)',
-        Zielart.buchkapitel => 'Kapitel $id im Buch cmid $cmid',
-        Zielart.frage => 'Frage $id (Sammlung cmid $cmid)',
-      };
+    Zielart.aktivitaet => 'cmid $id',
+    Zielart.abschnitt => 'Abschnitt (id $id)',
+    Zielart.buchkapitel => 'Kapitel $id im Buch cmid $cmid',
+    Zielart.frage => 'Frage $id (Sammlung cmid $cmid)',
+  };
 
-  Map<String, Object?> toJson() => {'art': art.name, 'id': id, if (cmid != null) 'cmid': cmid};
+  Map<String, Object?> toJson() => {
+    'art': art.name,
+    'id': id,
+    if (cmid != null) 'cmid': cmid,
+  };
 
   static Formularziel ausJson(Map j) {
     final art = Zielart.values.byName('${j['art']}');
@@ -109,8 +119,10 @@ class Formularziel {
   static Formularziel ausOrdner(String ordner) {
     final f = File(p.join(ordner, '.stand', 'ziel.json'));
     if (!f.existsSync()) {
-      throw MoodleFehler('In $ordner fehlt .stand/ziel.json -- ist das ein Ordner, den die App '
-          'gelesen hat? Erst lesen, dann ändern.');
+      throw MoodleFehler(
+        'In $ordner fehlt .stand/ziel.json -- ist das ein Ordner, den die App '
+        'gelesen hat? Erst lesen, dann ändern.',
+      );
     }
     return ausJson(jsonDecode(f.readAsStringSync()) as Map);
   }
@@ -151,7 +163,10 @@ class Seitenangaben {
   final String? upload;
 
   static Seitenangaben aus(String seite) {
-    final cfg = RegExp(r'M\.cfg\s*=\s*(\{.*?\});', dotAll: true).firstMatch(seite);
+    final cfg = RegExp(
+      r'M\.cfg\s*=\s*(\{.*?\});',
+      dotAll: true,
+    ).firstMatch(seite);
     Map? m;
     try {
       m = cfg == null ? null : jsonDecode(cfg.group(1)!) as Map;
@@ -159,15 +174,36 @@ class Seitenangaben {
       m = null;
     }
     final kurs = (m?['courseId'] as num?)?.toInt();
-    final repo = RegExp(r'"id":"?(\d+)"?,[^{}]{0,400}?"type":"upload"').firstMatch(seite)?.group(1);
-    return Seitenangaben(kurs != null && kurs > 1 ? kurs : null, m?['contextid']?.toString(), repo);
+    final repo = RegExp(r'"id":"?(\d+)"?,[^{}]{0,400}?"type":"upload"')
+        .firstMatch(seite)
+        ?.group(1);
+    return Seitenangaben(
+      kurs != null && kurs > 1 ? kurs : null,
+      m?['contextid']?.toString(),
+      repo,
+    );
   }
 }
 
 class FormularGelesen {
-  FormularGelesen(this.ziel, this.kurs, this.name, this.modul, this.ordner, this.felder, this.dateien,
-      this.fehlend, this.auswertungen, this.dateiinfo, this.hinweise,
-      {this.einstellungen = const [], this.bereiche = const []});
+  FormularGelesen(
+    this.ziel,
+    this.kurs,
+    this.name,
+    this.modul,
+    this.ordner,
+    this.felder,
+    this.dateien,
+    this.fehlend,
+    this.auswertungen,
+    this.dateiinfo,
+    this.hinweise, {
+    this.einstellungen = const [],
+    this.bereiche = const [],
+    this.lernlandkarte,
+    this.lernlandkarteTitel = const {},
+    this.lernlandkarteZielstatus = const {},
+  });
   final Formularziel ziel;
   final List<Einstellung> einstellungen;
   final List<Dateibereich> bereiche;
@@ -186,49 +222,88 @@ class FormularGelesen {
   /// Was bei der Auswertung nicht geklappt hat (etwa: Titel verlinkter
   /// Aktivitäten nicht abrufbar). Kein Fehler des Lesens.
   final List<String> hinweise;
+  final Map<String, Object?>? lernlandkarte;
+  final Map<int, (String, String)> lernlandkarteTitel;
+  final Map<int, String> lernlandkarteZielstatus;
 
   String zusammenfassung() {
     final b = StringBuffer()
-      ..writeln('Gelesen: ${name ?? "(ohne Namen)"} (${[
-        if (modul != null) modul,
-        ziel.bezeichnung,
-        if (kurs != null) 'Kurs $kurs'
-      ].join(', ')})')
+      ..writeln(
+        'Gelesen: ${name ?? "(ohne Namen)"} (${[if (modul != null) modul, ziel.bezeichnung, if (kurs != null) 'Kurs $kurs'].join(', ')})',
+      )
       ..writeln('Ordner: $ordner');
     // Ticket #23, E3: Ein Typ außerhalb der Positivliste wird gelesen, aber nicht
     // geändert. Die Lücke steht im Ergebnis, damit eine Auswertung ohne Verweise
     // nicht wie ein stiller Erfolg aussieht.
     if (ziel.art == Zielart.aktivitaet &&
         modul != null &&
+        modul != 'learningmap' &&
         !MoodleZugang.schreibbareModule.contains(modul)) {
-      b.writeln('Prüflücke: Typ „$modul" ist nicht schreibbar -- gelesen, nicht geändert (aendern lehnt ab). '
-          'Die Verweisprüfung erfasst nur Textfelder; Auswahlfelder werden nicht geprüft.');
-      if (modul == 'learningmap') {
-        b.writeln('Prüflücke: SVG im Feld svgcode und Ortsziele im verborgenen placestore-JSON werden nicht ausgewertet. '
-            'Die Zuordnung der Lernlandkartenorte zu Aktivitäten ist damit nicht vollständig geprüft.');
-      }
+      b.writeln(
+        'Prüflücke: Typ „$modul" ist nicht schreibbar -- gelesen, nicht geändert (aendern lehnt ab). '
+        'Die Verweisprüfung erfasst nur Textfelder; Auswahlfelder werden nicht geprüft.',
+      );
     }
     if (fehlend.isNotEmpty) {
       b.writeln('NICHT gelesen (${fehlend.length}): ${fehlend.join(", ")}');
     }
+    if (lernlandkarte != null) {
+      b.writeln(
+        '\nLernlandkarte (${(lernlandkarte!['orte'] as List).length} Orte, '
+        '${(lernlandkarte!['wege'] as List).length} Wege):',
+      );
+      final store = lernlandkarte!['placestore'] as Map;
+      final orte = lernlandkarte!['orte'] as List;
+      for (final ort in orte.whereType<Map>()) {
+        final id = '${ort['id'] ?? '(ohne Kennung)'}';
+        final rolle = lernlandkarteRolle(store, id);
+        final ziel = (ort['linkedActivity'] as num?)?.toInt();
+        final titel = ziel == null ? null : lernlandkarteTitel[ziel];
+        final status = ziel == null ? null : lernlandkarteZielstatus[ziel];
+        final anzahl = orte
+            .whereType<Map>()
+            .where((x) => x['id'] == ort['id'])
+            .length;
+        final zielText = switch (status) {
+          'im Kurs' when titel != null =>
+            'Aktivität $ziel „${titel.$1}" (${titel.$2})',
+          'außerhalb des Kurses' when titel != null =>
+            'Ziel außerhalb des Kurses: cm $ziel „${titel.$1}"',
+          'Kurszugehörigkeit nicht prüfbar' when titel != null =>
+            'Aktivität $ziel „${titel.$1}" (Kurszugehörigkeit nicht prüfbar)',
+          _ => 'Ziel nicht gefunden oder nicht prüfbar: cm $ziel',
+        };
+        b.writeln(
+          '  Ort $id${rolle == null ? '' : ' · $rolle'}'
+          '${anzahl > 1 ? ' · mehrdeutige Ortskennung' : ''}'
+          '${ziel == null ? ' · ohne Verknüpfung' : ' · $zielText'}',
+        );
+      }
+    }
     b.write(uebersichtText(auswertungen, dateiinfo));
     final zeigen = [...?wichtigeEinstellungen[modul], ...immerZeigen];
     final wichtig = [
-      for (final k in zeigen) ...einstellungen.where((e) => e.schluessel == k)
+      for (final k in zeigen) ...einstellungen.where((e) => e.schluessel == k),
     ];
     if (einstellungen.isNotEmpty) {
-      b.writeln('\nEinstellungen (${einstellungen.length}, alle in einstellungen.json):');
+      b.writeln(
+        '\nEinstellungen (${einstellungen.length}, alle in einstellungen.json):',
+      );
       for (final e in wichtig) {
         b.writeln('  ${e.label}: ${e.wert}');
       }
     }
     for (final d in bereiche) {
-      b.writeln('\nDateibereich ${d.feld} „${d.label}": ${d.dateien.length} Datei(en) in bereiche/${d.feld}/');
+      b.writeln(
+        '\nDateibereich ${d.feld} „${d.label}": ${d.dateien.length} Datei(en) in bereiche/${d.feld}/',
+      );
       for (final e in d.dateien.entries) {
         final i = e.value;
-        b.writeln('  ${e.key.substring(1)} · ${i.bytes} Bytes · ${i.format ?? "?"}'
-            '${i.breite == null ? '' : ' ${i.breite}×${i.hoehe}'}'
-            '${i.titel == null ? '' : ' · SVG-Titel „${i.titel}"'}');
+        b.writeln(
+          '  ${e.key.substring(1)} · ${i.bytes} Bytes · ${i.format ?? "?"}'
+          '${i.breite == null ? '' : ' ${i.breite}×${i.hoehe}'}'
+          '${i.titel == null ? '' : ' · SVG-Titel „${i.titel}"'}',
+        );
       }
       for (final n in d.nichtGelesen) {
         b.writeln('  NICHT gelesen: $n');
@@ -237,10 +312,12 @@ class FormularGelesen {
     for (final h in hinweise) {
       b.writeln('Hinweis: $h');
     }
-    b.writeln('\nQuelltext unverändert in <feld>.html. '
-        'Zum Ändern <feld>.html, dateien/ und bereiche/ bearbeiten -- neue Bilder in dateien/ '
-        'ablegen und als src="@@PLUGINFILE@@/<name>" einbinden --, dann aendern(ordner). '
-        '.stand/ nicht anfassen.');
+    b.writeln(
+      '\nQuelltext unverändert in <feld>.html. '
+      'Zum Ändern <feld>.html, dateien/ und bereiche/ bearbeiten -- neue Bilder in dateien/ '
+      'ablegen und als src="@@PLUGINFILE@@/<name>" einbinden --, dann aendern(ordner). '
+      '.stand/ nicht anfassen.',
+    );
     return b.toString();
   }
 }
@@ -251,20 +328,27 @@ const int bereichGrenze = 25 * 1024 * 1024;
 /// Liest die Dateibereiche des Formulars nach `bereiche/<feld>/` (und .stand/).
 /// Die Wurzel jedes Bereichs steht schon in der Seite; Unterordner fragt die
 /// App einzeln ab.
-Future<List<Dateibereich>> _bereicheLesen(MoodleZugang moodle, dom.Element form,
-    List<Map<String, Object?>> roh, String ziel, String? sesskey) async {
+Future<List<Dateibereich>> _bereicheLesen(
+  MoodleZugang moodle,
+  dom.Element form,
+  List<Map<String, Object?>> roh,
+  String ziel,
+  String? sesskey,
+) async {
   final aus = <Dateibereich>[];
   for (final b in roh) {
     final feld = '${b['target'] ?? ''}'.replaceFirst('id_', '');
     final itemid = '${b['itemid'] ?? ''}';
     if (feld.isEmpty || itemid.isEmpty) continue;
-    final label = (form.querySelector('#fitem_id_$feld .col-form-label')?.text ?? feld)
-        .replaceAll(RegExp(r'\s+'), ' ')
-        .trim();
+    final label =
+        (form.querySelector('#fitem_id_$feld .col-form-label')?.text ?? feld)
+            .replaceAll(RegExp(r'\s+'), ' ')
+            .trim();
     final bereich = Dateibereich(feld, label);
     aus.add(bereich);
     await Directory(p.join(ziel, 'bereiche', feld)).create(recursive: true);
-    await Directory(p.join(ziel, '.stand', 'bereiche', feld)).create(recursive: true);
+    await Directory(p.join(ziel, '.stand', 'bereiche', feld))
+        .create(recursive: true);
     final offen = <List<Object?>>[(b['list'] as List?) ?? const []];
     var runden = 0;
     while (offen.isNotEmpty && runden++ < 200) {
@@ -277,14 +361,19 @@ Future<List<Dateibereich>> _bereicheLesen(MoodleZugang moodle, dom.Element form,
             bereich.nichtGelesen.add('$pfad$name/ (Unterordner, kein sesskey)');
             continue;
           }
-          final unter = await moodle.senden('/repository/draftfiles_ajax.php?action=list', [
-            MapEntry('itemid', itemid),
-            MapEntry('filepath', '$pfad$name/'.replaceAll('//', '/')),
-            MapEntry('client_id', '${b['client_id'] ?? ''}'),
-            MapEntry('sesskey', sesskey),
-          ]);
+          final unter = await moodle.senden(
+            '/repository/draftfiles_ajax.php?action=list',
+            [
+              MapEntry('itemid', itemid),
+              MapEntry('filepath', '$pfad$name/'.replaceAll('//', '/')),
+              MapEntry('client_id', '${b['client_id'] ?? ''}'),
+              MapEntry('sesskey', sesskey),
+            ],
+          );
           try {
-            offen.add(((jsonDecode(unter.text) as Map)['list'] as List?) ?? const []);
+            offen.add(
+              ((jsonDecode(unter.text) as Map)['list'] as List?) ?? const [],
+            );
           } catch (_) {
             bereich.nichtGelesen.add('$pfad$name/ (Unterordner nicht lesbar)');
           }
@@ -293,7 +382,9 @@ Future<List<Dateibereich>> _bereicheLesen(MoodleZugang moodle, dom.Element form,
         final groesse = int.tryParse('${e['size'] ?? ''}') ?? 0;
         final url = '${e['url'] ?? ''}';
         if (groesse > bereichGrenze) {
-          bereich.nichtGelesen.add('$pfad$name (${(groesse / 1048576).toStringAsFixed(0)} MB, zu groß)');
+          bereich.nichtGelesen.add(
+            '$pfad$name (${(groesse / 1048576).toStringAsFixed(0)} MB, zu groß)',
+          );
           continue;
         }
         try {
@@ -303,7 +394,15 @@ Future<List<Dateibereich>> _bereicheLesen(MoodleZugang moodle, dom.Element form,
             continue;
           }
           for (final wurzel in [ziel, p.join(ziel, '.stand')]) {
-            final f = File(p.joinAll([wurzel, 'bereiche', feld, ...pfad.split('/').where((s) => s.isNotEmpty), name]));
+            final f = File(
+              p.joinAll([
+                wurzel,
+                'bereiche',
+                feld,
+                ...pfad.split('/').where((s) => s.isNotEmpty),
+                name,
+              ]),
+            );
             await f.parent.create(recursive: true);
             await f.writeAsBytes(d.bytes);
           }
@@ -321,8 +420,12 @@ Future<List<Dateibereich>> _bereicheLesen(MoodleZugang moodle, dom.Element form,
 /// eigenen Kurses (eine Anfrage), was dort fehlt, aus dem jeweiligen
 /// Bearbeitungsformular -- höchstens [grenze] Stück.
 Future<Map<int, (String, String)>> _zielTitel(
-    MoodleZugang moodle, int? kurs, Set<int> cmids, List<String> hinweise,
-    {int grenze = 10}) async {
+  MoodleZugang moodle,
+  int? kurs,
+  Set<int> cmids,
+  List<String> hinweise, {
+  int grenze = 10,
+}) async {
   final titel = <int, (String, String)>{};
   if (cmids.isEmpty) return titel;
   if (kurs != null) {
@@ -353,8 +456,10 @@ Future<Map<int, (String, String)>> _zielTitel(
   }
   final offen = cmids.where((c) => !titel.containsKey(c)).toList();
   if (offen.isNotEmpty) {
-    hinweise.add('Titel nicht geprüft für Verweise auf cm ${offen.join(", ")} '
-        '(nicht abrufbar oder mehr als $grenze außerhalb des Kurses).');
+    hinweise.add(
+      'Titel nicht geprüft für Verweise auf cm ${offen.join(", ")} '
+      '(nicht abrufbar oder mehr als $grenze außerhalb des Kurses).',
+    );
   }
   return titel;
 }
@@ -411,13 +516,18 @@ int _jsonEnde(String s, int start) {
 /// Selektor mit Komma liefert das erste Formular im Dokument, das irgendeinen
 /// trifft -- und das ist auf Moodle-Seiten oft die Suche in der Kopfzeile.
 dom.Element? hauptformular(dom.Document d) =>
-    d.querySelector('form.mform') ?? d.querySelector('form#mform1') ?? d.querySelector('form[action*="edit"]');
+    d.querySelector('form.mform') ??
+    d.querySelector('form#mform1') ??
+    d.querySelector('form[action*="edit"]');
 
 /// Name, der im Formular steht: das Feld name, sonst ein Titel- oder
 /// Fragenname-Feld.
 String? _nameIn(dom.Element form) {
   for (final n in ['name', 'title', 'questiontext_name']) {
-    final e = form.querySelectorAll('input').where((e) => e.attributes['name'] == n).firstOrNull;
+    final e = form
+        .querySelectorAll('input')
+        .where((e) => e.attributes['name'] == n)
+        .firstOrNull;
     final v = e?.attributes['value'];
     if (v != null && v.isNotEmpty) return v;
   }
@@ -445,26 +555,42 @@ Future<T> ordnerSperre<T>(String pfad, Future<T> Function() tu) {
   });
 }
 
-Future<FormularGelesen> formularLesen(MoodleZugang moodle, Formularziel ziel, String arbeitsordner) {
-  return ordnerSperre(ordnerSchluessel(ziel, arbeitsordner),
-      () => formularLesenOhneSperre(moodle, ziel, arbeitsordner));
+Future<FormularGelesen> formularLesen(
+  MoodleZugang moodle,
+  Formularziel ziel,
+  String arbeitsordner,
+) {
+  return ordnerSperre(
+    ordnerSchluessel(ziel, arbeitsordner),
+    () => formularLesenOhneSperre(moodle, ziel, arbeitsordner),
+  );
 }
 
 /// Nur innerhalb einer [ordnerSperre] aufrufen, sonst wartet der Aufruf auf sich selbst.
 Future<FormularGelesen> formularLesenOhneSperre(
-    MoodleZugang moodle, Formularziel ziel, String arbeitsordner) async {
+  MoodleZugang moodle,
+  Formularziel ziel,
+  String arbeitsordner,
+) async {
   final r = await moodle.lesen(ziel.adresse);
   if (r.status != 200) {
-    throw MoodleFehler('Das Bearbeitungsformular von ${ziel.bezeichnung} ist nicht abrufbar (HTTP ${r.status}).');
+    throw MoodleFehler(
+      'Das Bearbeitungsformular von ${ziel.bezeichnung} ist nicht abrufbar (HTTP ${r.status}).',
+    );
   }
   final doc = html_parser.parse(r.text);
   final form = hauptformular(doc);
   if (form == null) {
-    throw MoodleFehler('In der Antwort steht kein Bearbeitungsformular. Entweder gibt es '
-        '${ziel.bezeichnung} nicht, oder diese Sitzung darf es nicht bearbeiten.');
+    throw MoodleFehler(
+      'In der Antwort steht kein Bearbeitungsformular. Entweder gibt es '
+      '${ziel.bezeichnung} nicht, oder diese Sitzung darf es nicht bearbeiten.',
+    );
   }
-  String? wert(String n) =>
-      form.querySelectorAll('input').where((e) => e.attributes['name'] == n).firstOrNull?.attributes['value'];
+  String? wert(String n) => form
+      .querySelectorAll('input')
+      .where((e) => e.attributes['name'] == n)
+      .firstOrNull
+      ?.attributes['value'];
   final seite = Seitenangaben.aus(r.text);
 
   final felder = <GelesenesFeld>[];
@@ -473,34 +599,48 @@ Future<FormularGelesen> formularLesenOhneSperre(
     if (!n.endsWith('[text]')) continue;
     // Textarea ist RCDATA: .text liefert den Quelltext so, wie der Editor
     // ihn bekäme -- Entities aufgelöst, sonst unverändert.
-    felder.add(GelesenesFeld(n.substring(0, n.length - '[text]'.length), ta.text));
+    felder.add(
+      GelesenesFeld(n.substring(0, n.length - '[text]'.length), ta.text),
+    );
   }
 
   final ziel0 = Directory(p.join(arbeitsordner, ziel.ordnerName));
   if (await ziel0.exists()) await ziel0.delete(recursive: true);
   await Directory(p.join(ziel0.path, 'dateien')).create(recursive: true);
-  await Directory(p.join(ziel0.path, '.stand', 'dateien')).create(recursive: true);
-  await File(p.join(ziel0.path, '.stand', 'ziel.json')).writeAsString(jsonEncode(ziel.toJson()));
+  await Directory(p.join(ziel0.path, '.stand', 'dateien'))
+      .create(recursive: true);
+  await File(p.join(ziel0.path, '.stand', 'ziel.json'))
+      .writeAsString(jsonEncode(ziel.toJson()));
 
   // Das Formular selbst, für Einstellungen und Fehlersuche -- ohne sesskey.
   final kopie = form.clone(true);
   for (final e in kopie.querySelectorAll('input[name="sesskey"]')) {
     e.attributes['value'] = '…';
   }
-  await File(p.join(ziel0.path, '.stand', 'formular.html')).writeAsString(kopie.outerHtml, encoding: utf8);
+  await File(p.join(ziel0.path, '.stand', 'formular.html'))
+      .writeAsString(kopie.outerHtml, encoding: utf8);
   final bereicheRoh = dateibereiche(r.text);
   await File(p.join(ziel0.path, '.stand', 'dateibereiche.json')).writeAsString(
-      const JsonEncoder.withIndent('  ').convert(bereicheRoh),
-      encoding: utf8);
+    const JsonEncoder.withIndent('  ').convert(bereicheRoh),
+    encoding: utf8,
+  );
   final einstellungen = einstellungenLesen(form);
-  final einstellungenJson =
-      const JsonEncoder.withIndent('  ').convert([for (final e in einstellungen) e.toJson()]);
+  final einstellungenJson = const JsonEncoder.withIndent('  ')
+      .convert([for (final e in einstellungen) e.toJson()]);
   // Oben zum Lesen; in .stand für den Vergleich beim Ändern (hat jemand anderes
   // eine Einstellung geändert, die jetzt geändert werden soll?).
-  await File(p.join(ziel0.path, 'einstellungen.json')).writeAsString(einstellungenJson, encoding: utf8);
-  await File(p.join(ziel0.path, '.stand', 'einstellungen.json')).writeAsString(einstellungenJson, encoding: utf8);
+  await File(p.join(ziel0.path, 'einstellungen.json'))
+      .writeAsString(einstellungenJson, encoding: utf8);
+  await File(p.join(ziel0.path, '.stand', 'einstellungen.json'))
+      .writeAsString(einstellungenJson, encoding: utf8);
   final sesskey = wert('sesskey');
-  final bereiche = await _bereicheLesen(moodle, form, bereicheRoh, ziel0.path, sesskey);
+  final bereiche = await _bereicheLesen(
+    moodle,
+    form,
+    bereicheRoh,
+    ziel0.path,
+    sesskey,
+  );
 
   // Referenzierte Dateien einsammeln: src und href, die auf Datei-Adressen
   // dieser Moodle-Instanz zeigen.
@@ -512,7 +652,10 @@ Future<FormularGelesen> formularLesenOhneSperre(
       final roh = m.group(2)!.replaceAll('&amp;', '&');
       final u = Uri.tryParse(roh);
       if (u == null || u.host != basis.host) continue;
-      if (!u.path.startsWith('/draftfile.php/') && !u.path.startsWith('/pluginfile.php/')) continue;
+      if (!u.path.startsWith('/draftfile.php/') &&
+          !u.path.startsWith('/pluginfile.php/')) {
+        continue;
+      }
       adressen.putIfAbsent(roh, () => <String>{}).add(f.feld);
     }
   }
@@ -539,7 +682,8 @@ Future<FormularGelesen> formularLesenOhneSperre(
         continue;
       }
       await File(p.join(ziel0.path, 'dateien', name)).writeAsBytes(d.bytes);
-      await File(p.join(ziel0.path, '.stand', 'dateien', name)).writeAsBytes(d.bytes);
+      await File(p.join(ziel0.path, '.stand', 'dateien', name))
+          .writeAsBytes(d.bytes);
       vergeben.add(name);
       namenFuer[e.key] = name;
       dateien.add(GeleseneDatei(name, d.bytes.length, d.inhaltstyp, e.value));
@@ -550,61 +694,124 @@ Future<FormularGelesen> formularLesenOhneSperre(
   }
 
   for (final f in felder) {
-    await File(p.join(ziel0.path, '${f.feld}.html')).writeAsString(f.html, encoding: utf8);
-    await File(p.join(ziel0.path, '.stand', '${f.feld}.html')).writeAsString(f.html, encoding: utf8);
+    await File(p.join(ziel0.path, '${f.feld}.html'))
+        .writeAsString(f.html, encoding: utf8);
+    await File(p.join(ziel0.path, '.stand', '${f.feld}.html'))
+        .writeAsString(f.html, encoding: utf8);
   }
 
   // Auswerten: Quelltext jedes Felds, Titel der verlinkten Aktivitäten.
   final kurs = int.tryParse(wert('course') ?? '') ?? seite.kurs;
   final auswertungen = [
-    for (final f in felder) feldAuswerten(f.feld, f.html, host: basis.host, lokalerName: namenFuer)
+    for (final f in felder)
+      feldAuswerten(f.feld, f.html, host: basis.host, lokalerName: namenFuer),
   ];
   final hinweise = <String>[];
   final eigene = ziel.art == Zielart.aktivitaet ? ziel.id : ziel.cmid;
+  final modul = wert('modulename') ?? wert('qtype');
+  final karte = modul == 'learningmap' ? lernlandkarteLesen(form) : null;
   final verlinkt = {
     for (final a in auswertungen)
       for (final v in a.verweise)
-        if (v.art == VerweisArt.aktivitaet && v.cmid != eigene) v.cmid!
+        if (v.art == VerweisArt.aktivitaet && v.cmid != eigene) v.cmid!,
   };
+  if (karte != null) {
+    final orte = (karte['orte'] as List).whereType<Map>();
+    verlinkt.addAll(
+      orte
+          .map((ort) => (ort['linkedActivity'] as num?)?.toInt())
+          .whereType<int>(),
+    );
+  }
   final titel = await _zielTitel(moodle, kurs, verlinkt, hinweise);
+  final lernlandkarteZielstatus = <int, String>{};
+  if (karte != null && kurs != null) {
+    try {
+      final lokaleCmids = (await kursLesen(moodle, kurs)).nachCmid.keys.toSet();
+      for (final cmid in verlinkt) {
+        lernlandkarteZielstatus[cmid] = lokaleCmids.contains(cmid)
+            ? 'im Kurs'
+            : titel.containsKey(cmid)
+            ? 'außerhalb des Kurses'
+            : 'nicht gefunden oder nicht prüfbar';
+      }
+    } on MoodleFehler {
+      for (final cmid in verlinkt) {
+        lernlandkarteZielstatus[cmid] = titel.containsKey(cmid)
+            ? 'Kurszugehörigkeit nicht prüfbar'
+            : 'nicht gefunden oder nicht prüfbar';
+      }
+    }
+  }
   for (final a in auswertungen) {
     verweiseAbgleichen(a, titel);
   }
 
-  final modul = wert('modulename') ?? wert('qtype');
-  final ergebnis = FormularGelesen(ziel, kurs, _nameIn(form), modul, ziel0.path, felder,
-      dateien, fehlend, auswertungen, dateiinfo, hinweise,
-      einstellungen: einstellungen, bereiche: bereiche);
+  if (karte != null) {
+    final json = const JsonEncoder.withIndent('  ').convert(karte);
+    await File(p.join(ziel0.path, 'lernlandkarte.json'))
+        .writeAsString(json, encoding: utf8);
+    await File(p.join(ziel0.path, '.stand', 'lernlandkarte.json'))
+        .writeAsString(json, encoding: utf8);
+  }
+  final ergebnis = FormularGelesen(
+    ziel,
+    kurs,
+    _nameIn(form),
+    modul,
+    ziel0.path,
+    felder,
+    dateien,
+    fehlend,
+    auswertungen,
+    dateiinfo,
+    hinweise,
+    einstellungen: einstellungen,
+    bereiche: bereiche,
+    lernlandkarte: karte,
+    lernlandkarteTitel: titel,
+    lernlandkarteZielstatus: lernlandkarteZielstatus,
+  );
   await File(p.join(ziel0.path, 'uebersicht.json')).writeAsString(
-      const JsonEncoder.withIndent('  ').convert({
-        'ziel': ziel.toJson(),
-        'kurs': kurs,
-        'name': ergebnis.name,
-        'modul': ergebnis.modul,
-        'gelesen': DateTime.now().toIso8601String(),
-        'felder': [
-          for (final f in felder) {'feld': f.feld, 'zeichen': f.html.length, 'datei': '${f.feld}.html'}
-        ],
-        'dateien': [
-          for (final d in dateien)
-            {'name': d.name, 'bytes': d.bytes, 'typ': d.typ, 'felder': d.felder.toList()}
-        ],
-        'nichtGelesen': fehlend,
-        'bereiche': [
-          for (final b in bereiche)
-            {
-              'feld': b.feld,
-              'label': b.label,
-              'dateien': [for (final e in b.dateien.entries) {'pfad': e.key, ...e.value.toJson()}],
-              'nichtGelesen': b.nichtGelesen,
-            }
-        ],
-        'auswertung': {
-          'felder': [for (final a in auswertungen) a.toJson()],
-          'dateien': [for (final d in dateiinfo.values) d.toJson()],
-          'hinweise': hinweise,
-        },
-      }),
-      encoding: utf8);
+    const JsonEncoder.withIndent('  ').convert({
+      'ziel': ziel.toJson(),
+      'kurs': kurs,
+      'name': ergebnis.name,
+      'modul': ergebnis.modul,
+      'gelesen': DateTime.now().toIso8601String(),
+      'felder': [
+        for (final f in felder)
+          {'feld': f.feld, 'zeichen': f.html.length, 'datei': '${f.feld}.html'},
+      ],
+      'dateien': [
+        for (final d in dateien)
+          {
+            'name': d.name,
+            'bytes': d.bytes,
+            'typ': d.typ,
+            'felder': d.felder.toList(),
+          },
+      ],
+      'nichtGelesen': fehlend,
+      'bereiche': [
+        for (final b in bereiche)
+          {
+            'feld': b.feld,
+            'label': b.label,
+            'dateien': [
+              for (final e in b.dateien.entries)
+                {'pfad': e.key, ...e.value.toJson()},
+            ],
+            'nichtGelesen': b.nichtGelesen,
+          },
+      ],
+      'auswertung': {
+        'felder': [for (final a in auswertungen) a.toJson()],
+        'dateien': [for (final d in dateiinfo.values) d.toJson()],
+        'hinweise': hinweise,
+      },
+    }),
+    encoding: utf8,
+  );
   return ergebnis;
 }

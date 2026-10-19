@@ -14,6 +14,11 @@ umzuwandeln. Tests und Fragen baut der Skill `moodle-fragen`.
 
 **Eine Lernsituation ist ein Kursabschnitt, und maßgeblich ist, was in Moodle steht.** Der Entwurf ist nur der Weg dorthin: Er entsteht im Arbeitsordner der App, wird geprüft und in den Kurs gebracht, und danach braucht ihn niemand mehr. Wer eine Lernsituation ändern will, die schon im Kurs steht, ändert sie in Moodle — über den Skill `moodle`, nach frischem Lesen —, nicht im Entwurf. Jede Aktivität des Entwurfs hat ein Gegenstück dort, und jedes Objekt dort eine Rolle hier; die Tabelle steht am Ende dieses Skills („Die Brücke") und gleichlautend im Skill `moodle`.
 
+Eine vorhandene Lernlandkarte kann als bereits bestehende Orientierung in die
+Planung eingehen. Der Entwurf legt keine Lernlandkarten an und verändert weder
+Karte noch Wege; Lesen, Zielprüfung und ausdrücklich freigegebene Zielwechsel
+beschreibt der Skill `moodle` in `references/lernlandkarte.md`.
+
 Er gilt für den ganzen Bereich der berufsbildenden Schule: Ausbildungsberufe,
 Berufliches Gymnasium, Berufsfachschule, Fachoberschule, allgemeinbildende
 Fächer. Der Rahmenlehrplan ist deshalb je Auftrag ein anderer — und der Skill

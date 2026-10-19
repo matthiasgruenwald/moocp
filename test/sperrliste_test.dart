@@ -110,6 +110,7 @@ const werkzeugGet = [
   '/login/index.php',
   '/login/index.php?testsession=5',
   '/course/modedit.php?update=15271',
+  '/mod/learningmap/view.php?id=15731',
   '/course/modedit.php?add=assign&type=&course=43&section=0&return=0&sr=0',
   '/course/editsection.php?id=812',
   '/filter/manage.php?contextid=11591',
@@ -125,27 +126,38 @@ const werkzeugGet = [
 
 void main() {
   test('Sperrliste sperrt, was Personendaten zeigt', () {
-    final durch = [for (final a in mussSperren) if (!gesperrt(Uri.parse(a))) a];
+    final durch = [
+      for (final a in mussSperren)
+        if (!gesperrt(Uri.parse(a))) a,
+    ];
     expect(durch, isEmpty);
   });
 
   test('Sperrliste lässt Kursinhalte und Bewertungsschemata durch', () {
-    final gesperrteDabei = [for (final a in mussDurchlassen) if (gesperrt(Uri.parse(a))) '$a ← ${sperrregel(Uri.parse(a))}'];
+    final gesperrteDabei = [
+      for (final a in mussDurchlassen)
+        if (gesperrt(Uri.parse(a))) '$a ← ${sperrregel(Uri.parse(a))}',
+    ];
     expect(gesperrteDabei, isEmpty);
   });
 
-  test('Gegenprobe: was die Werkzeuge brauchen, ist erlaubt und nicht gesperrt', () {
-    final z = MoodleZugang(Protokoll());
-    for (final a in werkzeugGet) {
-      final u = Uri.parse('https://m.example$a');
-      expect(gesperrt(u), isFalse, reason: '$a ← ${sperrregel(u)}');
-      expect(z.erlaubt('GET', u), isTrue, reason: a);
-    }
-  });
+  test(
+    'Gegenprobe: was die Werkzeuge brauchen, ist erlaubt und nicht gesperrt',
+    () {
+      final z = MoodleZugang(Protokoll());
+      for (final a in werkzeugGet) {
+        final u = Uri.parse('https://m.example$a');
+        expect(gesperrt(u), isFalse, reason: '$a ← ${sperrregel(u)}');
+        expect(z.erlaubt('GET', u), isTrue, reason: a);
+      }
+    },
+  );
 
   test('Die Positivliste allein ließe Abgaben unter pluginfile.php durch -- darum die Sperrliste', () {
     final z = MoodleZugang(Protokoll());
-    final u = Uri.parse('https://m.example/pluginfile.php/5007/assignsubmission_file/submission_files/88/abgabe.pdf');
+    final u = Uri.parse(
+      'https://m.example/pluginfile.php/5007/assignsubmission_file/submission_files/88/abgabe.pdf',
+    );
     expect(z.erlaubt('GET', u), isTrue);
     expect(gesperrt(u), isTrue);
   });
@@ -192,39 +204,58 @@ void main() {
       }
     });
 
-    test('Pfade mit .. bleiben gesperrt, auch wenn sie auf eine Sicherung enden', () {
-      for (final a in [
-        '/pluginfile.php/5001/user/backup/../private/abgabe.mbz?forcedownload=1',
-        '/pluginfile.php/5001/user/backup/../../user/private/kurs.mbz?forcedownload=1',
-        '/pluginfile.php/5001/user/backup/%2e%2e/private/kurs.mbz?forcedownload=1',
-      ]) {
-        expect(gesperrt(Uri.parse('$basis$a')), isTrue, reason: a);
-      }
-    });
+    test(
+      'Pfade mit .. bleiben gesperrt, auch wenn sie auf eine Sicherung enden',
+      () {
+        for (final a in [
+          '/pluginfile.php/5001/user/backup/../private/abgabe.mbz?forcedownload=1',
+          '/pluginfile.php/5001/user/backup/../../user/private/kurs.mbz?forcedownload=1',
+          '/pluginfile.php/5001/user/backup/%2e%2e/private/kurs.mbz?forcedownload=1',
+        ]) {
+          expect(gesperrt(Uri.parse('$basis$a')), isTrue, reason: a);
+        }
+      },
+    );
   });
 
   test('Protokoll ohne Parameterwerte', () {
-    expect(adresseOhneWerte(Uri.parse('https://m.example/mod/checklist/view.php?id=5008&studentid=45')),
-        '/mod/checklist/view.php?id=…&studentid=…');
-    expect(adresseOhneWerte(Uri.parse('https://m.example/user/index.php')), '/user/index.php');
+    expect(
+      adresseOhneWerte(
+        Uri.parse(
+          'https://m.example/mod/checklist/view.php?id=5008&studentid=45',
+        ),
+      ),
+      '/mod/checklist/view.php?id=…&studentid=…',
+    );
+    expect(
+      adresseOhneWerte(Uri.parse('https://m.example/user/index.php')),
+      '/user/index.php',
+    );
   });
 
-  test('Personenfelder werden entfernt, auch verschachtelt; idnumber bleibt', () {
-    final aus = ohnePersonenfelder({
-      'itemid': 5,
-      'author': 'Erika Mustermann',
-      'idnumber': 'LS2-A1',
-      'list': [
-        {'filename': 'a.pdf', 'author': 'Erika Mustermann', 'userid': 7},
-      ],
-    });
-    expect(aus, isA<Map<String, Object?>>(), reason: 'dateibereiche() prüft genau diesen Typ');
-    expect(aus, {
-      'itemid': 5,
-      'idnumber': 'LS2-A1',
-      'list': [
-        {'filename': 'a.pdf'},
-      ],
-    });
-  });
+  test(
+    'Personenfelder werden entfernt, auch verschachtelt; idnumber bleibt',
+    () {
+      final aus = ohnePersonenfelder({
+        'itemid': 5,
+        'author': 'Erika Mustermann',
+        'idnumber': 'LS2-A1',
+        'list': [
+          {'filename': 'a.pdf', 'author': 'Erika Mustermann', 'userid': 7},
+        ],
+      });
+      expect(
+        aus,
+        isA<Map<String, Object?>>(),
+        reason: 'dateibereiche() prüft genau diesen Typ',
+      );
+      expect(aus, {
+        'itemid': 5,
+        'idnumber': 'LS2-A1',
+        'list': [
+          {'filename': 'a.pdf'},
+        ],
+      });
+    },
+  );
 }

@@ -1,6 +1,10 @@
 # Changelog
 
 ## 0.9.23
+- Lernlandkarten: Eine verborgene Karte lässt sich aus dem nativen Moodle-Formular anlegen; eine skriptfreie `lernlandkarte.json`-Vorlage kann Orte und Wege vorgeben, Ortsziele bleiben gezielt freigabegeschützt änderbar.
+- Lernlandkarten: Zieländerungen verfallen, wenn sich Karte, Kurs oder Ziel während der Freigabe ändern; die Rückleseprobe vergleicht SVG, Kartendaten, Einstellungen und übrige Inhalte.
+- Lernlandkarten: Nach dem Speichern meldet das Rücklesen `verified: true`, auch wenn Moodle die Ortsbeschriftung und die Hintergrunddatei neu ablegt; vorher stand dort fälschlich `false`.
+- Debug-Testbetrieb: Eigene verborgene ZZ-Lernlandkarten lassen sich im gebundenen Testumfang ohne persönliche Freigabe ändern und als Bild prüfen.
 - Debug-Testbetrieb: Gebundene Testprofile melden sich selbst an; automatische Freigaben einschließlich Inhaltsbildern bleiben auf erlaubte Testkurse und eigene verborgene ZZ-Textseiten begrenzt.
 - Änderungen speichern: Die Rückleseprobe wartet nicht mehr auf ihre eigene Ordnersperre.
 - Moodle-Profile: Ein nicht mehr benötigtes Profil lässt sich in den Einstellungen löschen; Anmeldung, gespeicherte Zugangsdaten und der Eintrag in Claude Code, Codex und LM Studio werden dabei entfernt, und bleibt einer stehen, sagt die App welcher.
