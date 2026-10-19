@@ -651,4 +651,98 @@ void main() {
       expect(File(p.join(tmp.path, 'heim/.lmstudio/skills/fremd/SKILL.md')).existsSync(), isTrue);
     }, skip: Platform.isMacOS ? 'Werkzeugsuche unter macOS: findet echte Programme auf dem Rechner (/opt/homebrew/bin); braucht injizierbare Suchordner, siehe TODO.md' : null);
   });
+
+  group('Profil löschen: Einträge in den Werkzeugen', () {
+    const claudeExe = 'lokal/Packages/Claude_pzs8sxrjxfjjc/LocalCache/Roaming/Claude/claude-code/2.1.9/claude.exe';
+    const macSkip = 'Werkzeugsuche unter macOS: findet echte Programme auf dem Rechner (/opt/homebrew/bin); braucht injizierbare Suchordner, siehe TODO.md';
+    late Map<String, String> umgebung;
+    late File konfig;
+    late File toml;
+    final aufrufe = <List<String>>[];
+
+    setUp(() async {
+      aufrufe.clear();
+      umgebung = {
+        'CLAUDE_CONFIG_DIR': p.join(tmp.path, 'cfg'),
+        'LOCALAPPDATA': p.join(tmp.path, 'lokal'),
+        'USERPROFILE': p.join(tmp.path, 'heim'),
+        'HOME': p.join(tmp.path, 'heim'),
+      };
+      konfig = datei(
+          'cfg/.claude.json',
+          jsonEncode({
+            'mcpServers': {
+              'moodle': {'type': 'http', 'url': 'http://127.0.0.1:1/mcp'},
+              'moodle-test': {'type': 'http', 'url': 'http://127.0.0.1:2/mcp'},
+            },
+          }));
+      toml = datei('heim/.codex/config.toml', 'model = "gpt-5"\n');
+      await CodexCli(umgebung).eintragen(47811, 'abc', name: 'moodle');
+      await CodexCli(umgebung).eintragen(47812, 'def', name: 'moodle-test');
+    });
+
+    // Tut, was `claude mcp remove <name>` tut: nimmt genau den Namen heraus.
+    Future<int> claudeAttrappe(String programm, List<String> argumente) async {
+      aufrufe.add(argumente);
+      final d = jsonDecode(konfig.readAsStringSync()) as Map;
+      (d['mcpServers'] as Map).remove(argumente[2]);
+      konfig.writeAsStringSync(jsonEncode(d));
+      return 0;
+    }
+
+    List<KiWerkzeug> werkzeuge(Future<int> Function(String, List<String>) ausfuehren) =>
+        [ClaudeCode(umgebung)..ausfuehren = ausfuehren, CodexCli(umgebung)];
+
+    test('nimmt nur den Eintrag des gelöschten Profils heraus', () async {
+      datei(claudeExe);
+      final rest = await profilEintragEntfernen(
+          umgebung: umgebung, name: 'moodle-test', werkzeuge: werkzeuge(claudeAttrappe));
+      expect(rest, isEmpty);
+      expect(aufrufe, [
+        ['mcp', 'remove', 'moodle-test', '--scope', 'user'],
+      ]);
+      expect(((jsonDecode(konfig.readAsStringSync()) as Map)['mcpServers'] as Map).keys, ['moodle']);
+      expect(tomlBlock(toml.readAsStringSync(), 'moodle-test'), isNull);
+      expect(tomlBlock(toml.readAsStringSync(), 'moodle'), isNotNull);
+      expect(toml.readAsStringSync(), startsWith('model = "gpt-5"'));
+    }, skip: Platform.isMacOS ? macSkip : null);
+
+    test('bleibt ein Eintrag stehen, nennt die Rückgabe Werkzeug und Namen', () async {
+      datei(claudeExe);
+      final rest = await profilEintragEntfernen(
+          umgebung: umgebung, name: 'moodle-test', werkzeuge: werkzeuge((_, _) async => 0));
+      expect(rest, ['Claude Code (moodle-test)']);
+      // Codex wurde trotzdem aufgeräumt.
+      expect(tomlBlock(toml.readAsStringSync(), 'moodle-test'), isNull);
+    }, skip: Platform.isMacOS ? macSkip : null);
+
+    test('Codex: Block des Profils samt Unterblöcken weg, der andere bleibt', () async {
+      final rest = await profilEintragEntfernen(
+          umgebung: umgebung, name: 'moodle-test', werkzeuge: [CodexCli(umgebung)]);
+      expect(rest, isEmpty);
+      expect(tomlBlock(toml.readAsStringSync(), 'moodle-test'), isNull);
+      expect(toml.readAsStringSync(), isNot(contains('moodle-test')));
+      expect(tomlBlock(toml.readAsStringSync(), 'moodle'), isNotNull);
+      expect(toml.readAsStringSync(), startsWith('model = "gpt-5"'));
+    });
+
+    test('ohne Eintrag wird nichts aufgerufen', () async {
+      final rest = await profilEintragEntfernen(
+          umgebung: umgebung, name: 'gibt-es-nicht', werkzeuge: werkzeuge(claudeAttrappe));
+      expect(rest, isEmpty);
+      expect(aufrufe, isEmpty);
+    });
+
+    test('Deinstallation entfernt die Einträge aller Profile', () async {
+      datei(claudeExe);
+      final e = await einrichtungEntfernen(
+          umgebung: umgebung,
+          skills: const [],
+          mcpNamen: ['moodle', 'moodle-test'],
+          werkzeuge: werkzeuge(claudeAttrappe));
+      expect(e.code, 0);
+      expect((jsonDecode(konfig.readAsStringSync()) as Map)['mcpServers'], isEmpty);
+      expect(toml.readAsStringSync(), 'model = "gpt-5"\n');
+    }, skip: Platform.isMacOS ? macSkip : null);
+  });
 }

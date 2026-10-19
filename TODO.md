@@ -239,6 +239,8 @@ Umgesetzt (`zielwegPruefen`, `Zielweg` in `lib/moodle/wiederherstellung_regeln.d
 
 ## Instanzprofile (Issue #4): offene Teile
 
+- Profil löschen räumt die Einträge in Claude Code und Codex auf (Issue #28). Ungemessen: Aufräumen gegen die echten Programme, auf dem Mac (`~/.claude.json`, `CLAUDE_CONFIG_DIR`, `CODEX_HOME`) und mit `claude` aus Claude Desktop; die Claude-Tests laufen auf dem Mac nicht (Werkzeugsuche). Die Brücke für Bionic kennt nur `moodle`, ein gelöschtes Profil hat dort nie einen Eintrag.
+
 - Die Brücke für Bionic kennt nur den Namen `moodle`; weitere Profile sind dort nicht eingerichtet.
 - Arbeitsordner: Bei mehreren Profilen je ein Unterordner nach Kennung (umgesetzt); Aufräumen beim Beenden prüfen, wenn Unterordner in Benutzung sind.
 - Der Wechsel des Eintrags `moodle` zur Produktivinstanz (E31, Folgen) ist mit dem Umstellen des Testinstanz-Eintrags zu tun, nicht erledigt.
