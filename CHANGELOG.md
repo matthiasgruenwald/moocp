@@ -1,6 +1,7 @@
 # Changelog
 
 ## 0.9.23
+- Wiederherstellung: Die Freigabe nennt nur noch die Aktivitäten, die im Archiv wirklich stehen; leere Zeilen „„“ ()“ aus den Einstellungen des Archivs entfallen, und ein Quiz scheitert nicht mehr an einem angeblich unlesbaren Typ.
 - Wiederherstellung: Dateien, die nur im Dateimanager einer Aktivität liegen, meldet die App als nicht lesbar (Prüflücke) statt als „fehlend im Ziel".
 - Wiederherstellung: Enthält das Archiv mehrere Tests, vergleicht die App die Fragen je Test; ein Test, den sie nicht zuordnen kann, steht einzeln als Prüflücke. Liegen alle Fragen im Test selbst, gilt ihre Herkunft auch ohne angegebene Sammlung als eigen, auch bei späteren Statusabfragen.
 - Wiederherstellung: Meldet Moodle einen Fehler, urteilt die App nicht danach, sondern liest den Zielkurs zurück: vollständig und gleich gilt als verifiziert, Abweichungen werden genannt, und ist das Ende des Hintergrundauftrags nicht belegt, bleibt der Vorgang gesperrt und die Antwort enthält eine fertige Nachfrage an die Verwaltung; „fehlgeschlagen" steht nur noch mit Beleg.

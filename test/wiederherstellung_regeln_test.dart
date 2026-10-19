@@ -82,6 +82,18 @@ void main() {
       expect(b.aktivitaeten.single.titel, 'ZZ Testseite');
     });
 
+    test('Kennungen in den Einstellungen sind keine Aktivitäten des Archivs', () async {
+      final xml = _sicherungXml().replaceFirst('</moodle_backup>',
+          '<settings><setting><level>activity</level><activity>page_1</activity><name>page_1_included</name><value>1</value></setting></settings></moodle_backup>');
+      final b = await archivPruefen(_mbz([
+        _eintrag('moodle_backup.xml', _xml(xml)),
+        _eintrag('activities/page_1/page.xml', _xml('<activity/>')),
+      ]));
+      expect(b.ok, isTrue, reason: b.grund);
+      expect(b.aktivitaeten, hasLength(1));
+      expect(b.aktivitaeten.single.titel, 'ZZ Testseite');
+    });
+
     test('gültiger Kurs ohne Nutzerdaten wird angenommen', () async {
       final b = await archivPruefen(_mbz([
         _eintrag('moodle_backup.xml', _xml(_sicherungXml(typ: 'course'))),

@@ -247,12 +247,12 @@ Future<ArchivBefund> archivPruefen(
   }
 
   final aktivitaeten = <ArchivAktivitaet>[
-    for (final a in doc.findAllElements('activity'))
+    for (final a in archivAktivitaetsElemente(doc))
       (modul: a.getElement('modulename')?.innerText.trim() ?? '', titel: a.getElement('title')?.innerText.trim() ?? ''),
   ];
 
   final quizTitel = <String, String>{
-    for (final a in doc.findAllElements('activity'))
+    for (final a in archivAktivitaetsElemente(doc))
       if (a.getElement('modulename')?.innerText.trim() == 'quiz' &&
           (a.getElement('directory')?.innerText.trim() ?? '').isNotEmpty)
         a.getElement('directory')!.innerText.trim().split('/').last: a.getElement('title')?.innerText.trim() ?? '',
@@ -531,3 +531,9 @@ String verwaltungsNachfrage({
       'entstehen. Was ist mit dem Hintergrundauftrag (Ad-hoc-Aufgabe, Cron) los: läuft er noch, ist er '
       'abgebrochen oder hängt er?';
 }
+
+/// Die Aktivitäten, die `moodle_backup.xml` auflistet. Dasselbe Element `activity` steht auch
+/// in den Einstellungen als bloße Kennung (`<activity>quiz_1941</activity>`); diese haben weder
+/// Typ noch Titel und sind keine Aktivitäten des Archivs.
+Iterable<XmlElement> archivAktivitaetsElemente(XmlDocument doc) =>
+    doc.findAllElements('activity').where((a) => a.getElement('modulename') != null);

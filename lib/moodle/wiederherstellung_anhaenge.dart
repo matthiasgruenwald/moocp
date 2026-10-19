@@ -29,7 +29,7 @@ import 'package:xml/xml.dart';
 
 import 'moodle_zugang.dart';
 import 'sicherung.dart';
-import 'wiederherstellung_regeln.dart' show WiederhergestellteAktivitaet;
+import 'wiederherstellung_regeln.dart' show WiederhergestellteAktivitaet, archivAktivitaetsElemente;
 
 /// Eine Datei der Quellaufnahme.
 ///
@@ -89,7 +89,7 @@ List<QuellDatei>? quelldateienAus(Uint8List mbz, {required String modul, require
   try {
     final doc = XmlDocument.parse(utf8.decode(backup, allowMalformed: true));
     final verzeichnisse = [
-      for (final a in doc.findAllElements('activity'))
+      for (final a in archivAktivitaetsElemente(doc))
         if (_text(a, 'modulename') == modul && _text(a, 'title') == titel) _text(a, 'directory') ?? '',
     ];
     if (verzeichnisse.length != 1) return null;
