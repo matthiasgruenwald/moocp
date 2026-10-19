@@ -112,6 +112,7 @@ class ArchivBefund {
     this.aktivitaeten = const [],
     this.quizFragen = const {},
     this.quizUnlesbar = const {},
+    this.quizTitel = const {},
   });
   final String? grund;
   final String? moodleVersion;
@@ -126,6 +127,9 @@ class ArchivBefund {
   /// Quizze, deren quiz.xml oder questions.xml nicht lesbar ist (Befund 7): kein Abbruch
   /// des Archivs, sondern eine Prüflücke bei der Herkunft.
   final Set<String> quizUnlesbar;
+
+  /// Titel je Quiz-Ordner (quiz_21), aus moodle_backup.xml. Fehlt der Ordner dort, fehlt der Eintrag.
+  final Map<String, String> quizTitel;
 
   bool get ok => grund == null;
 }
@@ -247,6 +251,13 @@ Future<ArchivBefund> archivPruefen(
       (modul: a.getElement('modulename')?.innerText.trim() ?? '', titel: a.getElement('title')?.innerText.trim() ?? ''),
   ];
 
+  final quizTitel = <String, String>{
+    for (final a in doc.findAllElements('activity'))
+      if (a.getElement('modulename')?.innerText.trim() == 'quiz' &&
+          (a.getElement('directory')?.innerText.trim() ?? '').isNotEmpty)
+        a.getElement('directory')!.innerText.trim().split('/').last: a.getElement('title')?.innerText.trim() ?? '',
+  };
+
   // Fragen der Quizze (Issue #20). Lesbar nur, wenn beide Dateien es sind.
   final fragenXml = dateien['questions.xml'] == null ? null : utf8.decode(dateien['questions.xml']!, allowMalformed: true);
   final quizFragen = <String, List<QuizFrage>>{};
@@ -266,6 +277,7 @@ Future<ArchivBefund> archivPruefen(
     aktivitaeten: aktivitaeten,
     quizFragen: quizFragen,
     quizUnlesbar: quizUnlesbar,
+    quizTitel: quizTitel,
   );
 }
 

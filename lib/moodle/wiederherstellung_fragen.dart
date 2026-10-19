@@ -241,3 +241,53 @@ List<QuizFrage> quizFragenAusXml(String quizXml, String? questionsXml) {
   }
   return fragen;
 }
+
+/// Die Quellfragen je Quiz-Titel. Ein Titel, der im Archiv mehrfach vorkommt oder zu dem
+/// kein Ordner bekannt ist, bekommt keine Quelle (Prüflücke bei der Zuordnung). Kennt das
+/// Archiv keine Ordner, aber nur ein Quiz, gilt dessen Titel für die einzige Quelle.
+Map<String, List<QuizFrage>> quizQuellenNachTitel({
+  required Map<String, List<QuizFrage>> quizFragen,
+  required Map<String, String> quizTitel,
+  required List<String> archivQuizTitel,
+}) {
+  final quellen = <String, List<QuizFrage>>{};
+  for (final e in quizFragen.entries) {
+    final titel = quizTitel[e.key];
+    if (titel == null || archivQuizTitel.where((t) => t == titel).length != 1) continue;
+    quellen[titel] = e.value;
+  }
+  if (quellen.isEmpty && quizTitel.isEmpty && quizFragen.length == 1 && archivQuizTitel.length == 1) {
+    quellen[archivQuizTitel.single] = quizFragen.values.single;
+  }
+  return quellen;
+}
+
+/// Ein Quiz aus dem Archiv und sein Gegenstück im Kurs. [luecke] nennt den Grund, wenn
+/// die Zuordnung nicht eindeutig ist; dann gibt es keinen Vergleich.
+typedef QuizZuordnung = ({String titel, List<QuizFrage>? quelle, int? zielCmid, String? luecke});
+
+/// Ordnet jedes Quiz im Archiv genau einem neuen Quiz im Kurs zu: über den Titel, und
+/// bei genau einem Quiz auf jeder Seite auch ohne gleichen Titel. Mehrdeutiges bleibt
+/// eine Prüflücke je Quiz, nie ein Raten.
+List<QuizZuordnung> quizZuordnen({
+  required List<String> archivQuizTitel,
+  required Map<String, List<QuizFrage>>? quellen,
+  required List<({int cmid, String name})> neueQuizze,
+}) {
+  QuizZuordnung luecke(String titel, String grund) => (titel: titel, quelle: null, zielCmid: null, luecke: grund);
+  final einzeln = archivQuizTitel.length == 1 && neueQuizze.length == 1;
+  return [
+    for (final titel in archivQuizTitel)
+      () {
+        final quelle = einzeln && quellen != null && quellen.length == 1 ? quellen.values.single : quellen?[titel];
+        if (quelle == null) {
+          return luecke(titel, 'Quellfragen nicht aufgenommen oder Titel im Archiv nicht eindeutig.');
+        }
+        final ziele = einzeln ? neueQuizze : [for (final q in neueQuizze) if (q.name == titel) q];
+        if (ziele.length != 1) {
+          return luecke(titel, 'im Kurs ${ziele.isEmpty ? 'kein' : 'mehrere'} neues Quiz mit diesem Titel.');
+        }
+        return (titel: titel, quelle: quelle, zielCmid: ziele.single.cmid, luecke: null);
+      }(),
+  ];
+}

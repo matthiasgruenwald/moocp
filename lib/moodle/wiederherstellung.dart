@@ -249,11 +249,17 @@ Future<String> wiederherstellen(
           '${freigaben.frist.inMinutes} Minuten freigegeben. Nichts geändert.';
     }
 
+    final quellen = quizQuellenNachTitel(
+      quizFragen: befund.quizFragen,
+      quizTitel: befund.quizTitel,
+      archivQuizTitel: [for (final a in befund.aktivitaeten) if (a.modul == 'quiz') a.titel],
+    );
     // 6. Vorgang anlegen und Datei hochladen (jedes Mal neu, nie eine alte Kennung).
     final vg = await vorgaenge.neuWiederherstellung(
         kurs: kurs ?? 0, datei: datei, fingerabdruck: fp, wiederholungVon: wiederholungVon,
         profilKennung: profilKennung,
-        quizQuelle: befund.quizFragen.length == 1 ? befund.quizFragen.values.first : null);
+        quizQuellen: quellen,
+        herkunftEigen: herkunft.eigen);
     _laufendeWiederherstellungen.add(vg.id);
     // Die Nummer geht nur an den Aufrufer, damit er das Ergebnis je Ziel
     // zuordnen kann (uebertragen, Issue #10). Ohne Rückruf unverändert.
@@ -269,7 +275,7 @@ Future<String> wiederherstellen(
           kurzname: kurzname,
           vorherCmids: vorherCmids,
           wiederherstellungAktivitaeten: befund.aktivitaeten,
-          quizQuelle: befund.quizFragen.length == 1 ? befund.quizFragen.values.first : null,
+          quizQuellen: quellen,
           herkunftEigen: herkunft.eigen,
           vorherText: vorherText,
           name: p.basename(datei));
@@ -355,7 +361,7 @@ Future<String> _ausfuehren(
   required String? kurzname,
   required List<int> vorherCmids,
   required List<ArchivAktivitaet> wiederherstellungAktivitaeten,
-  List<QuizFrage>? quizQuelle,
+  Map<String, List<QuizFrage>>? quizQuellen,
   bool herkunftEigen = false,
   required String vorherText,
   required String name,
@@ -462,7 +468,7 @@ Future<String> _ausfuehren(
         kurs: kurs,
         vorherCmids: vorherCmids,
         wiederherstellungAktivitaeten: wiederherstellungAktivitaeten,
-        quizQuelle: quizQuelle,
+        quizQuellen: quizQuellen,
         herkunftEigen: herkunftEigen,
         sichtbarGesetzt: sichtbarGesetzt);
     return ergebnis;
@@ -547,7 +553,7 @@ Future<String> _warten(
   required int? kurs,
   required List<int> vorherCmids,
   required List<ArchivAktivitaet> wiederherstellungAktivitaeten,
-  List<QuizFrage>? quizQuelle,
+  Map<String, List<QuizFrage>>? quizQuellen,
   bool herkunftEigen = false,
   bool sichtbarGesetzt = false,
   Duration gesamt = const Duration(minutes: 10),
@@ -613,7 +619,7 @@ Future<String> _warten(
           '(nicht verifiziert).${sichtbarGesetzt ? ' Verborgen gesetzt, sofern das Formular es bot.' : ''}';
     }
     return await _gegenlesen(moodle, vorgaenge, vg, kurs: kurs, vorherCmids: vorherCmids,
-        erwartet: wiederherstellungAktivitaeten, quizQuelle: quizQuelle, herkunftEigen: herkunftEigen);
+        erwartet: wiederherstellungAktivitaeten, quizQuellen: quizQuellen, herkunftEigen: herkunftEigen);
   } on MoodleFehler {
     await _uebergang(vorgaenge, vg, WiederherstellungStand.unklar,
         text: 'Abfrage nicht gelungen; wiederherstellung_status prüft erneut.');
@@ -628,6 +634,20 @@ Future<({List<String> zeilen, bool eigen})> _herkunftZeilen(
     MoodleZugang moodle, ArchivBefund befund, int? sammlung) async {
   if (!befund.aktivitaeten.any((a) => a.modul == 'quiz')) return (zeilen: const <String>[], eigen: false);
   if (sammlung == null) {
+    // Ohne Sammlung belegen nur quizlokale Fragen die eigene Herkunft: Sie liegen im Archiv
+    // im Kontext des Quiz und werden mit ihm gesichert, ein Vergleich von Sachnummern entfällt.
+    final lokal = befund.quizUnlesbar.isEmpty &&
+        befund.quizFragen.isNotEmpty &&
+        befund.quizFragen.values.every((fragen) => fragen.isNotEmpty && fragen.every((f) => f.lokal == true));
+    if (lokal) {
+      return (
+        zeilen: [
+          for (final e in befund.quizFragen.entries)
+            'Quiz ${e.key}: ${herkunftPruefen(verwendet: e.value, eigeneSachnummern: const {}, eigeneAnzahl: 0).text}',
+        ],
+        eigen: true,
+      );
+    }
     return (
       zeilen: const ['Fragenherkunft nicht geprüft: keine eigene Fragensammlung angegeben (Prüflücke).'],
       eigen: false,
@@ -679,7 +699,7 @@ Future<String> _gegenlesen(
   required int kurs,
   required List<int> vorherCmids,
   required List<ArchivAktivitaet> erwartet,
-  List<QuizFrage>? quizQuelle,
+  Map<String, List<QuizFrage>>? quizQuellen,
   bool herkunftEigen = false,
 }) async {
   // Erneut aufrufbar (nach „unklar"): Verborgenes wird nicht noch einmal angefasst.
@@ -732,30 +752,41 @@ Future<String> _gegenlesen(
       : alleVerborgen
           ? 'Neu im Kurs: $liste.'
           : 'Neu im Kurs: $liste. Nicht alle sind verborgen; bitte prüfen.';
-  // Fragenvergleich (Issue #20) nach dem Wiederherstellen: nur bei genau einem Quiz im
-  // Archiv und genau einem neuen Quiz im Kurs. Sonst Prüflücke, nie Gleichheit.
-  final quizArchiv = erwartet.where((a) => a.modul == 'quiz').length;
-  final neueQuizze = [for (final a in neue) if (a.modul == 'quiz') a.cmid];
-  FragenVergleich? vergleich;
-  if (quizArchiv > 0) {
-    vergleich = quizQuelle == null || quizArchiv != 1 || neueQuizze.length != 1
-        ? FragenVergleich(VergleichArt.pruefluecke,
-            'Fragenvergleich nicht möglich: Quiz im Archiv oder im Kurs nicht eindeutig zuzuordnen.')
-        : fragenVergleichen(
-            quelle: quizQuelle,
-            ziel: [for (final p in (await testLesen(moodle, neueQuizze.single)).plaetze) (name: p.name, zufall: p.zufall)],
-          );
+  // Fragenvergleich (Issue #20) nach dem Wiederherstellen: je Quiz aus dem Archiv, zugeordnet
+  // über den Titel (bei genau einem Quiz auf beiden Seiten auch ohne). Was sich nicht
+  // eindeutig zuordnen lässt, ist je Quiz eine Prüflücke, nie Gleichheit.
+  final archivQuizTitel = [for (final a in erwartet) if (a.modul == 'quiz') a.titel];
+  final vergleiche = <FragenVergleich>[];
+  if (archivQuizTitel.isNotEmpty) {
+    final zuordnung = quizZuordnen(
+      archivQuizTitel: archivQuizTitel,
+      quellen: quizQuellen,
+      neueQuizze: [for (final a in neue) if (a.modul == 'quiz') (cmid: a.cmid, name: a.name)],
+    );
+    for (final z in zuordnung) {
+      final FragenVergleich v;
+      if (z.luecke != null) {
+        v = FragenVergleich(VergleichArt.pruefluecke,
+            'Fragenvergleich nicht möglich (Prüflücke): ${z.luecke}');
+      } else {
+        v = fragenVergleichen(
+          quelle: z.quelle,
+          ziel: [for (final p in (await testLesen(moodle, z.zielCmid!)).plaetze) (name: p.name, zufall: p.zufall)],
+        );
+      }
+      vergleiche.add(FragenVergleich(v.art, 'Quiz „${z.titel}": ${v.text}', fehlend: v.fehlend, zusaetzlich: v.zusaetzlich));
+    }
   }
   // verified nur, wenn alle Prüfungen es erlauben: Verbergen, Anhänge und Fragenvergleich.
   final anhangOk = anhang == null || anhang.vollstaendig;
-  final vergleichOk = vergleich == null || quizVerifiziert(vergleich);
+  final vergleichOk = vergleiche.every(quizVerifiziert);
   // Befund 7: Fragenherkunft nur bei eigenen Fragen; Befund 8: nicht schreibbare Typen nie verifiziert.
   final herkunftOk = erwartet.every((a) => a.modul != 'quiz') || herkunftEigen;
   final schreibPruefluecke = nichtSchreibbarePruefluecke(erwartet.map((a) => a.modul));
   final verifiziert = alleVerborgen && anhangOk && vergleichOk && herkunftOk && schreibPruefluecke == null;
   final zusatz = [
     if (anhang != null) anhang.text,
-    if (vergleich != null) vergleich.text,
+    for (final v in vergleiche) v.text,
     if (!herkunftOk) 'Fragenherkunft nicht bestätigt (siehe Freigabe).',
     ?schreibPruefluecke,
   ].join(' ');
@@ -794,7 +825,8 @@ Future<String> wiederherstellungStatus(MoodleZugang moodle, Vorgaenge vorgaenge,
           kurs: v.kurs == 0 ? null : v.kurs,
           vorherCmids: v.vorherCmids ?? const [],
           wiederherstellungAktivitaeten: v.wiederherstellungAktivitaeten ?? const [],
-          quizQuelle: v.quizQuelle);
+          quizQuellen: v.quizQuellen,
+          herkunftEigen: v.herkunftEigen);
     } finally {
       _laufendeWiederherstellungen.remove(v.id);
     }

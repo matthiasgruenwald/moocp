@@ -177,4 +177,35 @@ void main() {
       expect(herkunftVerifiziert(const []), isFalse);
     });
   });
+
+  group('quizZuordnen', () {
+    const q = <QuizFrage>[(name: 'F', sachnummer: 'ZZ-1', zufall: false, lokal: true)];
+
+    test('zwei Quizze werden über den Titel zugeordnet', () {
+      final z = quizZuordnen(
+        archivQuizTitel: ['A', 'B'],
+        quellen: {'A': q, 'B': q},
+        neueQuizze: [(cmid: 8, name: 'B'), (cmid: 7, name: 'A')],
+      );
+      expect([for (final x in z) x.zielCmid], [7, 8]);
+      expect(z.every((x) => x.luecke == null), isTrue);
+    });
+
+    test('ohne gleichnamiges Quiz im Kurs: Prüflücke, bei einem Quiz je Seite aber Zuordnung', () {
+      final z = quizZuordnen(archivQuizTitel: ['A', 'B'], quellen: {'A': q, 'B': q}, neueQuizze: [(cmid: 7, name: 'A')]);
+      expect(z[0].luecke, isNull);
+      expect(z[1].luecke, isNotNull);
+      final einzeln = quizZuordnen(archivQuizTitel: ['A'], quellen: {'A': q}, neueQuizze: [(cmid: 9, name: 'Anders')]);
+      expect(einzeln.single.zielCmid, 9);
+    });
+
+    test('doppelter Titel im Archiv bekommt keine Quelle', () {
+      final quellen = quizQuellenNachTitel(
+        quizFragen: {'quiz_1': q, 'quiz_2': q},
+        quizTitel: {'quiz_1': 'A', 'quiz_2': 'A'},
+        archivQuizTitel: ['A', 'A'],
+      );
+      expect(quellen, isEmpty);
+    });
+  });
 }

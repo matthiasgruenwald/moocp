@@ -70,7 +70,8 @@ class Vorgang {
     this.wiederholungVon,
     this.profilKennung,
     this.instanzAdresse,
-    this.quizQuelle,
+    this.quizQuellen,
+    this.herkunftEigen = false,
   }) : aktualisiert = aktualisiert ?? begonnen;
 
   final String id;
@@ -123,7 +124,10 @@ class Vorgang {
   String? instanzAdresse;
 
   /// Quellfragen bleiben auch ohne laufende Sitzung für den Vergleich verfügbar.
-  List<QuizFrage>? quizQuelle;
+  Map<String, List<QuizFrage>>? quizQuellen;
+
+  /// Die Fragenherkunft war vor dem Start als eigen belegt; bleibt für spätere Statusabfragen erhalten.
+  bool herkunftEigen;
 
   Map<String, Object?> zuJson() => {
         'id': id,
@@ -150,7 +154,10 @@ class Vorgang {
         'wiederholung_von': wiederholungVon,
         'profil_kennung': profilKennung,
         'instanz_adresse': instanzAdresse,
-        'quiz_quelle': quizQuelle?.map((f) => {'name': f.name, 'sachnummer': f.sachnummer, 'zufall': f.zufall, 'lokal': f.lokal}).toList(),
+        'herkunft_eigen': herkunftEigen,
+        'quiz_quellen': quizQuellen?.map((titel, fragen) => MapEntry(titel, [
+              for (final f in fragen) {'name': f.name, 'sachnummer': f.sachnummer, 'zufall': f.zufall, 'lokal': f.lokal},
+            ])),
       };
 
   static Vorgang? ausJson(Object? o) {
@@ -187,11 +194,23 @@ class Vorgang {
       wiederholungVon: o['wiederholung_von'] as String?,
       profilKennung: o['profil_kennung'] as String?,
       instanzAdresse: o['instanz_adresse'] as String?,
-      quizQuelle: (o['quiz_quelle'] as List?)?.whereType<Map>()
-          .where((f) => f['name'] is String && f['zufall'] is bool)
-          .map((f) => (name: f['name'] as String, sachnummer: f['sachnummer'] as String?, zufall: f['zufall'] as bool, lokal: f['lokal'] as bool?)).toList(),
+      herkunftEigen: o['herkunft_eigen'] == true,
+      quizQuellen: _quizQuellenAus(o['quiz_quellen']),
     );
   }
+}
+
+Map<String, List<QuizFrage>>? _quizQuellenAus(Object? o) {
+  if (o is! Map) return null;
+  return {
+    for (final e in o.entries)
+      if (e.key is String && e.value is List)
+        e.key as String: [
+          for (final f in (e.value as List).whereType<Map>())
+            if (f['name'] is String && f['zufall'] is bool)
+              (name: f['name'] as String, sachnummer: f['sachnummer'] as String?, zufall: f['zufall'] as bool, lokal: f['lokal'] as bool?),
+        ],
+  };
 }
 
 /// Alle Vorgänge im Sicherungsordner, in vorgaenge.json. Geschrieben wird über
@@ -304,14 +323,16 @@ class Vorgaenge {
     String? fingerabdruck,
     String? wiederholungVon,
     String? profilKennung,
-    List<QuizFrage>? quizQuelle,
+    Map<String, List<QuizFrage>>? quizQuellen,
+    bool herkunftEigen = false,
   }) async {
     final v = await neu(kurs: kurs, cmid: 0, datei: datei);
     v.wiederherstellung = WiederherstellungStand.anstehend;
     v.fingerabdruck = fingerabdruck;
     v.wiederholungVon = wiederholungVon;
     v.profilKennung = profilKennung ?? this.profilKennung;
-    v.quizQuelle = quizQuelle;
+    v.quizQuellen = quizQuellen;
+    v.herkunftEigen = herkunftEigen;
     await _speichern(v);
     return v;
   }

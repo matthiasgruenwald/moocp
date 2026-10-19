@@ -32,6 +32,7 @@ class _Moodle {
   Object progress = <String, Object?>{'progress': 0.2};
   Completer<void>? hold;
   bool completed = false;
+  List<String> weitereQuizze = [];
   static const restore = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
   Uri get basis => Uri.parse('http://127.0.0.1:${server.port}');
   String page(String body) => '<script>M.cfg = {"sesskey":"sk","courseId":12,"contextid":"55"};</script>$body';
@@ -69,12 +70,15 @@ class _Moodle {
             data = {
               'cm': [
                 if (completed) {'id': 70, 'module': modul, 'name': title, 'visible': 0, 'sectionid': 1},
+                if (completed)
+                  for (var i = 0; i < weitereQuizze.length; i++)
+                    {'id': 71 + i, 'module': 'quiz', 'name': weitereQuizze[i], 'visible': 0, 'sectionid': 1},
               ],
               'section': [
                 {
                   'id': 1,
                   'visible': 1,
-                  'cmlist': [if (completed) 70],
+                  'cmlist': [if (completed) 70, if (completed) for (var i = 0; i < weitereQuizze.length; i++) 71 + i],
                 },
               ],
             };
@@ -274,7 +278,7 @@ void main() {
     await client.initialize();
   }
 
-  void writeArchive({bool quiz = false, bool image = false}) {
+  void writeArchive({bool quiz = false, bool image = false, bool lokal = false}) {
     external.modul = quiz ? 'quiz' : 'page';
     external.title = quiz ? 'ZZ Quiz' : 'ZZ Blatt';
     final archive = Archive();
@@ -285,8 +289,35 @@ void main() {
       'files.xml': image
           ? '<files><file><id>1</id><component>mod_page</component><filename>bild.png</filename><contenthash>0000000000000000000000000000000000000000</contenthash></file></files>'
           : '<files/>',
-      if (quiz) 'activities/quiz_7/quiz.xml': '<quiz><question_instance><question_reference><questionbankentryid>1</questionbankentryid><version>1</version></question_reference></question_instance></quiz>',
-      if (quiz) 'questions.xml': '<question_bank_entry id="1"><idnumber>ZZ-1</idnumber><question_version><question_versions><version>1</version><questions><question><name>ZZ Frage</name></question></questions></question_versions></question_version></question_bank_entry>',
+      if (quiz) 'activities/quiz_7/quiz.xml': '<activity contextid="5"><quiz><question_instance><question_reference><questionbankentryid>1</questionbankentryid><version>1</version></question_reference></question_instance></quiz></activity>',
+      if (quiz) 'questions.xml': '<questions>${lokal ? '<question_category id="1"><contextid>5</contextid></question_category>' : ''}<question_bank_entry id="1">${lokal ? '<questioncategoryid>1</questioncategoryid>' : ''}<idnumber>ZZ-1</idnumber><question_version><question_versions><version>1</version><questions><question><name>ZZ Frage</name></question></questions></question_versions></question_version></question_bank_entry></questions>',
+    }.entries) {
+      archive.addFile(ArchiveFile.bytes(e.key, utf8.encode(e.value)));
+    }
+    File(p.join(folder.path, 'test.mbz'))
+        .writeAsBytesSync(GZipEncoder().encodeBytes(TarEncoder().encodeBytes(archive)));
+  }
+
+  /// Ein Archiv mit zwei Quizzen, beide mit der einen Frage „ZZ Frage".
+  void writeTwoQuizArchive() {
+    external.modul = 'quiz';
+    external.title = 'ZZ Quiz';
+    String quizXml() =>
+        '<activity contextid="5"><quiz><question_instance><question_reference><questionbankentryid>1</questionbankentryid><version>1</version></question_reference></question_instance></quiz></activity>';
+    final archive = Archive();
+    for (final e in <String, String>{
+      'moodle_backup.xml':
+          '<moodle_backup><information><format>moodle2</format><type>activity</type></information><activities>'
+          '<activity><modulename>quiz</modulename><title>ZZ Quiz</title><directory>activities/quiz_7</directory></activity>'
+          '<activity><modulename>quiz</modulename><title>ZZ Quiz B</title><directory>activities/quiz_8</directory></activity>'
+          '</activities></moodle_backup>',
+      'activities/quiz_7/inforef.xml': '<inforef/>',
+      'activities/quiz_8/inforef.xml': '<inforef/>',
+      'files.xml': '<files/>',
+      'activities/quiz_7/quiz.xml': quizXml(),
+      'activities/quiz_8/quiz.xml': quizXml(),
+      'questions.xml':
+          '<questions><question_category id="1"><contextid>5</contextid></question_category><question_bank_entry id="1"><questioncategoryid>1</questioncategoryid><idnumber>ZZ-1</idnumber><question_version><question_versions><version>1</version><questions><question><name>ZZ Frage</name></question></questions></question_versions></question_version></question_bank_entry></questions>',
     }.entries) {
       archive.addFile(ArchiveFile.bytes(e.key, utf8.encode(e.value)));
     }
@@ -458,6 +489,46 @@ void main() {
     final again = await client.tool('wiederherstellung_status', {'id': number});
     expect(again, contains('Fragenzahl und Fragennamen stimmen mit der Quelle überein (1)'));
     expect(external.starts, 1);
+  });
+
+  test('Fragen im Kontext des Quiz belegen die eigene Herkunft auch ohne angegebene Sammlung', () async {
+    writeArchive(quiz: true, lokal: true);
+    external.progress = {'unexpected': true};
+    final started = await client.tool('wiederherstellen_datei', arguments);
+    final number = RegExp(r'Nummer ([a-z0-9]+)').firstMatch(started)!.group(1)!;
+    external.progress = {'progress': 1, 'status': 1000};
+    external.completed = true;
+    final status = await client.tool('wiederherstellung_status', {'id': number});
+    expect(status, contains('Fragenzahl und Fragennamen stimmen mit der Quelle überein (1)'));
+    expect(status, isNot(contains('Fragenherkunft nicht bestätigt')));
+  });
+
+  test('mehrere Quizze im Archiv werden je zugeordnet verglichen', () async {
+    writeTwoQuizArchive();
+    external.progress = {'unexpected': true};
+    final started = await client.tool('wiederherstellen_datei', arguments);
+    final number = RegExp(r'Nummer ([a-z0-9]+)').firstMatch(started)!.group(1)!;
+    external.weitereQuizze = ['ZZ Quiz B'];
+    external.progress = {'progress': 1, 'status': 1000};
+    external.completed = true;
+    final status = await client.tool('wiederherstellung_status', {'id': number});
+    expect('stimmen mit der Quelle überein'.allMatches(status).length, 2, reason: status);
+    expect(status, contains('„ZZ Quiz B"'));
+    expect(status, isNot(contains('nicht eindeutig')));
+    expect(status, isNot(contains('Fragenherkunft nicht bestätigt')));
+  });
+
+  test('ein Quiz ohne Gegenstück im Kurs ist eine Prüflücke, die anderen werden verglichen', () async {
+    writeTwoQuizArchive();
+    external.progress = {'unexpected': true};
+    final started = await client.tool('wiederherstellen_datei', arguments);
+    final number = RegExp(r'Nummer ([a-z0-9]+)').firstMatch(started)!.group(1)!;
+    external.progress = {'progress': 1, 'status': 1000};
+    external.completed = true;
+    final status = await client.tool('wiederherstellung_status', {'id': number});
+    expect('stimmen mit der Quelle überein'.allMatches(status).length, 1, reason: status);
+    expect(status, contains('„ZZ Quiz B"'));
+    expect(status, contains('Prüflücke'));
   });
 
   test('kollidierende Sachnummern in einer Zielsammlung bestätigen keine Quellherkunft', () async {

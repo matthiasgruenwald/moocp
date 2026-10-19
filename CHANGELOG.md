@@ -1,6 +1,7 @@
 # Changelog
 
 ## 0.9.23
+- Wiederherstellung: Enthält das Archiv mehrere Tests, vergleicht die App die Fragen je Test; ein Test, den sie nicht zuordnen kann, steht einzeln als Prüflücke. Liegen alle Fragen im Test selbst, gilt ihre Herkunft auch ohne angegebene Sammlung als eigen, auch bei späteren Statusabfragen.
 - Wiederherstellung: Meldet Moodle einen Fehler, steht der Vorgang auf „fehlgeschlagen" statt „unklar"; er sperrt eine zweite Wiederherstellung derselben Datei weiter, weil schon Inhalte angelegt sein können.
 - Wiederherstellung: Fragenvergleiche bleiben nach Neustarts erhalten; unklare Versionen und eine nicht belegte Quellherkunft bleiben ausdrücklich Prüflücken.
 - Formulare lesen: Ein Aktivitätstyp, den die App nicht ändern kann, steht mit „Prüflücke" im Ergebnis; die Verweise darin sind geprüft oder ausdrücklich als nicht geprüft benannt.
