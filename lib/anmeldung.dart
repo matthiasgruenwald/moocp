@@ -34,6 +34,19 @@ class AnmeldeAuftrag {
   final bool merken;
 }
 
+/// Hält den normalen Start bei der Einrichtung an; nur eine explizite
+/// Testprofilbindung darf die Testanmeldung vor dem Einrichtungsdialog starten.
+Future<bool> testprofilVorEinrichtungStarten({
+  required bool gebunden,
+  required Future<void> Function() anmelden,
+  required Future<bool> Function() einrichtungPruefen,
+}) async {
+  if (gebunden) await anmelden();
+  if (!await einrichtungPruefen()) return false;
+  if (!gebunden) await anmelden();
+  return true;
+}
+
 /// Gibt gespeicherte Zugangsdaten nur zurück, wenn das Profil nach dem Laden
 /// noch ausgewählt ist.
 Future<Anmeldedaten?> gespeicherteAnmeldedatenVerwenden({
