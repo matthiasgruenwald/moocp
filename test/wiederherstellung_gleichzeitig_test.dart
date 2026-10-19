@@ -107,6 +107,33 @@ void main() {
     final ergebnisse = await Future.wait([erster, zweiter]);
     expect(ergebnisse.whereType<MoodleFehler>(), hasLength(1));
     expect(ergebnisse.whereType<String>().single, contains('Nicht wiederhergestellt'));
-
   });
+
+  test('eine Ausnahme bei der Freigabe gibt die Reservierung der Datei wieder frei', () async {
+    final ordner = Directory.systemTemp.createTempSync('wh_ausnahme_');
+    addTearDown(() => ordner.deleteSync(recursive: true));
+    File(p.join(ordner.path, 'sicherung.mbz')).writeAsBytesSync(_sicherung());
+    final moodle = _Moodle();
+    final vorgaenge = Vorgaenge(ordner.path);
+
+    Future<String> aufruf(Freigaben f) => wiederherstellen(moodle, f, vorgaenge,
+        datei: 'sicherung.mbz', instanz: 'Test', weg: 'aktueller_kurs_verschmelzen', kurs: 1, name: 'Testkurs');
+
+    await expectLater(aufruf(_WirftFreigaben(Protokoll())), throwsA(isA<StateError>()));
+
+    final freigaben = _ZaehlFreigaben(Protokoll());
+    final zweiter = aufruf(freigaben).then<Object>((v) => v, onError: (Object e) => e);
+    await Future<void>.delayed(const Duration(milliseconds: 200));
+    expect(freigaben.gezaehlt, 1, reason: 'Der zweite Aufruf darf nicht als Doppelstart abgewiesen werden.');
+    freigaben.entscheiden(false);
+    expect(await zweiter, contains('Nicht wiederhergestellt'));
+  });
+}
+
+/// Eine Freigabe, die bei der Anfrage mit einer Ausnahme abbricht.
+class _WirftFreigaben extends Freigaben {
+  _WirftFreigaben(super.protokoll);
+
+  @override
+  Future<bool> anfragen(FreigabeAnfrage a) async => throw StateError('Anfrage abgebrochen');
 }
