@@ -21,7 +21,11 @@
 import 'package:xml/xml.dart';
 
 /// Eine tatsächlich verwendete Frage aus der Quelle.
-typedef QuizFrage = ({String name, String? sachnummer, bool zufall});
+///
+/// [lokal]: true, wenn die Kategorie der Frage im Archiv denselben Kontext hat wie das
+/// Quiz (quizlokale Fragen, mit dem Quiz gesichert); false bei einem anderen Kontext;
+/// null, wenn der Archivaufbau das nicht eindeutig hergibt.
+typedef QuizFrage = ({String name, String? sachnummer, bool zufall, bool? lokal});
 
 /// Eine Frage in der Zusammenstellung des Ziels.
 typedef ZielFrage = ({String name, bool zufall});
@@ -62,7 +66,18 @@ HerkunftBefund herkunftPruefen({
     return HerkunftBefund(HerkunftArt.pruefluecke,
         'Herkunft nicht festlegbar: Zufallsfragen (${zufall.join(', ')}).');
   }
-  final ohneNummer = [for (final f in verwendet) if (f.sachnummer == null) f.name];
+  final fremdLokal = [for (final f in verwendet) if (f.lokal == false) f.name];
+  if (fremdLokal.isNotEmpty) {
+    return HerkunftBefund(HerkunftArt.fremdOderUnbekannt,
+        'Fragen aus einem anderen Kontext als dem Quiz (geteilte Sammlung): ${fremdLokal.join(', ')}. '
+        'Ein Fragenimport in eine neue Testzusammenstellung ist eine Alternative, nicht automatisch.',
+        nichtEigene: fremdLokal);
+  }
+  if (verwendet.every((f) => f.lokal == true)) {
+    return HerkunftBefund(HerkunftArt.eigene,
+        'Alle Fragen liegen im Kontext des Quiz und werden mit ihm gesichert.');
+  }
+  final ohneNummer = [for (final f in verwendet) if (f.lokal != true && f.sachnummer == null) f.name];
   if (ohneNummer.isNotEmpty) {
     return HerkunftBefund(HerkunftArt.pruefluecke,
         'Zuordnung nicht auflösbar, Frage ohne Sachnummer: ${ohneNummer.join(', ')}.');
@@ -165,10 +180,19 @@ List<String> _rest(List<String> a, List<String> b) {
 /// eine fehlende Version bleibt eine Prüflücke. [questionsXml] null: keine Fragenbank,
 /// dann hat keine Frage eine Sachnummer.
 List<QuizFrage> quizFragenAusXml(String quizXml, String? questionsXml) {
-  final bank = <String, ({String? idnummer, Map<int, String> versionen, Set<int> entwuerfe})>{};
+  final bank = <String, ({String? idnummer, String? kontext, Map<int, String> versionen, Set<int> entwuerfe})>{};
+  final quizKontext = XmlDocument.parse(quizXml).rootElement.getAttribute('contextid');
   if (questionsXml != null) {
+    final kategorieKontexte = <String, String>{};
+    for (final k in XmlDocument.parse(questionsXml).findAllElements('question_category')) {
+      final id = k.getAttribute('id');
+      final kontext = k.getElement('contextid')?.innerText.trim();
+      if (id != null && kontext != null && kontext.isNotEmpty) kategorieKontexte[id] = kontext;
+    }
     for (final e in XmlDocument.parse(questionsXml).findAllElements('question_bank_entry')) {
       final id = e.getAttribute('id') ?? '';
+      final kategorie = e.getElement('questioncategoryid')?.innerText.trim();
+      final kontext = kategorie == null || kategorie.isEmpty ? null : kategorieKontexte[kategorie];
       final idnummer = e.getElement('idnumber')?.innerText.trim();
       final versionen = <int, String>{};
       final entwuerfe = <int>{};
@@ -183,13 +207,13 @@ List<QuizFrage> quizFragenAusXml(String quizXml, String? questionsXml) {
         if (v.getElement('status')?.innerText.trim() == 'draft') entwuerfe.add(nummer);
       }
       versionen.removeWhere((n, _) => doppelt.contains(n));
-      bank[id] = (idnummer: idnummer == null || idnummer.isEmpty ? null : idnummer, versionen: versionen, entwuerfe: entwuerfe);
+      bank[id] = (idnummer: idnummer == null || idnummer.isEmpty ? null : idnummer, kontext: kontext, versionen: versionen, entwuerfe: entwuerfe);
     }
   }
   final fragen = <QuizFrage>[];
   for (final qi in XmlDocument.parse(quizXml).findAllElements('question_instance')) {
     if (qi.findAllElements('question_set_reference').isNotEmpty) {
-      fragen.add((name: 'Zufallsfrage', sachnummer: null, zufall: true));
+      fragen.add((name: 'Zufallsfrage', sachnummer: null, zufall: true, lokal: null));
       continue;
     }
     final ref = qi.findAllElements('questionbankentryid').map((n) => n.innerText.trim()).toList();
@@ -207,11 +231,12 @@ List<QuizFrage> quizFragenAusXml(String quizXml, String? questionsXml) {
       }
     }
     if (eintrag == null) {
-      fragen.add((name: 'Frage Nr. $id (nicht in questions.xml)', sachnummer: null, zufall: false));
+      fragen.add((name: 'Frage Nr. $id (nicht in questions.xml)', sachnummer: null, zufall: false, lokal: null));
     } else if (name == null || name.isEmpty) {
-      fragen.add((name: 'Frage Nr. $id (Version nicht auflösbar, Prüflücke)', sachnummer: null, zufall: false));
+      fragen.add((name: 'Frage Nr. $id (Version nicht auflösbar, Prüflücke)', sachnummer: null, zufall: false, lokal: null));
     } else {
-      fragen.add((name: name, sachnummer: eintrag.idnummer, zufall: false));
+      final lokal = quizKontext == null || eintrag.kontext == null ? null : quizKontext == eintrag.kontext;
+      fragen.add((name: name, sachnummer: eintrag.idnummer, zufall: false, lokal: lokal));
     }
   }
   return fragen;

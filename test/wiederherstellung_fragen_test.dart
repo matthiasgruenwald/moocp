@@ -10,8 +10,8 @@ void main() {
     test('gleiche Sachnummern belegen ohne Quellkontext keine eigene Herkunft', () {
       final b = herkunftPruefen(
         verwendet: [
-          (name: 'Frage A', sachnummer: 'ZZ-A', zufall: false),
-          (name: 'Frage B', sachnummer: 'ZZ-B', zufall: false),
+          (name: 'Frage A', sachnummer: 'ZZ-A', zufall: false, lokal: null),
+          (name: 'Frage B', sachnummer: 'ZZ-B', zufall: false, lokal: null),
         ],
         eigeneSachnummern: {'ZZ-A', 'ZZ-B', 'ZZ-C'},
         eigeneAnzahl: 3,
@@ -23,8 +23,8 @@ void main() {
     test('Frage nicht in der eigenen Sammlung: fremd oder unbekannt, mit Namen', () {
       final b = herkunftPruefen(
         verwendet: [
-          (name: 'Frage A', sachnummer: 'ZZ-A', zufall: false),
-          (name: 'Frage X', sachnummer: 'ZZ-X', zufall: false),
+          (name: 'Frage A', sachnummer: 'ZZ-A', zufall: false, lokal: null),
+          (name: 'Frage X', sachnummer: 'ZZ-X', zufall: false, lokal: null),
         ],
         eigeneSachnummern: {'ZZ-A'},
         eigeneAnzahl: 1,
@@ -36,7 +36,7 @@ void main() {
 
     test('leere eigene Sammlung ist kein Herkunftsnachweis', () {
       final b = herkunftPruefen(
-        verwendet: [(name: 'Frage A', sachnummer: 'ZZ-A', zufall: false)],
+        verwendet: [(name: 'Frage A', sachnummer: 'ZZ-A', zufall: false, lokal: null)],
         eigeneSachnummern: const {},
         eigeneAnzahl: 0,
       );
@@ -57,8 +57,8 @@ void main() {
     test('Zufallsfrage: Prüflücke, Herkunft nicht festlegbar', () {
       final b = herkunftPruefen(
         verwendet: [
-          (name: 'Frage A', sachnummer: 'ZZ-A', zufall: false),
-          (name: 'Zufall', sachnummer: null, zufall: true),
+          (name: 'Frage A', sachnummer: 'ZZ-A', zufall: false, lokal: null),
+          (name: 'Zufall', sachnummer: null, zufall: true, lokal: null),
         ],
         eigeneSachnummern: {'ZZ-A'},
         eigeneAnzahl: 1,
@@ -69,7 +69,7 @@ void main() {
 
     test('Frage ohne Sachnummer: Zuordnung nicht auflösbar, Prüflücke', () {
       final b = herkunftPruefen(
-        verwendet: [(name: 'Ohne Nummer', sachnummer: null, zufall: false)],
+        verwendet: [(name: 'Ohne Nummer', sachnummer: null, zufall: false, lokal: null)],
         eigeneSachnummern: {'ZZ-A'},
         eigeneAnzahl: 1,
       );
@@ -82,8 +82,8 @@ void main() {
     test('gleiche Anzahl und gleiche Namen: gleich, verifizierbar', () {
       final v = fragenVergleichen(
         quelle: [
-          (name: 'Frage A', sachnummer: 'ZZ-A', zufall: false),
-          (name: 'Frage B', sachnummer: 'ZZ-B', zufall: false),
+          (name: 'Frage A', sachnummer: 'ZZ-A', zufall: false, lokal: null),
+          (name: 'Frage B', sachnummer: 'ZZ-B', zufall: false, lokal: null),
         ],
         ziel: [
           (name: 'Frage B', zufall: false),
@@ -97,8 +97,8 @@ void main() {
     test('fehlende Frage: Abweichung mit Zahl und Namen, nicht verifiziert', () {
       final v = fragenVergleichen(
         quelle: [
-          (name: 'Frage A', sachnummer: 'ZZ-A', zufall: false),
-          (name: 'Frage B', sachnummer: 'ZZ-B', zufall: false),
+          (name: 'Frage A', sachnummer: 'ZZ-A', zufall: false, lokal: null),
+          (name: 'Frage B', sachnummer: 'ZZ-B', zufall: false, lokal: null),
         ],
         ziel: [(name: 'Frage A', zufall: false)],
       );
@@ -110,7 +110,7 @@ void main() {
 
     test('anderer Name bei gleicher Zahl: Abweichung', () {
       final v = fragenVergleichen(
-        quelle: [(name: 'Frage A', sachnummer: 'ZZ-A', zufall: false)],
+        quelle: [(name: 'Frage A', sachnummer: 'ZZ-A', zufall: false, lokal: null)],
         ziel: [(name: 'Frage Anders', zufall: false)],
       );
       expect(v.art, VergleichArt.abweichung);
@@ -129,7 +129,7 @@ void main() {
 
     test('Zufallsfrage im Ziel: Prüflücke, kein falscher Gleichheitsvergleich', () {
       final v = fragenVergleichen(
-        quelle: [(name: 'Frage A', sachnummer: 'ZZ-A', zufall: false)],
+        quelle: [(name: 'Frage A', sachnummer: 'ZZ-A', zufall: false, lokal: null)],
         ziel: [(name: 'Zufall', zufall: true)],
       );
       expect(v.art, VergleichArt.pruefluecke);
@@ -138,7 +138,7 @@ void main() {
 
     test('Zufallsfrage in der Quelle: Prüflücke', () {
       final v = fragenVergleichen(
-        quelle: [(name: 'Zufall', sachnummer: null, zufall: true)],
+        quelle: [(name: 'Zufall', sachnummer: null, zufall: true, lokal: null)],
         ziel: [(name: 'Zufall', zufall: false)],
       );
       expect(v.art, VergleichArt.pruefluecke);

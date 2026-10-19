@@ -150,7 +150,7 @@ class Vorgang {
         'wiederholung_von': wiederholungVon,
         'profil_kennung': profilKennung,
         'instanz_adresse': instanzAdresse,
-        'quiz_quelle': quizQuelle?.map((f) => {'name': f.name, 'sachnummer': f.sachnummer, 'zufall': f.zufall}).toList(),
+        'quiz_quelle': quizQuelle?.map((f) => {'name': f.name, 'sachnummer': f.sachnummer, 'zufall': f.zufall, 'lokal': f.lokal}).toList(),
       };
 
   static Vorgang? ausJson(Object? o) {
@@ -189,7 +189,7 @@ class Vorgang {
       instanzAdresse: o['instanz_adresse'] as String?,
       quizQuelle: (o['quiz_quelle'] as List?)?.whereType<Map>()
           .where((f) => f['name'] is String && f['zufall'] is bool)
-          .map((f) => (name: f['name'] as String, sachnummer: f['sachnummer'] as String?, zufall: f['zufall'] as bool)).toList(),
+          .map((f) => (name: f['name'] as String, sachnummer: f['sachnummer'] as String?, zufall: f['zufall'] as bool, lokal: f['lokal'] as bool?)).toList(),
     );
   }
 }

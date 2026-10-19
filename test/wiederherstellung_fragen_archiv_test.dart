@@ -152,6 +152,27 @@ void main() {
       expect(quizFragenAusXml(quiz, bank).single.name, 'Neu');
     });
 
+    test('Kategoriekontext gegen Quizkontext: lokal, geteilt, unbekannt', () {
+      String bank(String ctx) => '<question_categories><question_category id="5"><contextid>$ctx</contextid>'
+          '<question_bank_entries><question_bank_entry id="11"><questioncategoryid>5</questioncategoryid>'
+          '<idnumber>ZZ-1</idnumber><question_version><question_versions><version>1</version><questions>'
+          '<question><name>A</name></question></questions></question_versions></question_version>'
+          '</question_bank_entry></question_bank_entries></question_category></question_categories>';
+      String quiz(String attr) => '<activity $attr><question_instance><question_reference>'
+          '<questionbankentryid>11</questionbankentryid><version>1</version></question_reference></question_instance></activity>';
+      final lokal = quizFragenAusXml(quiz('contextid="77"'), bank('77'));
+      expect(lokal.single.lokal, isTrue);
+      expect(herkunftPruefen(verwendet: lokal, eigeneSachnummern: const {}, eigeneAnzahl: 0).art, HerkunftArt.eigene);
+      final geteilt = quizFragenAusXml(quiz('contextid="77"'), bank('88'));
+      expect(geteilt.single.lokal, isFalse);
+      expect(herkunftPruefen(verwendet: geteilt, eigeneSachnummern: {'ZZ-1'}, eigeneAnzahl: 1).art,
+          HerkunftArt.fremdOderUnbekannt);
+      final unbekannt = quizFragenAusXml(quiz(''), bank('77'));
+      expect(unbekannt.single.lokal, isNull);
+      expect(herkunftPruefen(verwendet: unbekannt, eigeneSachnummern: {'ZZ-1'}, eigeneAnzahl: 1).art,
+          HerkunftArt.pruefluecke, reason: 'gleiche Sachnummer am Ziel beweist nichts');
+    });
+
     test('Eintrag ohne Fragenbank: Sachnummer fehlt, Name nennt die Nummer', () {
       final f = quizFragenAusXml(_quizXml, null);
       expect(f.first.sachnummer, isNull);
