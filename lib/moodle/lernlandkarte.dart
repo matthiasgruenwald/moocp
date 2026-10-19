@@ -13,15 +13,17 @@ String _placestoreStruktur(Object? daten) {
   if (daten is Map) {
     final objekt = daten;
     final keys = objekt.keys.map((k) => '$k').toList()..sort();
-    return keys.map((k) {
-      final wert = objekt[k];
-      final art = wert is List
-          ? 'Liste(${wert.length})'
-          : wert is Map
-          ? 'Objekt'
-          : wert?.runtimeType.toString() ?? 'null';
-      return '$k:$art';
-    }).join(', ');
+    return keys
+        .map((k) {
+          final wert = objekt[k];
+          final art = wert is List
+              ? 'Liste(${wert.length})'
+              : wert is Map
+              ? 'Objekt'
+              : wert?.runtimeType.toString() ?? 'null';
+          return '$k:$art';
+        })
+        .join(', ');
   }
   if (daten is List) return 'Liste mit ${daten.length} Einträgen';
   return daten?.runtimeType.toString() ?? 'null';
@@ -53,7 +55,8 @@ Map<String, Object?>? lernlandkarteLesen(dom.Element form) {
       '(Parserposition ${e.offset ?? -1} von ${placestore.length}; Signatur: $signatur).',
     );
   }
-  final defaults = daten is Map<String, dynamic> &&
+  final defaults =
+      daten is Map<String, dynamic> &&
       daten['mapid'] is String &&
       daten['editmode'] is bool;
   final orte = daten is Map<String, dynamic>
@@ -217,9 +220,7 @@ Future<String> lernlandkarteVerknuepfungenSetzen(
     final aktuell = erwartet == 0 ? null : erwartet;
     final neuesZiel = (a['ziel'] as num?)?.toInt();
     final neu = neuesZiel == 0 ? null : neuesZiel;
-    details.add(
-      'Ort $ort: ${zielText(aktuell)} → ${zielText(neu)}',
-    );
+    details.add('Ort $ort: ${zielText(aktuell)} → ${zielText(neu)}');
   }
   final ja = await freigaben.anfragen(
     FreigabeAnfrage(
@@ -255,12 +256,11 @@ Future<String> lernlandkarteVerknuepfungenSetzen(
         return jetzt == null ||
             (jetzt.name, jetzt.modul, jetzt.abschnittId) != e.value;
       }) ||
-      ungeklaerteAlteZiele.any(
-        aktuelleStruktur.nachCmid.containsKey,
-      ) ||
+      ungeklaerteAlteZiele.any(aktuelleStruktur.nachCmid.containsKey) ||
       zuordnungen.any((a) {
         final cmid = (a['ziel'] as num?)?.toInt();
-        return cmid != null && cmid != 0 &&
+        return cmid != null &&
+            cmid != 0 &&
             aktuelleStruktur.nachCmid[cmid] == null;
       })) {
     throw MoodleFehler(
@@ -285,13 +285,16 @@ Future<String> lernlandkarteVerknuepfungenSetzen(
   final rueckForm = await formularHolen(moodle, ziel.adresse);
   final gelesen = await formularLesen(moodle, ziel, arbeitsordner);
   final rueck = gelesen.lernlandkarte?['placestore'];
-  final karteOk = ohneOrtsbeschriftung(gelesen.lernlandkarte?['svgcode']) ==
+  final karteOk =
+      ohneOrtsbeschriftung(gelesen.lernlandkarte?['svgcode']) ==
           ohneOrtsbeschriftung(lesestand.lernlandkarte?['svgcode']) &&
       const JsonEncoder().convert(rueck) == const JsonEncoder().convert(store);
-  final formularOk = gelesen.name == vorher.name && gelesen.kurs == kurs &&
-      _gleicheFormularFelder(aktuell, rueckForm) &&
+  final formularOk =
+      gelesen.name == vorher.name &&
+      gelesen.kurs == kurs &&
+      _gleicheFormularFelder(aktuell, rueckForm, beschriftungenNeu: true) &&
       _gleicheFelder(lesestand, gelesen) &&
-      _gleicheEinstellungen(lesestand, gelesen);
+      _gleicheEinstellungen(lesestand, gelesen, beschriftungenNeu: true);
   final verified = karteOk && formularOk;
   return 'Lernlandkarte „${gelesen.name}" zurückgelesen; Ortszuordnungen verified: $verified.';
 }
@@ -301,11 +304,10 @@ Future<String> lernlandkarteVerknuepfungenSetzen(
 /// Karte 1968). Der Vergleich der Zuordnung läuft über `placestore`; die
 /// Beschriftung im SVG bleibt außen vor.
 String? ohneOrtsbeschriftung(Object? svg) => svg is String
-    ? svg
-        .replaceAllMapped(
-          RegExp(r'(<(?:title|text) id="(?:title|text)[^"]*"[^>]*>)[^<]*'),
-          (m) => m[1]!,
-        )
+    ? svg.replaceAllMapped(
+        RegExp(r'(<(?:title|text) id="(?:title|text)[^"]*"[^>]*>)[^<]*'),
+        (m) => m[1]!,
+      )
     : null;
 
 bool _gleicheFelder(FormularGelesen vorher, FormularGelesen nachher) {
@@ -316,13 +318,26 @@ bool _gleicheFelder(FormularGelesen vorher, FormularGelesen nachher) {
 
 /// Gleicher Formularstand ohne Entwurfs-IDs. Der Hintergrund wird über seine
 /// Dateiliste geprüft, wie beim Ändern.
-bool _gleicheFormularFelder(Formular vorher, Formular nachher) {
+bool _gleicheFormularFelder(
+  Formular vorher,
+  Formular nachher, {
+  bool beschriftungenNeu = false,
+}) {
+  // Nach dem Speichern darf sich im SVG nur die von Moodle neu geschriebene
+  // Ortsbeschriftung unterscheiden; beim Standvergleich vor dem Schreiben nichts.
   List<List<String>> stand(Formular f) => [
     for (final e in f.felder)
-      if (e.key != 'sesskey' && !istEntwurfsId(e.key)) [e.key, e.value],
+      if (e.key != 'sesskey' && !istEntwurfsId(e.key))
+        [
+          e.key,
+          beschriftungenNeu && e.key == 'svgcode'
+              ? ohneOrtsbeschriftung(e.value)!
+              : e.value,
+        ],
   ];
   String liste(Formular f) => [
-    for (final e in (f.bereiche['backgroundfile']?['list'] as List? ?? const []))
+    for (final e
+        in (f.bereiche['backgroundfile']?['list'] as List? ?? const []))
       if (e is Map)
         '${e['filepath']}${e['filename']}:${e['size']}:${e['datemodified']}',
   ].join('|');
@@ -331,8 +346,22 @@ bool _gleicheFormularFelder(Formular vorher, Formular nachher) {
       liste(vorher) == liste(nachher);
 }
 
-bool _gleicheEinstellungen(FormularGelesen vorher, FormularGelesen nachher) {
-  final a = {for (final e in vorher.einstellungen) e.schluessel: e.wert};
-  final b = {for (final e in nachher.einstellungen) e.schluessel: e.wert};
+bool _gleicheEinstellungen(
+  FormularGelesen vorher,
+  FormularGelesen nachher, {
+  bool beschriftungenNeu = false,
+}) {
+  Object? wert(String schluessel, Object? w) =>
+      beschriftungenNeu && schluessel == 'svgcode'
+      ? ohneOrtsbeschriftung(w)
+      : w;
+  final a = {
+    for (final e in vorher.einstellungen)
+      e.schluessel: wert(e.schluessel, e.wert),
+  };
+  final b = {
+    for (final e in nachher.einstellungen)
+      e.schluessel: wert(e.schluessel, e.wert),
+  };
   return const JsonEncoder().convert(a) == const JsonEncoder().convert(b);
 }

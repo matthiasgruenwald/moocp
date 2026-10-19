@@ -27,6 +27,7 @@ class TestMoodle {
   int lernlandkarteSpeicherungen = 0;
   String? kartenSichtbar;
   bool svgBeimRuecklesenAendern = false;
+  bool ortsbeschriftungNeuSchreiben = false;
   bool einstellungBeimRuecklesenAendern = false;
   String svg = '<svg><circle id="p1"/></svg>';
   String karteneinstellung = 'vorher';
@@ -42,6 +43,7 @@ class TestMoodle {
     if (doppelterOrt) (daten['places'] as List).add({'id': 'p1'});
     return jsonEncode(daten);
   }
+
   String seite(String text) =>
       '<script>M.cfg = {"sesskey":"sk","courseId":12,"contextid":"55"};</script>$text';
   Future<void> starten() async {
@@ -112,11 +114,11 @@ class TestMoodle {
                 },
                 if (!entferneNeuesKartenziel)
                   {
-                  'id': 72,
-                  'module': 'page',
-                  'name': 'ZZ Ziel',
-                  'visible': 0,
-                  'sectionid': 1,
+                    'id': 72,
+                    'module': 'page',
+                    'name': 'ZZ Ziel',
+                    'visible': 0,
+                    'sectionid': 1,
                   },
               ],
             ],
@@ -138,7 +140,19 @@ class TestMoodle {
             kartenSichtbar = f['visible'];
             placestore = f['placestore']!;
             svg = f['svgcode']!;
-            if (svgBeimRuecklesenAendern) svg = '<svg><circle id="fremd"/></svg>';
+            if (svgBeimRuecklesenAendern) {
+              svg = '<svg><circle id="fremd"/></svg>';
+            }
+            if (ortsbeschriftungNeuSchreiben) {
+              // Moodle schreibt die Beschriftung jedes Ortes beim Speichern aus
+              // dem Namen der verknüpften Aktivität neu (Messung an der Spike-Instanz).
+              svg = svg
+                  .replaceAll(RegExp(r'<title id="titlep1">[^<]*</title>'), '')
+                  .replaceFirst(
+                    '</svg>',
+                    '<title id="titlep1">Etikett ${lernlandkarteSpeicherungen + 1}</title></svg>',
+                  );
+            }
             if (einstellungBeimRuecklesenAendern) {
               karteneinstellung = 'nach dem Speichern geändert';
             }
@@ -163,7 +177,8 @@ class TestMoodle {
         if (r.uri.queryParameters['add'] == 'learningmap' &&
             lernlandkarteAnlegen) {
           placestore = '{"editmode":true,"mapid":"native-test-map"}';
-          antwort = seite('''<form class="mform" action="/course/modedit.php" method="post">
+          antwort = seite(
+            '''<form class="mform" action="/course/modedit.php" method="post">
           <input name="_qf__mod_learningmap_mod_form" value="1"><input name="sesskey" value="sk">
           <input name="course" value="${r.uri.queryParameters['course']}"><input name="section" value="${r.uri.queryParameters['section']}">
           <input name="modulename" value="learningmap"><input name="name" value="">
@@ -172,7 +187,8 @@ class TestMoodle {
           <textarea name="svgcode">&lt;svg&gt;&lt;circle id="p1"/&gt;&lt;/svg&gt;</textarea>
           <input type="hidden" name="placestore" value='${const HtmlEscape().convert(placestore)}'>
           <script>M.form_filemanager.init(Y, {"target":"id_backgroundfile","itemid":9});</script>
-          <input type="submit" name="submitbutton" value="Speichern"></form>''');
+          <input type="submit" name="submitbutton" value="Speichern"></form>''',
+          );
         } else if (r.uri.queryParameters['update'] == '71') {
           // Moodle vergibt bei jedem Laden neue Entwurfs-IDs; sie sind kein Stand.
           entwurfsId++;
@@ -321,6 +337,30 @@ void main() {
     );
   });
 
+  test(
+    'von Moodle neu geschriebene Ortsbeschriftung ist kein Rücklesefehler',
+    () async {
+      extern.lernlandkarteVorhanden = true;
+      extern.ortsbeschriftungNeuSchreiben = true;
+      extern.svg =
+          '<svg><circle id="p1"/><title id="titlep1">Etikett 0</title></svg>';
+      freigaben.stufe = Bestaetigungen.keine;
+      await starten();
+      final geschrieben = await client.tool(
+        'lernlandkarte_verknuepfungen_setzen',
+        {
+          'cmid': 71,
+          'name': 'ZZ Karte',
+          'zuordnungen': [
+            {'ort': 'p1', 'aktuell': 70, 'ziel': 72},
+          ],
+        },
+      );
+      expect(extern.svg, contains('Etikett 1'));
+      expect(geschrieben, contains('verified: true'));
+    },
+  );
+
   test('Lernlandkarte wird über MCP gelesen, ein Ziel freigegeben geschrieben und zurückgelesen', () async {
     extern.lernlandkarteVorhanden = true;
     freigaben.stufe = Bestaetigungen.keine;
@@ -351,14 +391,10 @@ void main() {
       ],
     });
     expect(stale, contains('seit dem Lesen anders'));
-    expect(
-      (jsonDecode(extern.placestore) as Map)['paths'],
-      [
-        {'id': 'w1', 'from': 'p1', 'to': 'p1'},
-      ],
-    );
+    expect((jsonDecode(extern.placestore) as Map)['paths'], [
+      {'id': 'w1', 'from': 'p1', 'to': 'p1'},
+    ]);
   });
-
 
   test('eigene ZZ-Lernlandkarte wird verborgen über MCP angelegt und zurückgelesen', () async {
     extern.lernlandkarteAnlegen = true;
@@ -403,8 +439,8 @@ void main() {
     expect(link, contains('verified: true'));
     expect(link, contains('Debug-Testbetrieb: automatisch freigegeben'));
     expect(
-      ((jsonDecode(extern.placestore) as Map)['places'] as List).first
-          ['linkedActivity'],
+      ((jsonDecode(extern.placestore) as Map)['places'] as List)
+          .first['linkedActivity'],
       72,
     );
   });
@@ -451,64 +487,71 @@ void main() {
     },
   );
 
-  test('entferntes Ziel während der Freigabe wird vor dem POST erkannt', () async {
-    extern.lernlandkarteVorhanden = true;
-    await starten();
-    final angefragt = Completer<void>();
-    void listener() {
-      if (freigaben.aktuell?.titel == 'Lernlandkarte ändern?' &&
-          !angefragt.isCompleted) {
-        angefragt.complete();
+  test(
+    'entferntes Ziel während der Freigabe wird vor dem POST erkannt',
+    () async {
+      extern.lernlandkarteVorhanden = true;
+      await starten();
+      final angefragt = Completer<void>();
+      void listener() {
+        if (freigaben.aktuell?.titel == 'Lernlandkarte ändern?' &&
+            !angefragt.isCompleted) {
+          angefragt.complete();
+        }
       }
-    }
 
-    freigaben.addListener(listener);
-    final aufruf = client.tool('lernlandkarte_verknuepfungen_setzen', {
-      'cmid': 71,
-      'name': 'ZZ Karte',
-      'zuordnungen': [
-        {'ort': 'p1', 'aktuell': 70, 'ziel': 72},
-      ],
-    });
-    await angefragt.future.timeout(const Duration(seconds: 2));
-    expect(freigaben.aktuell!.punkte.join('\n'), contains('ZZ Ziel'));
-    expect(freigaben.aktuell!.punkte.join('\n'), contains('ZZ Kurs'));
-    expect(freigaben.aktuell!.punkte.join('\n'), contains('cmid 70'));
-    expect(freigaben.aktuell!.punkte.join('\n'), contains('cmid 72'));
-    extern.entferneNeuesKartenziel = true;
-    freigaben.entscheiden(true);
-    final ergebnis = await aufruf;
-    freigaben.removeListener(listener);
+      freigaben.addListener(listener);
+      final aufruf = client.tool('lernlandkarte_verknuepfungen_setzen', {
+        'cmid': 71,
+        'name': 'ZZ Karte',
+        'zuordnungen': [
+          {'ort': 'p1', 'aktuell': 70, 'ziel': 72},
+        ],
+      });
+      await angefragt.future.timeout(const Duration(seconds: 2));
+      expect(freigaben.aktuell!.punkte.join('\n'), contains('ZZ Ziel'));
+      expect(freigaben.aktuell!.punkte.join('\n'), contains('ZZ Kurs'));
+      expect(freigaben.aktuell!.punkte.join('\n'), contains('cmid 70'));
+      expect(freigaben.aktuell!.punkte.join('\n'), contains('cmid 72'));
+      extern.entferneNeuesKartenziel = true;
+      freigaben.entscheiden(true);
+      final ergebnis = await aufruf;
+      freigaben.removeListener(listener);
 
-    expect(ergebnis, contains('seit der Freigabe geändert'));
-    expect(extern.lernlandkarteSpeicherungen, 0);
-  });
+      expect(ergebnis, contains('seit der Freigabe geändert'));
+      expect(extern.lernlandkarteSpeicherungen, 0);
+    },
+  );
 
-  test('geänderte Karteneinstellung während der Freigabe verhindert den POST', () async {
-    extern.lernlandkarteVorhanden = true;
-    await starten();
-    final angefragt = Completer<void>();
-    void listener() {
-      if (freigaben.aktuell?.titel == 'Lernlandkarte ändern?' &&
-          !angefragt.isCompleted) {
-        angefragt.complete();
+  test(
+    'geänderte Karteneinstellung während der Freigabe verhindert den POST',
+    () async {
+      extern.lernlandkarteVorhanden = true;
+      await starten();
+      final angefragt = Completer<void>();
+      void listener() {
+        if (freigaben.aktuell?.titel == 'Lernlandkarte ändern?' &&
+            !angefragt.isCompleted) {
+          angefragt.complete();
+        }
       }
-    }
-    freigaben.addListener(listener);
-    final aufruf = client.tool('lernlandkarte_verknuepfungen_setzen', {
-      'cmid': 71,
-      'name': 'ZZ Karte',
-      'zuordnungen': [
-        {'ort': 'p1', 'aktuell': 70, 'ziel': 72},
-      ],
-    });
-    await angefragt.future.timeout(const Duration(seconds: 2));
-    extern.karteneinstellung = 'zwischenzeitlich geändert';
-    freigaben.entscheiden(true);
-    expect(await aufruf, contains('seit der Freigabe geändert'));
-    expect(extern.lernlandkarteSpeicherungen, 0);
-    freigaben.removeListener(listener);
-  });
+
+      freigaben.addListener(listener);
+      final aufruf = client.tool('lernlandkarte_verknuepfungen_setzen', {
+        'cmid': 71,
+        'name': 'ZZ Karte',
+        'zuordnungen': [
+          {'ort': 'p1', 'aktuell': 70, 'ziel': 72},
+        ],
+      });
+      await angefragt.future.timeout(const Duration(seconds: 2));
+      extern.karteneinstellung = 'zwischenzeitlich geändert';
+      freigaben.entscheiden(true);
+      expect(await aufruf, contains('seit der Freigabe geändert'));
+      expect(extern.lernlandkarteSpeicherungen, 0);
+      freigaben.removeListener(listener);
+    },
+  );
 
   test('Kurswechsel während der Freigabe verhindert den POST', () async {
     extern.lernlandkarteVorhanden = true;
@@ -520,6 +563,7 @@ void main() {
         angefragt.complete();
       }
     }
+
     freigaben.addListener(listener);
     final aufruf = client.tool('lernlandkarte_verknuepfungen_setzen', {
       'cmid': 71,
@@ -536,25 +580,34 @@ void main() {
     freigaben.removeListener(listener);
   });
 
-  test('mehrdeutige Ortskennung wird über MCP vor einer Freigabe abgelehnt', () async {
-    extern.lernlandkarteVorhanden = true;
-    extern.doppelterOrt = true;
-    await starten();
-    final ergebnis = await client.tool('lernlandkarte_verknuepfungen_setzen', {
-      'cmid': 71,
-      'name': 'ZZ Karte',
-      'zuordnungen': [
-        {'ort': 'p1', 'aktuell': 70, 'ziel': 72},
-      ],
-    });
-    expect(ergebnis, contains('fehlt oder kommt mehrfach vor'));
-    expect(extern.lernlandkarteSpeicherungen, 0);
-    expect(freigaben.aktuell, isNull);
-  });
+  test(
+    'mehrdeutige Ortskennung wird über MCP vor einer Freigabe abgelehnt',
+    () async {
+      extern.lernlandkarteVorhanden = true;
+      extern.doppelterOrt = true;
+      await starten();
+      final ergebnis = await client.tool(
+        'lernlandkarte_verknuepfungen_setzen',
+        {
+          'cmid': 71,
+          'name': 'ZZ Karte',
+          'zuordnungen': [
+            {'ort': 'p1', 'aktuell': 70, 'ziel': 72},
+          ],
+        },
+      );
+      expect(ergebnis, contains('fehlt oder kommt mehrfach vor'));
+      expect(extern.lernlandkarteSpeicherungen, 0);
+      expect(freigaben.aktuell, isNull);
+    },
+  );
 
   test('ungeklärtes Altziel steht ausdrücklich in der Freigabe', () async {
     extern.lernlandkarteVorhanden = true;
-    extern.placestore = extern.placestore.replaceFirst('"linkedActivity":70', '"linkedActivity":404');
+    extern.placestore = extern.placestore.replaceFirst(
+      '"linkedActivity":70',
+      '"linkedActivity":404',
+    );
     await starten();
     final angefragt = Completer<void>();
     void listener() {
@@ -563,6 +616,7 @@ void main() {
         angefragt.complete();
       }
     }
+
     freigaben.addListener(listener);
     final aufruf = client.tool('lernlandkarte_verknuepfungen_setzen', {
       'cmid': 71,
@@ -572,7 +626,10 @@ void main() {
       ],
     });
     await angefragt.future.timeout(const Duration(seconds: 2));
-    expect(freigaben.aktuell!.punkte.join('\n'), contains('ungeklärtes Ziel cm 404'));
+    expect(
+      freigaben.aktuell!.punkte.join('\n'),
+      contains('ungeklärtes Ziel cm 404'),
+    );
     freigaben.entscheiden(false);
     expect(await aufruf, contains('nicht freigegeben'));
     freigaben.removeListener(listener);
@@ -593,20 +650,26 @@ void main() {
     expect(ergebnis, contains('verified: false'));
   });
 
-  test('veränderte Einstellung nach dem Schreiben bleibt unverifiziert', () async {
-    extern.lernlandkarteVorhanden = true;
-    extern.einstellungBeimRuecklesenAendern = true;
-    freigaben.stufe = Bestaetigungen.keine;
-    await starten();
-    final ergebnis = await client.tool('lernlandkarte_verknuepfungen_setzen', {
-      'cmid': 71,
-      'name': 'ZZ Karte',
-      'zuordnungen': [
-        {'ort': 'p1', 'aktuell': 70, 'ziel': 72},
-      ],
-    });
-    expect(ergebnis, contains('verified: false'));
-  });
+  test(
+    'veränderte Einstellung nach dem Schreiben bleibt unverifiziert',
+    () async {
+      extern.lernlandkarteVorhanden = true;
+      extern.einstellungBeimRuecklesenAendern = true;
+      freigaben.stufe = Bestaetigungen.keine;
+      await starten();
+      final ergebnis = await client.tool(
+        'lernlandkarte_verknuepfungen_setzen',
+        {
+          'cmid': 71,
+          'name': 'ZZ Karte',
+          'zuordnungen': [
+            {'ort': 'p1', 'aktuell': 70, 'ziel': 72},
+          ],
+        },
+      );
+      expect(ergebnis, contains('verified: false'));
+    },
+  );
   for (final fall in ['Profil', 'Adresse', 'Kurs', 'Name']) {
     test('falscher $fall erhält keine automatische Schreibfreigabe', () async {
       await starten(
