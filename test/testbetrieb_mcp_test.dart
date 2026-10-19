@@ -28,6 +28,9 @@ class TestMoodle {
   String? kartenSichtbar;
   bool svgBeimRuecklesenAendern = false;
   bool ortsbeschriftungNeuSchreiben = false;
+  // Moodle speichert die Hintergrunddatei bei jedem Speichern neu; ihr
+  // Änderungsdatum steigt, der Inhalt bleibt (Messung an der Spike-Instanz).
+  int? hintergrundDatum;
   bool einstellungBeimRuecklesenAendern = false;
   String svg = '<svg><circle id="p1"/></svg>';
   String karteneinstellung = 'vorher';
@@ -157,6 +160,9 @@ class TestMoodle {
               karteneinstellung = 'nach dem Speichern geändert';
             }
             lernlandkarteSpeicherungen++;
+            if (hintergrundDatum != null) {
+              hintergrundDatum = hintergrundDatum! + 15;
+            }
             r.response.redirect(
               Uri.parse('/course/modedit.php?update=71'),
               status: 303,
@@ -200,6 +206,7 @@ class TestMoodle {
           <input name="karteneinstellung" value="$karteneinstellung">
           <textarea name="introeditor[text]"></textarea><input name="introeditor[itemid]" value="$entwurfsId">
           <input type="hidden" name="backgroundfile" value="${entwurfsId + 1000}">
+          ${hintergrundDatum == null ? '' : '<div id="fitem_id_backgroundfile"><label class="col-form-label">Hintergrundbild</label></div><script>M.form_filemanager.init(Y, {"target":"id_backgroundfile","itemid":${entwurfsId + 1000},"client_id":"c","list":[{"type":"file","filepath":"/","filename":"bg.png","size":3,"datemodified":$hintergrundDatum,"url":"$basis/draftfile.php/bg.png"}]});</script>'}
           <textarea name="svgcode">${const HtmlEscape().convert(svg)}</textarea>
           <input type="hidden" name="placestore" value='${const HtmlEscape().convert(formularPlacestore)}'>
           <input type="submit" name="submitbutton" value="Speichern"></form>''',
@@ -215,6 +222,10 @@ class TestMoodle {
           <input type="submit" name="submitbutton" value="Speichern"></form>''',
           );
         }
+      } else if (r.uri.path == '/draftfile.php/bg.png') {
+        r.response.add([1, 2, 3]);
+        await r.response.close();
+        return;
       } else if (r.uri.path == '/mod/page/view.php') {
         antwort = seite(
           '<p>Außerhalb des Inhalts</p><main id="region-main"><div class="generalbox center">$inhalt</div></main>',
@@ -342,6 +353,7 @@ void main() {
     () async {
       extern.lernlandkarteVorhanden = true;
       extern.ortsbeschriftungNeuSchreiben = true;
+      extern.hintergrundDatum = 1000;
       extern.svg =
           '<svg><circle id="p1"/><title id="titlep1">Etikett 0</title></svg>';
       freigaben.stufe = Bestaetigungen.keine;

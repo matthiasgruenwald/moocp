@@ -1,6 +1,9 @@
 import 'dart:convert';
+import 'dart:io';
 
+import 'package:crypto/crypto.dart';
 import 'package:html/dom.dart' as dom;
+import 'package:path/path.dart' as p;
 
 import '../freigabe.dart';
 import 'formular.dart';
@@ -292,7 +295,8 @@ Future<String> lernlandkarteVerknuepfungenSetzen(
   final formularOk =
       gelesen.name == vorher.name &&
       gelesen.kurs == kurs &&
-      _gleicheFormularFelder(aktuell, rueckForm, beschriftungenNeu: true) &&
+      _gleicheFormularFelder(aktuell, rueckForm, nachSpeichern: true) &&
+      _gleicheHintergrund(lesestand, gelesen) &&
       _gleicheFelder(lesestand, gelesen) &&
       _gleicheEinstellungen(lesestand, gelesen, beschriftungenNeu: true);
   final verified = karteOk && formularOk;
@@ -321,16 +325,19 @@ bool _gleicheFelder(FormularGelesen vorher, FormularGelesen nachher) {
 bool _gleicheFormularFelder(
   Formular vorher,
   Formular nachher, {
-  bool beschriftungenNeu = false,
+  bool nachSpeichern = false,
 }) {
-  // Nach dem Speichern darf sich im SVG nur die von Moodle neu geschriebene
-  // Ortsbeschriftung unterscheiden; beim Standvergleich vor dem Schreiben nichts.
+  // Nach dem Speichern darf sich nur unterscheiden, was Moodle selbst neu
+  // schreibt: die Ortsbeschriftung im SVG und das Änderungsdatum der
+  // Hintergrunddatei (gemessen an der Spike-Instanz: jedes Speichern legt sie
+  // neu ab). Ihren Inhalt vergleicht _gleicheHintergrund. Beim Standvergleich
+  // vor dem Schreiben unterscheidet sich nichts.
   List<List<String>> stand(Formular f) => [
     for (final e in f.felder)
       if (e.key != 'sesskey' && !istEntwurfsId(e.key))
         [
           e.key,
-          beschriftungenNeu && e.key == 'svgcode'
+          nachSpeichern && e.key == 'svgcode'
               ? ohneOrtsbeschriftung(e.value)!
               : e.value,
         ],
@@ -339,11 +346,29 @@ bool _gleicheFormularFelder(
     for (final e
         in (f.bereiche['backgroundfile']?['list'] as List? ?? const []))
       if (e is Map)
-        '${e['filepath']}${e['filename']}:${e['size']}:${e['datemodified']}',
+        '${e['filepath']}${e['filename']}:${e['size']}'
+            '${nachSpeichern ? '' : ':${e['datemodified']}'}',
   ].join('|');
   return const JsonEncoder().convert(stand(vorher)) ==
           const JsonEncoder().convert(stand(nachher)) &&
       liste(vorher) == liste(nachher);
+}
+
+/// Inhalt der Hintergrunddateien (SHA-256) vor und nach dem Speichern.
+bool _gleicheHintergrund(FormularGelesen vorher, FormularGelesen nachher) {
+  Map<String, String> hashes(FormularGelesen f) {
+    final wurzel = Directory(p.join(f.ordner, 'bereiche', 'backgroundfile'));
+    if (!wurzel.existsSync()) return {};
+    return {
+      for (final d in wurzel.listSync(recursive: true).whereType<File>())
+        p.relative(d.path, from: wurzel.path): sha256
+            .convert(d.readAsBytesSync())
+            .toString(),
+    };
+  }
+
+  return const JsonEncoder().convert(hashes(vorher)) ==
+      const JsonEncoder().convert(hashes(nachher));
 }
 
 bool _gleicheEinstellungen(
