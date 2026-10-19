@@ -22,6 +22,10 @@ class TestMoodle {
   String name = 'ZZ Probe';
   String inhalt = '<h3>ZZ Probe</h3><p>Vorher</p>';
   int objektKurs = 12;
+  bool lernlandkarteVorhanden = false;
+  int lernlandkarteSpeicherungen = 0;
+  String placestore =
+      '{"places":[{"id":"p1","linkedActivity":70}],"paths":[{"id":"w1","from":"p1","to":"p1"}],"startingplaces":["p1"],"targetplaces":[]}';
   Uri get basis => Uri.parse('http://127.0.0.1:${server.port}');
   String seite(String text) =>
       '<script>M.cfg = {"sesskey":"sk","courseId":12,"contextid":"55"};</script>$text';
@@ -48,7 +52,9 @@ class TestMoodle {
             : '<form><input name="logintoken" value="tok"></form>';
       } else if (r.uri.path == '/lib/ajax/service.php') {
         final call = (jsonDecode(body) as List).single as Map;
-        if (call['methodname'] == 'core_courseformat_get_state' && wartet != null && !wartet!.isCompleted) {
+        if (call['methodname'] == 'core_courseformat_get_state' &&
+            wartet != null &&
+            !wartet!.isCompleted) {
           wartet!.complete();
           await fortsetzen!.future;
         }
@@ -65,18 +71,38 @@ class TestMoodle {
                 'number': 0,
                 'title': 'Allgemeines',
                 'visible': 1,
-                'cmlist': [if (vorhanden) 70],
+                'cmlist': [
+                  if (vorhanden || lernlandkarteVorhanden) 70,
+                  if (lernlandkarteVorhanden) 71,
+                  if (lernlandkarteVorhanden) 72,
+                ],
               },
             ],
             'cm': [
-              if (vorhanden)
+              if (vorhanden || lernlandkarteVorhanden)
                 {
                   'id': 70,
                   'module': 'page',
-                  'name': name,
+                  'name': lernlandkarteVorhanden ? 'ZZ Ziel' : name,
                   'visible': 0,
                   'sectionid': 1,
                 },
+              if (lernlandkarteVorhanden) ...[
+                {
+                  'id': 71,
+                  'module': 'learningmap',
+                  'name': 'ZZ Karte',
+                  'visible': 0,
+                  'sectionid': 1,
+                },
+                {
+                  'id': 72,
+                  'module': 'page',
+                  'name': 'ZZ Ziel',
+                  'visible': 0,
+                  'sectionid': 1,
+                },
+              ],
             ],
           },
           'core_courseformat_update_course' => () {
@@ -91,6 +117,16 @@ class TestMoodle {
       } else if (r.uri.path == '/course/modedit.php') {
         if (r.method == 'POST') {
           final f = Uri.splitQueryString(body);
+          if (f['modulename'] == 'learningmap') {
+            placestore = f['placestore']!;
+            lernlandkarteSpeicherungen++;
+            r.response.redirect(
+              Uri.parse('/course/modedit.php?update=71'),
+              status: 303,
+            );
+            await r.response.close();
+            return;
+          }
           vorhanden = true;
           name = f['name']!;
           inhalt = f['page[text]']!;
@@ -101,15 +137,27 @@ class TestMoodle {
           await r.response.close();
           return;
         }
-        antwort = seite(
-          '''<form class="mform" action="/course/modedit.php" method="post">
+        if (r.uri.queryParameters['update'] == '71') {
+          antwort = seite(
+            '''<form class="mform" action="/course/modedit.php" method="post">
+          <input name="_qf__mod_learningmap_mod_form" value="1"><input name="sesskey" value="sk">
+          <input name="course" value="12"><input name="update" value="71">
+          <input name="modulename" value="learningmap"><input name="name" value="ZZ Karte">
+          <textarea name="svgcode">&lt;svg&gt;&lt;circle id="p1"/&gt;&lt;/svg&gt;</textarea>
+          <input type="hidden" name="placestore" value='${const HtmlEscape().convert(placestore)}'>
+          <input type="submit" name="submitbutton" value="Speichern"></form>''',
+          );
+        } else {
+          antwort = seite(
+            '''<form class="mform" action="/course/modedit.php" method="post">
           <input name="_qf__mod_page_mod_form" value="1"><input name="sesskey" value="sk"><input name="course" value="$objektKurs">
           <input name="modulename" value="page"><input name="name" value="$name">
           <select name="visible"><option value="0" selected>Verborgen</option><option value="1">Sichtbar</option></select>
           <textarea name="page[text]">${const HtmlEscape().convert(inhalt)}</textarea>
           <input name="page[format]" value="1"><input name="page[itemid]" value="9">
           <input type="submit" name="submitbutton" value="Speichern"></form>''',
-        );
+          );
+        }
       } else if (r.uri.path == '/mod/page/view.php') {
         antwort = seite(
           '<p>Außerhalb des Inhalts</p><main id="region-main"><div class="generalbox center">$inhalt</div></main>',
@@ -231,6 +279,81 @@ void main() {
       isNot(contains('ZZ Probe')),
     );
   });
+
+  test('Lernlandkarte wird über MCP gelesen, ein Ziel freigegeben geschrieben und zurückgelesen', () async {
+    extern.lernlandkarteVorhanden = true;
+    freigaben.stufe = Bestaetigungen.keine;
+    await starten();
+    final gelesen = await client.tool('aktivitaet_lesen', {'cmid': 71});
+    expect(gelesen, contains('Ort p1'));
+    expect(gelesen, contains('Aktivität 70'));
+    final geschrieben = await client.tool(
+      'lernlandkarte_verknuepfungen_setzen',
+      {
+        'cmid': 71,
+        'name': 'ZZ Karte',
+        'zuordnungen': [
+          {'ort': 'p1', 'aktuell': 70, 'ziel': 72},
+        ],
+      },
+    );
+    expect(geschrieben, contains('verified: true'));
+    expect(
+      (jsonDecode(extern.placestore) as Map)['places'][0]['linkedActivity'],
+      72,
+    );
+    final stale = await client.tool('lernlandkarte_verknuepfungen_setzen', {
+      'cmid': 71,
+      'name': 'ZZ Karte',
+      'zuordnungen': [
+        {'ort': 'p1', 'aktuell': 70, 'ziel': 70},
+      ],
+    });
+    expect(stale, contains('seit dem Lesen anders'));
+    expect((jsonDecode(extern.placestore) as Map)['paths'], isNotEmpty);
+  });
+
+  test(
+    'fehlendes Ziel und abgelehnte Freigabe ändern die Karte nicht',
+    () async {
+      extern.lernlandkarteVorhanden = true;
+      await starten();
+      final fehlend = await client.tool('lernlandkarte_verknuepfungen_setzen', {
+        'cmid': 71,
+        'name': 'ZZ Karte',
+        'zuordnungen': [
+          {'ort': 'p1', 'aktuell': 70, 'ziel': 999},
+        ],
+      });
+      expect(fehlend, contains('keine vorhandene Aktivität'));
+
+      final angefragt = Completer<void>();
+      void listener() {
+        if (freigaben.aktuell?.titel == 'Lernlandkarte ändern?' &&
+            !angefragt.isCompleted) {
+          angefragt.complete();
+        }
+      }
+
+      freigaben.addListener(listener);
+      final aufruf = client.tool('lernlandkarte_verknuepfungen_setzen', {
+        'cmid': 71,
+        'name': 'ZZ Karte',
+        'zuordnungen': [
+          {'ort': 'p1', 'aktuell': 70, 'ziel': 72},
+        ],
+      });
+      await angefragt.future.timeout(const Duration(seconds: 2));
+      freigaben.entscheiden(false);
+      expect(await aufruf, contains('nicht freigegeben'));
+      freigaben.removeListener(listener);
+      expect(extern.lernlandkarteSpeicherungen, 0);
+      expect(
+        (jsonDecode(extern.placestore) as Map)['places'][0]['linkedActivity'],
+        70,
+      );
+    },
+  );
   for (final fall in ['Profil', 'Adresse', 'Kurs', 'Name']) {
     test('falscher $fall erhält keine automatische Schreibfreigabe', () async {
       await starten(
@@ -302,31 +425,46 @@ void main() {
       },
     );
   }
-  test('MCP-Abbruch während der Vorprüfung erzeugt keine automatische Probe', () async {
-    await starten();
-    extern.wartet = Completer<void>();
-    extern.fortsetzen = Completer<void>();
-    final beendet = Completer<void>();
-    void protokollGeaendert() {
-      if (!beendet.isCompleted && freigaben.protokoll.eintraege.any((e) => e.text == 'Die KI wartet nicht mehr -- nicht gespeichert')) {
-        beendet.complete();
+  test(
+    'MCP-Abbruch während der Vorprüfung erzeugt keine automatische Probe',
+    () async {
+      await starten();
+      extern.wartet = Completer<void>();
+      extern.fortsetzen = Completer<void>();
+      final beendet = Completer<void>();
+      void protokollGeaendert() {
+        if (!beendet.isCompleted &&
+            freigaben.protokoll.eintraege.any(
+              (e) => e.text == 'Die KI wartet nicht mehr -- nicht gespeichert',
+            )) {
+          beendet.complete();
+        }
       }
-    }
-    freigaben.protokoll.addListener(protokollGeaendert);
-    // Nach MCP-Abbruch gibt es keine Antwort mehr. Der echte Protokolleintrag
-    // synchronisiert nur das Ende; das Ergebnis prüfen wir erneut über MCP.
-    final verworfen = anlegen().then<void>((_) {}, onError: (Object e) {
-      if (e is! HttpException && e is! SocketException) throw e;
-    });
-    await extern.wartet!.future;
-    await client.notification('notifications/cancelled', {'requestId': client.id, 'reason': 'Testabbruch'});
-    extern.fortsetzen!.complete();
-    await beendet.future;
-    freigaben.protokoll.removeListener(protokollGeaendert);
-    expect(await client.tool('kurs_uebersicht', {'kurs': 12}), isNot(contains('ZZ Probe')));
-    expect(freigaben.testfreigaben, 0);
-    client.http.close(force: true);
-    await verworfen;
-  });
 
+      freigaben.protokoll.addListener(protokollGeaendert);
+      // Nach MCP-Abbruch gibt es keine Antwort mehr. Der echte Protokolleintrag
+      // synchronisiert nur das Ende; das Ergebnis prüfen wir erneut über MCP.
+      final verworfen = anlegen().then<void>(
+        (_) {},
+        onError: (Object e) {
+          if (e is! HttpException && e is! SocketException) throw e;
+        },
+      );
+      await extern.wartet!.future;
+      await client.notification('notifications/cancelled', {
+        'requestId': client.id,
+        'reason': 'Testabbruch',
+      });
+      extern.fortsetzen!.complete();
+      await beendet.future;
+      freigaben.protokoll.removeListener(protokollGeaendert);
+      expect(
+        await client.tool('kurs_uebersicht', {'kurs': 12}),
+        isNot(contains('ZZ Probe')),
+      );
+      expect(freigaben.testfreigaben, 0);
+      client.http.close(force: true);
+      await verworfen;
+    },
+  );
 }

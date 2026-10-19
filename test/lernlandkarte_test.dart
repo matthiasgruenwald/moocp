@@ -36,7 +36,8 @@ class _Doppel {
   /// Die tatsächlichen Feldarten: editor-Beschreibung, rohe SVG-Textarea,
   /// verborgenes placestore-JSON und ein Auswahlfeld ohne Namen.
   /// Verweise sind absolut mit der Instanzadresse, so wie Moodle sie speichert.
-  String get karte => '''<form class="mform" method="post" action="/course/modedit.php">
+  String get karte =>
+      '''<form class="mform" method="post" action="/course/modedit.php">
 <input type="hidden" name="sesskey" value="$sesskey">
 <input type="hidden" name="modulename" value="learningmap">
 <input type="hidden" name="course" value="12">
@@ -52,7 +53,8 @@ class _Doppel {
 </form>''';
 
   /// Eine Textseite im selben Kurs, zum Gegenbeweis: kein Prüflücke-Hinweis.
-  static const seite = '''<form class="mform" method="post" action="/course/modedit.php">
+  static const seite =
+      '''<form class="mform" method="post" action="/course/modedit.php">
 <input type="hidden" name="sesskey" value="$sesskey">
 <input type="hidden" name="modulename" value="page">
 <input type="hidden" name="course" value="12">
@@ -88,7 +90,10 @@ class _Doppel {
     }
     if (pfad == '/login/index.php' && r.method == 'POST') {
       final f = Uri.splitQueryString(await utf8.decoder.bind(r).join());
-      if (id != null && f['username'] == benutzer && f['password'] == passwort && f['logintoken'] == 'tok') {
+      if (id != null &&
+          f['username'] == benutzer &&
+          f['password'] == passwort &&
+          f['logintoken'] == 'tok') {
         _angemeldet.add(id);
         return _umleiten(r, '/login/index.php?testsession=1');
       }
@@ -113,7 +118,11 @@ class _Doppel {
     await r.response.close();
   }
 
-  Future<void> _text(HttpRequest r, String body, {int status = HttpStatus.ok}) async {
+  Future<void> _text(
+    HttpRequest r,
+    String body, {
+    int status = HttpStatus.ok,
+  }) async {
     r.response
       ..statusCode = status
       ..headers.contentType = ContentType.html
@@ -131,8 +140,12 @@ void main() {
     doppel = _Doppel();
     await doppel.starten();
     arbeitsordner = Directory.systemTemp.createTempSync('ticket23-');
-    zugang = await MoodleZugang.fuerTest(Protokoll(), doppel.basis,
-        benutzer: _Doppel.benutzer, passwort: _Doppel.passwort);
+    zugang = await MoodleZugang.fuerTest(
+      Protokoll(),
+      doppel.basis,
+      benutzer: _Doppel.benutzer,
+      passwort: _Doppel.passwort,
+    );
   });
 
   tearDown(() async {
@@ -140,8 +153,12 @@ void main() {
     if (arbeitsordner.existsSync()) arbeitsordner.deleteSync(recursive: true);
   });
 
-  test('Lesen eines nicht schreibbaren Typs: Verweise sind nach Ziel getrennt, die Prüflücke steht im Ergebnis', () async {
-    final g = await formularLesen(zugang, Formularziel.aktivitaet(31), arbeitsordner.path);
+  test('Lernlandkarte: Orte, Wege und vorhandene Verknüpfungen werden lesbar ausgewertet', () async {
+    final g = await formularLesen(
+      zugang,
+      Formularziel.aktivitaet(31),
+      arbeitsordner.path,
+    );
     final text = g.zusammenfassung();
 
     // Erhaltenes Ziel im Kurs: mit Titel geprüft.
@@ -149,38 +166,51 @@ void main() {
     expect(text, contains('ZZ Seite'));
     // Nicht abrufbares Ziel: ausdrücklich nicht geprüft, kein stiller Erfolg.
     expect(text, contains('Titel nicht geprüft für Verweise auf cm 404'));
-    // Der Typ ist nicht schreibbar: die Lücke wird benannt.
-    expect(text, contains('Prüflücke'));
-    expect(text, contains('learningmap'));
-    expect(text, contains('placestore'));
-    expect(text, contains('svgcode'));
-    expect(text, contains('nicht ausgewertet'));
-    // Ehrlich: nur Textfelder werden auf Verweise geprüft, Auswahlfelder nicht (Befund 8).
-    expect(text, contains('Auswahlfelder werden nicht geprüft'));
-    expect(text, isNot(contains('Verweisprüfung gelten')));
-    // Die maßgebliche Zuordnung bleibt im Rohformular, ohne fachliche Zielprüfung.
-    final einstellungen = File(p.join(arbeitsordner.path, 'cm-31', 'einstellungen.json')).readAsStringSync();
-    expect(einstellungen, isNot(contains('placestore')));
-    expect(einstellungen, isNot(contains('learningmap-activity-selector')));
-    final roh = File(p.join(arbeitsordner.path, 'cm-31', '.stand', 'formular.html')).readAsStringSync();
-    expect(roh, contains('linkedActivity'));
-    expect(roh, contains('101'));
-    expect(File(p.join(arbeitsordner.path, 'cm-31', 'svgcode.html')).existsSync(), isFalse);
+    expect(text, contains('Lernlandkarte'));
+    expect(text, contains('Ort p1'));
+    expect(text, contains('Aktivität 101'));
+    expect(text, contains('Startort'));
+    expect(text, contains('Titel nicht geprüft für Verweise auf cm 404'));
+    final karte = jsonDecode(
+      File(p.join(arbeitsordner.path, 'cm-31', 'lernlandkarte.json'))
+          .readAsStringSync(),
+    ) as Map;
+    expect(karte['svgcode'], contains('<circle id="p1"/>'));
+    expect((karte['orte'] as List).single['linkedActivity'], 101);
   });
 
   test('Lesen eines schreibbaren Typs: keine Prüflücke', () async {
-    final g = await formularLesen(zugang, Formularziel.aktivitaet(101), arbeitsordner.path);
+    final g = await formularLesen(
+      zugang,
+      Formularziel.aktivitaet(101),
+      arbeitsordner.path,
+    );
     expect(g.zusammenfassung(), isNot(contains('Prüflücke')));
   });
 
   test('Ändern eines nicht schreibbaren Typs: nichts wird an Moodle geschickt, der Typ wird genannt', () async {
-    await formularLesen(zugang, Formularziel.aktivitaet(31), arbeitsordner.path);
+    await formularLesen(
+      zugang,
+      Formularziel.aktivitaet(31),
+      arbeitsordner.path,
+    );
     final datei = File(p.join(arbeitsordner.path, 'cm-31', 'introeditor.html'));
     datei.writeAsStringSync('${datei.readAsStringSync()}<p>ZZ Zusatz</p>');
 
     await expectLater(
-      aendern(zugang, Freigaben(Protokoll()), ordner: 'cm-31', arbeitsordner: arbeitsordner.path),
-      throwsA(isA<MoodleFehler>().having((e) => e.meldung, 'Meldung', contains('learningmap'))),
+      aendern(
+        zugang,
+        Freigaben(Protokoll()),
+        ordner: 'cm-31',
+        arbeitsordner: arbeitsordner.path,
+      ),
+      throwsA(
+        isA<MoodleFehler>().having(
+          (e) => e.meldung,
+          'Meldung',
+          contains('Lernlandkarte'),
+        ),
+      ),
     );
     expect(doppel.speichern, isEmpty);
   });

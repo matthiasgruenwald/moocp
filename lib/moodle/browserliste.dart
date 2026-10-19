@@ -50,7 +50,8 @@ enum BrowserWeg {
 /// Ob [s] nur aus Ziffern besteht (Kurs-, Modul- und Fragen-Nummern in Adressen und Formularen).
 bool istZahl(String? s) => s != null && RegExp(r'^\d+$').hasMatch(s);
 
-bool _nur(Map<String, String> q, Set<String> erlaubt) => q.keys.every(erlaubt.contains);
+bool _nur(Map<String, String> q, Set<String> erlaubt) =>
+    q.keys.every(erlaubt.contains);
 
 /// Die Seite, die der Browser als Dokument laden darf, mit kurzer
 /// Beschreibung -- oder null.
@@ -58,15 +59,27 @@ String? ansichtErlaubt(Uri uri) {
   final q = uri.queryParameters;
   return switch (uri.path) {
     '/mod/page/view.php' when q.length == 1 && istZahl(q['id']) => 'Textseite',
-    '/mod/book/view.php' when _nur(q, {'id', 'chapterid'}) && istZahl(q['id']) && (q['chapterid'] == null || istZahl(q['chapterid'])) =>
+    '/mod/learningmap/view.php' when q.length == 1 && istZahl(q['id']) =>
+      'Lernlandkarte',
+    '/mod/book/view.php'
+        when _nur(q, {'id', 'chapterid'}) &&
+            istZahl(q['id']) &&
+            (q['chapterid'] == null || istZahl(q['chapterid'])) =>
       'Buchkapitel',
     // Nur über pageid: bildschirmfoto.dart prüft vorher, dass die Seite zu
     // einem gemeinsamen Wiki gehört (wiki.dart, wikiAnsicht).
-    '/mod/wiki/view.php' when q.length == 1 && istZahl(q['pageid']) => 'Wikiseite',
+    '/mod/wiki/view.php' when q.length == 1 && istZahl(q['pageid']) =>
+      'Wikiseite',
     // Die Vorschau legt beim ersten Aufruf einen Vorschauversuch an und
     // leitet auf dieselbe Adresse mit previewid um.
     '/question/bank/previewquestion/preview.php'
-        when _nur(q, {'id', 'cmid', 'courseid', 'previewid', 'restartversion'}) &&
+        when _nur(q, {
+              'id',
+              'cmid',
+              'courseid',
+              'previewid',
+              'restartversion',
+            }) &&
             istZahl(q['id']) &&
             q.values.every(istZahl) =>
       'Fragenvorschau',
@@ -78,9 +91,10 @@ String? ansichtErlaubt(Uri uri) {
 /// Editorfelds (`pluginfile.php/<ctx>/<komponente>/<bereich>/…/<name>.html`),
 /// das Dokument eines Rahmens in der Seite (elemente.dart). Inhalt wie ein
 /// Bild der Seite; was es selbst lädt, geht wieder über diese Liste.
-bool elementDokument(Uri uri) => RegExp(r'^/pluginfile\.php/\d+/(?:mod_[a-z0-9]+|course)/[a-z_]+/.+\.html?$',
-        caseSensitive: false)
-    .hasMatch(uri.path);
+bool elementDokument(Uri uri) => RegExp(
+  r'^/pluginfile\.php/\d+/(?:mod_[a-z0-9]+|course)/[a-z_]+/.+\.html?$',
+  caseSensitive: false,
+).hasMatch(uri.path);
 
 /// Moodle-Dienste, die nur Vorlagen, Sprachtexte und Symbole liefern.
 const Set<String> browserDienste = {
@@ -94,15 +108,19 @@ const Set<String> browserDienste = {
 
 /// Statische Dateien von Theme und Moodle: Stylesheets, Skripte, Bilder,
 /// Schriften, Dateien aus Kursinhalten.
-final RegExp _statisch = RegExp(r'^/(theme/(styles|yui_combo|image|font|javascript|jquery)\.php'
-    r'|lib/(javascript|requirejs)\.php'
-    r'|pluginfile\.php/\d+/)');
+final RegExp _statisch = RegExp(
+  r'^/(theme/(styles|yui_combo|image|font|javascript|jquery)\.php'
+  r'|lib/(javascript|requirejs)\.php'
+  r'|pluginfile\.php/\d+/)',
+);
 
 /// Der Grund für Dateien aus corsscripts/ von STACK; bildschirmfoto.dart
 /// erkennt daran die Antworten, die Access-Control-Allow-Origin brauchen.
 const stackSkript = 'STACK-Skript';
 
-final RegExp _corsDatei = RegExp(r'^[A-Za-z0-9_-]+(/[A-Za-z0-9_-]+)*(\.[A-Za-z0-9_-]+)*\.(js|css)$');
+final RegExp _corsDatei = RegExp(
+  r'^[A-Za-z0-9_-]+(/[A-Za-z0-9_-]+)*(\.[A-Za-z0-9_-]+)*\.(js|css)$',
+);
 
 /// Ein Skript oder Stylesheet, das STACK seinen Zeichnungen mitgibt (JSXGraph,
 /// die Brücke zu den Eingabefeldern): seit 2024 über `cors.php?name=<datei>`,
@@ -113,7 +131,9 @@ bool stackSkriptDatei(Uri uri) {
     final q = uri.queryParameters;
     return q.length == 1 && _corsDatei.hasMatch(q['name'] ?? '');
   }
-  return uri.path.startsWith(ordner) && !uri.hasQuery && _corsDatei.hasMatch(uri.path.substring(ordner.length));
+  return uri.path.startsWith(ordner) &&
+      !uri.hasQuery &&
+      _corsDatei.hasMatch(uri.path.substring(ordner.length));
 }
 
 /// Ob ein Dienstaufruf (JSON-Rumpf: Liste von {methodname, args}) nur
@@ -122,7 +142,9 @@ bool _nurBrowserDienste(String? rumpf) {
   if (rumpf == null) return false;
   try {
     final l = jsonDecode(rumpf);
-    return l is List && l.isNotEmpty && l.every((a) => a is Map && browserDienste.contains(a['methodname']));
+    return l is List &&
+        l.isNotEmpty &&
+        l.every((a) => a is Map && browserDienste.contains(a['methodname']));
   } catch (_) {
     return false;
   }
@@ -133,7 +155,13 @@ bool _nurBrowserDienste(String? rumpf) {
 /// https://cdn.jsdelivr.net/npm/mathjax@3.2.2/). Der Filter schreibt sie als
 /// JSON in die Seite, mit „\/" statt „/". null: keine.
 String? mathjaxQuelle(String html) {
-  final m = RegExp(r'https:(?:\\?/){2}[^"' "'" r'\s]*?mathjax[^"' "'" r'\s]*').firstMatch(html);
+  final m = RegExp(
+    r'https:(?:\\?/){2}[^"'
+    "'"
+    r'\s]*?mathjax[^"'
+    "'"
+    r'\s]*',
+  ).firstMatch(html);
   if (m == null) return null;
   final adresse = m.group(0)!.replaceAll(r'\/', '/');
   final i = adresse.toLowerCase().indexOf('mathjax');
@@ -152,36 +180,60 @@ const nichtAufDerListe = 'nicht auf der Liste für Bildschirmfotos';
 /// Skripte und Hintergrundabfragen für Kopfzeile und Plugins ändern am Inhalt
 /// nichts -- sie stehen nur im Protokoll.
 bool veraendertBild(String grund, String? art) =>
-    grund != nichtAufDerListe || const {'Stylesheet', 'Image', 'Font', 'Media'}.contains(art);
+    grund != nichtAufDerListe ||
+    const {'Stylesheet', 'Image', 'Font', 'Media'}.contains(art);
 
 /// Entscheidet über eine Anfrage des Browsers. [dokument]: eine Seite, keine
 /// Datei in ihr. [basis]: die Moodle-Instanz der Sitzung. [seiten]: die
 /// Adressen, die als Seite geladen werden dürfen (die aufgenommene und ihre
 /// Umleitungsziele).
-(BrowserWeg, String) browserPruefen(String methode, Uri uri,
-    {required Uri basis, required Set<String> seiten, bool dokument = false, String? rumpf, String? mathjax}) {
-  if (uri.scheme == 'data' || uri.scheme == 'blob') return (BrowserWeg.direkt, 'eingebettet');
+(BrowserWeg, String) browserPruefen(
+  String methode,
+  Uri uri, {
+  required Uri basis,
+  required Set<String> seiten,
+  bool dokument = false,
+  String? rumpf,
+  String? mathjax,
+}) {
+  if (uri.scheme == 'data' || uri.scheme == 'blob')
+    return (BrowserWeg.direkt, 'eingebettet');
   if (uri.host != basis.host || uri.scheme != 'https') {
     final a = uri.toString();
-    if (!dokument && methode == 'GET' && mathjax != null && a.startsWith(mathjax) && !a.contains('..')) {
+    if (!dokument &&
+        methode == 'GET' &&
+        mathjax != null &&
+        a.startsWith(mathjax) &&
+        !a.contains('..')) {
       return (BrowserWeg.direkt, 'MathJax');
     }
     return (BrowserWeg.gesperrt, 'fremder Rechner');
   }
   final regel = sperrregel(uri);
-  if (regel != null) return (BrowserWeg.gesperrt, 'Datenschutz-Sperre (Regel $regel)');
+  if (regel != null)
+    return (BrowserWeg.gesperrt, 'Datenschutz-Sperre (Regel $regel)');
   if (dokument) {
-    if (methode == 'GET' && elementDokument(uri)) return (BrowserWeg.ueberApp, 'Element');
+    if (methode == 'GET' && elementDokument(uri))
+      return (BrowserWeg.ueberApp, 'Element');
     final a = ansichtErlaubt(uri);
-    if (methode != 'GET' || a == null) return (BrowserWeg.gesperrt, 'keine erlaubte Ansicht');
-    return seiten.contains(uri.toString()) ? (BrowserWeg.ueberApp, a) : (BrowserWeg.gesperrt, 'nicht die aufgenommene Seite');
+    if (methode != 'GET' || a == null)
+      return (BrowserWeg.gesperrt, 'keine erlaubte Ansicht');
+    return seiten.contains(uri.toString())
+        ? (BrowserWeg.ueberApp, a)
+        : (BrowserWeg.gesperrt, 'nicht die aufgenommene Seite');
   }
-  if (methode == 'GET' && _statisch.hasMatch(uri.path)) return (BrowserWeg.ueberApp, 'Datei');
-  if (methode == 'GET' && stackSkriptDatei(uri)) return (BrowserWeg.ueberApp, stackSkript);
-  final dienst = RegExp(r'^/lib/ajax/service(-nologin)?\.php$').hasMatch(uri.path);
-  if (dienst && methode == 'GET' && browserDienste.contains(uri.queryParameters['info'])) {
+  if (methode == 'GET' && _statisch.hasMatch(uri.path))
+    return (BrowserWeg.ueberApp, 'Datei');
+  if (methode == 'GET' && stackSkriptDatei(uri))
+    return (BrowserWeg.ueberApp, stackSkript);
+  final dienst = RegExp(r'^/lib/ajax/service(-nologin)?\.php$')
+      .hasMatch(uri.path);
+  if (dienst &&
+      methode == 'GET' &&
+      browserDienste.contains(uri.queryParameters['info'])) {
     return (BrowserWeg.ueberApp, 'Dienst ${uri.queryParameters['info']}');
   }
-  if (dienst && methode == 'POST' && _nurBrowserDienste(rumpf)) return (BrowserWeg.ueberApp, 'Dienst');
+  if (dienst && methode == 'POST' && _nurBrowserDienste(rumpf))
+    return (BrowserWeg.ueberApp, 'Dienst');
   return (BrowserWeg.gesperrt, nichtAufDerListe);
 }

@@ -1,6 +1,6 @@
 ---
 name: moodle
-description: "Moodle-Kurse über die App moocp lesen und bearbeiten. Kursstruktur erfassen; Textfelder, Textseiten, Aufgaben, Verzeichnisse, Dateien, Links, Unterabschnitte, Bücher, Fortschrittslisten, Wikis, Boards und Kanban-Boards anlegen, ändern, verschieben, verbergen, löschen; Bilder und Zeichnungen einbinden; Bewertungsraster festlegen. Diesen Skill immer verwenden, sobald eine Moodle-URL im Spiel ist (course/view.php, mod/assign, mod/page, mod/wiki, mod/board, mod/kanban, modedit.php) oder von Moodle, einem Kurs, einer Lernsituation, einem Kapitel, Abschnitt, Unterabschnitt, einer Aufgabe, einem Arbeitsauftrag, Textfeld, einer Textseite oder einem Verzeichnis die Rede ist, auch wenn das Wort Moodle gar nicht fällt. Auch Blätter aus PDF, ODT oder DOCX nach Moodle übernehmen. Eine Lernsituation didaktisch entwerfen macht der Skill lernsituation, Tests und Fragen der Skill moodle-fragen. Nicht verwenden für Serveradministration, Plugin-Entwicklung, Noten, Bewertungen einzelner Lernender oder Abgaben."
+description: "Moodle-Kurse über die App moocp lesen und bearbeiten. Kursstruktur erfassen; Textfelder, Textseiten, Aufgaben, Verzeichnisse, Dateien, Links, Unterabschnitte, Bücher, Fortschrittslisten, Wikis, Boards und Kanban-Boards anlegen, ändern, verschieben, verbergen, löschen; Bilder und Zeichnungen einbinden; Bewertungsraster festlegen. Diesen Skill immer verwenden, sobald eine Moodle-URL im Spiel ist (course/view.php, mod/assign, mod/page, mod/wiki, mod/board, mod/kanban, mod/learningmap, modedit.php) oder von Moodle, einem Kurs, einer Lernsituation, einem Kapitel, Abschnitt, Unterabschnitt, einer Aufgabe, einem Arbeitsauftrag, Textfeld, einer Textseite oder einem Verzeichnis die Rede ist, auch wenn das Wort Moodle gar nicht fällt. Auch Blätter aus PDF, ODT oder DOCX nach Moodle übernehmen. Eine Lernsituation didaktisch entwerfen macht der Skill lernsituation, Tests und Fragen der Skill moodle-fragen. Nicht verwenden für Serveradministration, Plugin-Entwicklung, Noten, Bewertungen einzelner Lernender oder Abgaben."
 ---
 
 # Moodle-Kurse über die App bearbeiten
@@ -28,6 +28,11 @@ Moodle-Instanz hat einen eigenen Server mit eigenem Präfix (etwa
 | Übertragung | `uebertragen` (Rollen und Kontext: `uebertragung_rolle_setzen`, `uebertragung_kontext`, `uebertragung_kontext_setzen`) |
 | Ansehen | `bildschirmfoto` |
 | Tests und Fragen | im Skill `moodle-fragen` |
+
+Lernlandkarten sind eine begrenzte Ausnahme: `aktivitaet_lesen` liest SVG,
+Orte, Wege, Rollen und vorhandene Aktivitätsziele. Für eine ausdrücklich
+entschiedene Zieländerung gilt [Lernlandkarten](references/lernlandkarte.md).
+Die Karte selbst und ihre Wege werden dadurch nicht bearbeitet.
 
 Eine Sicherung (`sichern_aktivitaet`) ist eine einzelne Aktivität, ohne Nutzerdaten,
 als Datei im Sicherungsordner der App. Sie ändert im Kurs nichts. Die Lehrkraft
@@ -389,9 +394,9 @@ diese Nummern gehören in deine Antwort an den Nutzer.
 <!-- <<< gemeinsam/bildschirmfoto.md - von build.py erzeugt, hier nicht bearbeiten -->
 ## Selbst nachsehen: Bildschirmfotos
 
-`bildschirmfoto` zeigt dir, wie eine Textseite, ein Buchkapitel, eine Seite eines gemeinsamen Wikis oder eine Frage in der Vorschau im Browser aussieht — mit `druck: true` bei Seite, Buch und Wiki so, wie sie gedruckt wird. Das Bild zeigt nur den Inhalt, ohne Kopf, Navigation und Blöcke.
+`bildschirmfoto` zeigt dir, wie eine Textseite, ein Buchkapitel, eine Seite eines gemeinsamen Wikis, eine Lernlandkarte oder eine Frage in der Vorschau im Browser aussieht — mit `druck: true` bei Seite, Buch und Wiki so, wie sie gedruckt wird. Eine Lernlandkarte wird nur am Bildschirm und nur im Kartenbereich gezeigt. Das Bild zeigt den Inhalt, ohne Kopf, Navigation und Blöcke.
 
-**Wofür:** prüfen, was du geschrieben hast, wo der Quelltext es nicht verrät — ob Formeln gesetzt sind, wie ein Blatt im Ausdruck umbricht, ob eine Frage in der Vorschau läuft und richtig aussieht. Bitte die Lehrkraft nicht um ein Bildschirmfoto, wenn du selbst nachsehen kannst.
+**Wofür:** prüfen, was du geschrieben hast, wo der Quelltext es nicht verrät — ob Formeln gesetzt sind, wie ein Blatt im Ausdruck umbricht, ob eine Lernlandkarte im Kartenbereich korrekt dargestellt wird oder eine Frage in der Vorschau läuft und richtig aussieht. Bitte die Lehrkraft nicht um ein Bildschirmfoto, wenn du selbst nachsehen kannst.
 
 **Nicht wofür:** zum Lesen von Inhalten — das tun die Lesewerkzeuge, vollständig und als Text. Und nicht routinemäßig nach jedem Schreiben: Jedes Bild erscheint in der App, und die Lehrkraft muss es freigeben.
 

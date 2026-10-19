@@ -1,6 +1,7 @@
 # Changelog
 
 ## 0.9.23
+- Lernlandkarten: Ziele lassen sich nach Freigabe neu verknüpfen; Orte und Wege bleiben erhalten, und die Kartenansicht lässt sich im App-Browser prüfen.
 - Debug-Testbetrieb: Gebundene Testprofile melden sich selbst an; automatische Freigaben einschließlich Inhaltsbildern bleiben auf erlaubte Testkurse und eigene verborgene ZZ-Textseiten begrenzt.
 - Änderungen speichern: Die Rückleseprobe wartet nicht mehr auf ihre eigene Ordnersperre.
 - Moodle-Profile: Ein nicht mehr benötigtes Profil lässt sich in den Einstellungen löschen; Anmeldung, gespeicherte Zugangsdaten und der Eintrag in Claude Code, Codex und LM Studio werden dabei entfernt, und bleibt einer stehen, sagt die App welcher.

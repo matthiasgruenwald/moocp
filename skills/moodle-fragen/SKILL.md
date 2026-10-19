@@ -252,9 +252,9 @@ diese Nummern gehören in deine Antwort an den Nutzer.
 <!-- <<< gemeinsam/bildschirmfoto.md - von build.py erzeugt, hier nicht bearbeiten -->
 ## Selbst nachsehen: Bildschirmfotos
 
-`bildschirmfoto` zeigt dir, wie eine Textseite, ein Buchkapitel, eine Seite eines gemeinsamen Wikis oder eine Frage in der Vorschau im Browser aussieht — mit `druck: true` bei Seite, Buch und Wiki so, wie sie gedruckt wird. Das Bild zeigt nur den Inhalt, ohne Kopf, Navigation und Blöcke.
+`bildschirmfoto` zeigt dir, wie eine Textseite, ein Buchkapitel, eine Seite eines gemeinsamen Wikis, eine Lernlandkarte oder eine Frage in der Vorschau im Browser aussieht — mit `druck: true` bei Seite, Buch und Wiki so, wie sie gedruckt wird. Eine Lernlandkarte wird nur am Bildschirm und nur im Kartenbereich gezeigt. Das Bild zeigt den Inhalt, ohne Kopf, Navigation und Blöcke.
 
-**Wofür:** prüfen, was du geschrieben hast, wo der Quelltext es nicht verrät — ob Formeln gesetzt sind, wie ein Blatt im Ausdruck umbricht, ob eine Frage in der Vorschau läuft und richtig aussieht. Bitte die Lehrkraft nicht um ein Bildschirmfoto, wenn du selbst nachsehen kannst.
+**Wofür:** prüfen, was du geschrieben hast, wo der Quelltext es nicht verrät — ob Formeln gesetzt sind, wie ein Blatt im Ausdruck umbricht, ob eine Lernlandkarte im Kartenbereich korrekt dargestellt wird oder eine Frage in der Vorschau läuft und richtig aussieht. Bitte die Lehrkraft nicht um ein Bildschirmfoto, wenn du selbst nachsehen kannst.
 
 **Nicht wofür:** zum Lesen von Inhalten — das tun die Lesewerkzeuge, vollständig und als Text. Und nicht routinemäßig nach jedem Schreiben: Jedes Bild erscheint in der App, und die Lehrkraft muss es freigeben.
 

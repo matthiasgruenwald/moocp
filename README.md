@@ -84,7 +84,7 @@ Das fachliche Wissen – wie Testfragen Können prüfen statt Auswendiggelerntes
 - **Verschieben, sichtbar schalten, löschen.**
 - **Interaktive Elemente** in Seiten einbauen: kleine Anwendungen zum Ausprobieren und Üben – ein Regler, an dem man sieht, was sich ändert, eine Aufgabe, die bei jedem Klick neu gewürfelt wird und sofort antwortet. Ohne Bewertung, und gespeichert wird nichts. Die KI schlägt eins vor, wo es an einer Stelle mehr bringt als Text und Bild; jedes läuft abgeschottet vom Rest von Moodle.
 - **Vorschlagen, was sich wofür anbietet**: neben Textseite und Aufgabe auch Board, Kanban-Board, Wiki, Fortschrittsliste oder ein Übungstest – am Gerät, auf Papier oder gemischt, etwa ein Schritt im Computerraum in einem Kurs, der sonst auf Papier läuft, oder ein Blatt, das die Lernenden abfotografieren und in der Aufgabe abgeben. Entscheiden tun Sie.
-- **Selbst nachsehen**: Die KI kann sich ansehen, wie eine Textseite, ein Buchkapitel, eine Wikiseite oder eine Frage im Browser aussieht – ob die Formeln gesetzt sind, wie ein Blatt im Ausdruck umbricht, ob eine Frage in der Vorschau läuft, ob ein interaktives Element startet. Jedes Bild sehen Sie zuerst, zusammen mit dem Grund, warum die KI es braucht.
+- **Selbst nachsehen**: Die KI kann sich ansehen, wie eine Textseite, ein Buchkapitel, eine Wikiseite, eine Lernlandkarte oder eine Frage im Browser aussieht – ob die Formeln gesetzt sind, wie ein Blatt im Ausdruck umbricht, ob eine Frage in der Vorschau läuft, ob ein interaktives Element startet. Jedes Bild sehen Sie zuerst, zusammen mit dem Grund, warum die KI es braucht.
 
 ### Unterstützte Aktivitäten und Fragetypen
 
@@ -108,6 +108,8 @@ Die Aktivitäten in dieser Tabelle kann die KI lesen, anlegen und ändern – Te
 | Kanban-Board\* | `kanban` | Spalten und Karten des gemeinsamen Boards – keine persönlichen Boards |
 
 Alle anderen Aktivitäten – Forum, Glossar, H5P und weitere – kann die KI lesen (Beschreibung und Einstellungen), verschieben, duplizieren, sichtbar schalten und löschen, aber nicht anlegen oder ändern. Abschnitte kann die KI anlegen, umbenennen, mit einer Beschreibung versehen, verschieben, sichtbar schalten und löschen.
+
+Lernlandkarten sind eine begrenzte Ausnahme: aktivitaet_lesen zeigt SVG, Orte, Wege und Ziele; lernlandkarte_verknuepfungen_setzen ändert nach Freigabe nur ausdrücklich entschiedene Ziele vorhandener Aktivitäten desselben Kurses. Die App kann Lernlandkarten nicht allgemein anlegen oder bearbeiten.
 
 **Fragetypen**, auch mit Bildern und Zeichnungen:
 
@@ -341,6 +343,7 @@ Eine Ausnahme: Was die KI gerade selbst verborgen angelegt hat, ist noch nichts 
 | `wiederherstellung_status` | Zeigt den Stand einer Wiederherstellung mit ihrer Nummer, ausschließlich im zugehörigen Profil an derselben Moodle-Adresse einschließlich Installationspfad. Alte Vorgänge ohne sichere Profil- und Instanzbindung werden nicht bei Moodle fortgesetzt und müssen im Kurs geprüft werden. Startet nichts neu; eine Wiederherstellung, die Moodle nie begonnen hat, gilt als fehlgeschlagen. | – |
 | `uebertragen` | Überträgt eine Auswahl in einem Auftrag auf mehrere Zielkurse dieser Instanz. Ohne `datei` wird zuerst im Quellkurs gesichert (Parameter wie bei `sichern_auswahl`), danach die Datei je Ziel wiederhergestellt. Jedes Ziel hat seinen Weg (`weg`, Pflicht; ohne Angabe wird nichts geraten; bei den löschenden Wegen `loeschend: true` im Ziel) und ein eigenes Ergebnis: fertig, fehlgeschlagen, unklar oder abgelehnt. Ein Fehler bei einem Ziel hält die übrigen nicht an, eine Ablehnung in der App schon. Auch bei „fertig“ nennt der Bericht alle Prüfprobleme und Prüflücken. Nach dem Zeitlimit nennt die Antwort den aktuellen Vorgang mit `sicherung_status` oder `wiederherstellung_status`; den Auftrag nicht erneut senden. Dieselbe Datei für ein Ziel wird nicht ohne Rückfrage erneut importiert; eine bewusste Wiederholung geht über `wiederherstellen_datei` mit `wiederholung_von` und einer neuen Freigabe. Eine Einfüge-Wiederherstellung kann Dubletten erzeugen; ein Aktualisieren ist nicht zugesagt. Das Protokoll je Ziel steht in `uebertragungen.json` im Einstellungsordner. Ziele auf einer anderen Instanz: zwei Aufrufe (`sichern_auswahl` auf der Quelle, `wiederherstellen_datei` auf dem Ziel). | **ja**, vor dem Start; je Schreibschritt nach Freigabestufe erneut |
 | `aendern` | Schreibt einen gelesenen Ordner zurück: Aktivität, Abschnitt, Buchkapitel oder Frage – Text, Dateien, Einstellungen. Bricht ab, wenn Moodle nicht mehr den gelesenen Stand zeigt. Eine Frage bekommt dabei eine neue Version. | **ja**, außer bei gerade verborgen Angelegtem |
+| `lernlandkarte_verknuepfungen_setzen` | Ändert benannte Ortsziele einer Lernlandkarte nach frischem Standvergleich und Freigabe; das Werkzeug prüft Kurs und Ziel-cmid und liest danach zurück. | **ja** |
 | `aendern_mehrere` | Wie `aendern` für mehrere Seiten eines Abschnitts, mit einer Freigabe. | **ja**, außer bei gerade verborgen Angelegtem |
 | `claude_schreiben` | Schreibt die Konventionen eines Kurses oder eines Abschnitts in die Datei „CLAUDE.md". Fehlt das Verzeichnis „CLAUDE", legt die App es verborgen an – dann ohne Rückfrage, wie jedes neue, verborgene Objekt. | **ja**, wenn die Datei schon da ist |
 | `links_setzen` | Setzt die Links zwischen den Seiten eines Abschnitts, etwa einer Lernsituation: auf Blätter über ihre Kennung („Infoblatt 1“), auf andere Aktivitäten über ihren Namen in Anführungszeichen. Der sichtbare Text bleibt gleich. Ist nichts zu tun, gibt es keine Freigabe. | **ja**, außer bei gerade verborgen Angelegtem |
@@ -362,7 +365,7 @@ Eine Ausnahme: Was die KI gerade selbst verborgen angelegt hat, ist noch nichts 
 
 | Werkzeug | Was es tut | Freigabe |
 |---|---|---|
-| `bildschirmfoto` | Zeigt, wie eine Textseite, ein Buchkapitel, eine Wikiseite oder eine Frage in der Vorschau im Browser aussieht, nur den Inhalt, nicht die Seite drumherum; interaktive Elemente im Anfangszustand, samt Fehlern in ihrem Skript. Jeder Aufruf nennt einen Grund. Moodle protokolliert den Aufruf unter Ihrem Konto; die Fragenvorschau legt einen Vorschauversuch an. | **ja, je Bild, auf jeder Stufe** – das Bild geht erst nach Ihrem Klick an die KI |
+| `bildschirmfoto` | Zeigt den Inhalt einer Textseite, eines Buchkapitels, einer Wikiseite, Lernlandkarte oder einer Frage in der Vorschau, ohne die Seite drumherum. Lernlandkarten nur am Bildschirm, nicht in der Druckansicht. Jeder Aufruf nennt einen Grund. Moodle protokolliert den Aufruf unter Ihrem Konto; die Fragenvorschau legt einen Vorschauversuch an. | **ja, je Bild, auf jeder Stufe** – das Bild geht erst nach Ihrem Klick an die KI |
 
 #### Wie viele Bestätigungen Sie bekommen
 
@@ -430,7 +433,7 @@ Dazu entfernt die App beim Lesen von Formularen Felder wie Autor, Ersteller, Nam
   - Buchkapitel speichern, löschen, verschieben;
   - Dateien in den eigenen Entwurfsbereich hochladen und ersetzen – die App nimmt sie nur aus dem Arbeitsordner.
 
-Für den Browser der **Bildschirmfotos** gilt eine eigene, noch engere Liste ([lib/moodle/browserliste.dart](lib/moodle/browserliste.dart)): Als Seite lädt er nur die eine, die aufgenommen wird, als Rahmen darin die interaktiven Elemente dieser Seite, dazu Stylesheets, Schriften, Bilder, die Skripte, die STACK seinen Zeichnungen mitgibt, und einige Dienste für Vorlagen und Sprachtexte, alles über die App und hinter der Sperrliste.
+Für den Browser der **Bildschirmfotos** gilt eine eigene, noch engere Liste ([lib/moodle/browserliste.dart](lib/moodle/browserliste.dart)): Als Seite lädt er nur die eine, die aufgenommen wird, als Rahmen darin die interaktiven Elemente dieser Seite, dazu Stylesheets, Schriften, Bilder, die Skripte, die STACK seinen Zeichnungen mitgibt, und einige Dienste für Vorlagen und Sprachtexte, alles über die App und hinter der Sperrliste. Lernlandkartenbilder zeigen ausschließlich den Kartenbereich.
 
 Die **Suche nach Updates** geht an GitHub statt an Moodle und hat deshalb ihre eigene Liste ([lib/update/updateliste.dart](lib/update/updateliste.dart)): erlaubt sind genau die Auskunft über das neueste Release dieses Repositorys und die Installationsdatei daraus, jeweils nur über `https` und samt jedem Umleitungsziel. Die Verbindung ist eine andere als die zu Moodle, Ihre Moodle-Sitzung geht also nicht mit.
 
