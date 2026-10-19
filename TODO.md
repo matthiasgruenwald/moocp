@@ -120,6 +120,18 @@ Wenn eine Aufgabe gelesen wird, müssen nicht nur Metadaten, sondern auch Daten 
 
 *Begriff:* Eine Kurskonvention ist alles, was im verborgenen Verzeichnis `CLAUDE` eines Kurses steht – `CLAUDE.md` mit Steckbrief und Regeln, dazu die Dateien daneben, für den ganzen Kurs (Abschnitt „Allgemeines") oder für einen Abschnitt. Sie gilt nur in diesem Kurs, und zwar so, wie sie dort steht (E17); woher sie kommt – selbst geschrieben, aus einer Vorlage, aus einem eigenen oder fremden Kurs, aus einer Datei –, ändert daran nichts, geändert wird sie im Kurs. Eine *Vorlage* ist eine Quelle für Kurskonventionen und gilt selbst nirgends. *Verwalten* heißt: Vorlagen anbieten – allgemeine je Schulform oder Fach mit den Skills (anonym, A11), schulspezifische bleiben in Moodle, etwa in einem Kurs der Fachgruppe –; übernehmen aus Vorlage, eigenem oder fremdem Kurs oder Datei, ganz oder in Teilen, mit Vergleich zur bestehenden Fassung und den Widersprüchen im Plan; weitergeben. Übernommenes bleibt Daten (A7): Verdachtsprüfung wie bei jeder Fassung, Zusatzdateien werden nie ausgeführt, und bei einem fremden Kurs zeigt der Plan alles, was übernommen wird. *Offen:* Kopie oder Verweis – sollen Kurse nachziehen, wenn sich die Vorlage der Fachgruppe ändert, und wird dafür die Herkunft vermerkt? Was ist übertragbar, was hängt am Kurs (im Steckbrief Jahrgang, Bildungsgang, Lehrbücher; die Regeln eines Abschnitts)? Welche Werkzeuge fehlen: `kurs_hinweise` liest und `claude_schreiben` schreibt `CLAUDE.md`; ob die Zusatzdateien mit `aktivitaet_lesen` und `aendern` von Kurs zu Kurs kommen, ist zu prüfen. Begriff und Bedienung dann in die README (Benutzerhandbuch) und nach `gemeinsam/kurshinweise.md`. *Prüfstein:* drei parallele Kurse je Jahrgang mit gemeinsamen Regeln und je eigenem Anforderungsniveau.
 
+## Lückenbefund: Gestaltungsstandard Informatik (Skill moodle)
+
+LÜCKENBEFUND
+Zum Nachrüsten: diesen Block unverändert im Projekt moocp einfügen.
+
+Skill:      moodle
+Art:        Typ nicht unterstützt
+Typ:        choicegroup (Gruppenwahl), lightboxgallery (Bildergalerie)
+Gefordert:  Beschreibung (intro) im Gestaltungsstandard ändern
+Anlass:     „Partnerzuordnung und Bildanleitung nach dem Gestaltungsstandard für Informatik umsetzen“
+Meldung:    Unbekannte Aktivitätsart "choicegroup" / "lightboxgallery". Coursepilot führt: label, page, url, folder, resource, choice, forum, assign, quiz.
+
 
 # Bugs
 - Sicherheit, Zugangsschlüssel im Klartext: Der Schlüssel des MCP-Servers steht im Klartext in `~/.claude.json` (Claude Code) und in `~/.codex/config.toml` (Codex CLI) und ist für jedes Programm des Benutzers lesbar. Bewusst so belassen (E6), solange Codex nicht über `codex mcp add` mit einer Umgebungsvariable eingerichtet wird (Q14). Umbau, falls gewünscht: Snippet und Umgebungsvariable statt Konfigurationsdatei.
