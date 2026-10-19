@@ -3,11 +3,10 @@
 // (formularLesen); geändert über aendern. Die Moodle-Grenze ist ein lokales
 // Test-Doppel auf 127.0.0.1, der Arbeitsordner ein Temp-Verzeichnis.
 //
-// Das Formular ist ein erfundenes Platzhalter-Formular: Der Modulname
-// „zzkarte" und alle Namen und Nummern sind frei erfunden. Es zeigt, was der
-// vorhandene Weg bei einem Typ ohne gemessenes Formular liefert -- nicht, wie
-// die echte Lernlandkarte aufgebaut ist (das ist nicht gemessen, ohne
-// Live-Zugriff).
+// Die Feldstruktur stammt aus mod_learningmap 0.9.16, Commit
+// c8c61bba1266a1f4126b71adefc371612d379dd4 (mod_form.php und activityselector.mustache):
+// https://github.com/bycs-lp/mod_learningmap/tree/c8c61bba1266a1f4126b71adefc371612d379dd4
+// Eigenständig aufgebautes HTML mit Musterdaten, kein Plugin-Code und kein Live-Dump.
 import 'dart:convert';
 import 'dart:io';
 
@@ -34,21 +33,22 @@ class _Doppel {
   static const passwort = 'test-geheim-23';
   static const sesskey = 'sk23';
 
-  /// Das Platzhalter-Formular: Text mit Verweisen auf eine Seite im Kurs (101),
-  /// auf eine nicht vorhandene Aktivität (404) und ein Auswahlfeld mit einem
-  /// Ortsziel (101).
+  /// Die tatsächlichen Feldarten: editor-Beschreibung, rohe SVG-Textarea,
+  /// verborgenes placestore-JSON und ein Auswahlfeld ohne Namen.
   /// Verweise sind absolut mit der Instanzadresse, so wie Moodle sie speichert.
   String get karte => '''<form class="mform" method="post" action="/course/modedit.php">
 <input type="hidden" name="sesskey" value="$sesskey">
-<input type="hidden" name="modulename" value="zzkarte">
+<input type="hidden" name="modulename" value="learningmap">
 <input type="hidden" name="course" value="12">
 <input type="hidden" name="update" value="31">
 <div id="fitem_id_name" class="mb-3 row fitem"><div class="col-md-3 col-form-label"><label for="id_name">Name</label></div>
 <div class="col-md-9 felement" data-fieldtype="text"><input type="text" name="name" id="id_name" value="ZZ Karte"></div></div>
 <div id="fitem_id_intro" class="mb-3 row fitem"><div class="col-md-3 col-form-label"><p>Beschreibung</p></div>
 <div class="col-md-9 felement" data-fieldtype="editor"><textarea name="introeditor[text]"><p>Start: <a href="$basis/mod/page/view.php?id=101">ZZ Seite</a> und <a href="$basis/mod/page/view.php?id=404">ZZ Fehlt</a></p></textarea></div></div>
-<div id="fitem_id_ort" class="mb-3 row fitem"><div class="col-md-3 col-form-label"><label for="id_ort">Ort 1</label></div>
-<div class="col-md-9 felement" data-fieldtype="select"><select name="ort[1][cmid]" id="id_ort"><option value="0">(keine)</option><option value="101" selected>ZZ Seite</option></select></div></div>
+<div id="fitem_id_svgcode" class="mb-3 row fitem"><div class="col-md-9 felement" data-fieldtype="textarea">
+<textarea name="svgcode" id="id_svgcode">&lt;svg xmlns="http://www.w3.org/2000/svg"&gt;&lt;circle id="p1"/&gt;&lt;/svg&gt;</textarea></div></div>
+<input type="hidden" name="placestore" value='{ "places": [{"id":"p1","linkId":"a1","linkedActivity":101,"placecolor":null,"visitedcolor":null}], "paths":[], "startingplaces":["p1"], "targetplaces":[] }'>
+<select id="learningmap-activity-selector"><option value="0">(keine)</option><option value="101" selected>ZZ Seite</option></select>
 </form>''';
 
   /// Eine Textseite im selben Kurs, zum Gegenbeweis: kein Prüflücke-Hinweis.
@@ -151,13 +151,21 @@ void main() {
     expect(text, contains('Titel nicht geprüft für Verweise auf cm 404'));
     // Der Typ ist nicht schreibbar: die Lücke wird benannt.
     expect(text, contains('Prüflücke'));
-    expect(text, contains('zzkarte'));
+    expect(text, contains('learningmap'));
+    expect(text, contains('placestore'));
+    expect(text, contains('svgcode'));
+    expect(text, contains('nicht ausgewertet'));
     // Ehrlich: nur Textfelder werden auf Verweise geprüft, Auswahlfelder nicht (Befund 8).
     expect(text, contains('Auswahlfelder werden nicht geprüft'));
     expect(text, isNot(contains('Verweisprüfung gelten')));
-    // Das Auswahlfeld zeigt den Anzeigetext des Ziels, nicht die Nummer (Lücke, siehe TODO.md).
+    // Die maßgebliche Zuordnung bleibt im Rohformular, ohne fachliche Zielprüfung.
     final einstellungen = File(p.join(arbeitsordner.path, 'cm-31', 'einstellungen.json')).readAsStringSync();
-    expect(einstellungen, contains('ZZ Seite'));
+    expect(einstellungen, isNot(contains('placestore')));
+    expect(einstellungen, isNot(contains('learningmap-activity-selector')));
+    final roh = File(p.join(arbeitsordner.path, 'cm-31', '.stand', 'formular.html')).readAsStringSync();
+    expect(roh, contains('linkedActivity'));
+    expect(roh, contains('101'));
+    expect(File(p.join(arbeitsordner.path, 'cm-31', 'svgcode.html')).existsSync(), isFalse);
   });
 
   test('Lesen eines schreibbaren Typs: keine Prüflücke', () async {
@@ -172,7 +180,7 @@ void main() {
 
     await expectLater(
       aendern(zugang, Freigaben(Protokoll()), ordner: 'cm-31', arbeitsordner: arbeitsordner.path),
-      throwsA(isA<MoodleFehler>().having((e) => e.meldung, 'Meldung', contains('zzkarte'))),
+      throwsA(isA<MoodleFehler>().having((e) => e.meldung, 'Meldung', contains('learningmap'))),
     );
     expect(doppel.speichern, isEmpty);
   });

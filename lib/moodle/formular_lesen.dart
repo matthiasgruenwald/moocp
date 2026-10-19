@@ -203,6 +203,10 @@ class FormularGelesen {
         !MoodleZugang.schreibbareModule.contains(modul)) {
       b.writeln('Prüflücke: Typ „$modul" ist nicht schreibbar -- gelesen, nicht geändert (aendern lehnt ab). '
           'Die Verweisprüfung erfasst nur Textfelder; Auswahlfelder werden nicht geprüft.');
+      if (modul == 'learningmap') {
+        b.writeln('Prüflücke: SVG im Feld svgcode und Ortsziele im verborgenen placestore-JSON werden nicht ausgewertet. '
+            'Die Zuordnung der Lernlandkartenorte zu Aktivitäten ist damit nicht vollständig geprüft.');
+      }
     }
     if (fehlend.isNotEmpty) {
       b.writeln('NICHT gelesen (${fehlend.length}): ${fehlend.join(", ")}');
