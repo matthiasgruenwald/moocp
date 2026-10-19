@@ -1,5 +1,5 @@
 // Fragenherkunft vor einer Quiz-Wiederherstellung und Fragenvergleich danach
-// (Issue #20, Teil von E9/E17). Reine Regeln ohne Netz. Die Quelle liefert das
+// (E9/E17). Reine Regeln ohne Netz. Die Quelle liefert das
 // Archiv (verwendete Fragen), das Ziel die Zusammenstellung des Testes
 // (test_lesen). Was nicht sicher auflösbar ist, wird Prüflücke, nie Gleichheit.
 //
@@ -15,8 +15,8 @@
 //     Hintergrundauftrag geht nie in die Verifikation ein.
 //
 // Das Archivformat folgt dem offiziellen Moodle-Builder (siehe quizFragenAusXml),
-// nicht einer Messung auf der Instanz. Ob die Quellfragen quizlokal waren, liest
-// der Parser nicht aus; siehe TODO.md.
+// und ist im Testkurs für eigene und geteilte Sammlungen gemessen. Der Parser
+// vergleicht den Kategoriekontext der Fragen mit dem Quellkontext des Quiz.
 
 import 'package:xml/xml.dart';
 
@@ -47,7 +47,7 @@ class HerkunftBefund {
 /// Vergleich der verwendeten Quellfragen mit Sachnummern der angegebenen
 /// Zielsammlung. Ohne belegte Quellidentität bleibt Gleichheit eine Prüflücke.
 /// [verwendet] null heißt: die Quelle wurde nicht gelesen.
-/// Befund 7: Herkunft darf nur in verified einfließen, wenn jedes Quiz eigene
+/// Herkunft darf nur in verified einfließen, wenn jedes Quiz eigene
 /// Fragen nachweist. Eine Prüflücke oder eine fremde Herkunft genügt zum Nein.
 bool herkunftVerifiziert(List<HerkunftBefund> befunde) =>
     befunde.isNotEmpty && befunde.every((b) => b.art == HerkunftArt.eigene);
@@ -62,16 +62,19 @@ HerkunftBefund herkunftPruefen({
         'Herkunft nicht geprüft: keine verwendeten Fragen in der Quelle ermittelt.');
   }
   final zufall = [for (final f in verwendet) if (f.zufall) f.name];
-  if (zufall.isNotEmpty) {
-    return HerkunftBefund(HerkunftArt.pruefluecke,
-        'Herkunft nicht festlegbar: Zufallsfragen (${zufall.join(', ')}).');
-  }
   final fremdLokal = [for (final f in verwendet) if (f.lokal == false) f.name];
   if (fremdLokal.isNotEmpty) {
     return HerkunftBefund(HerkunftArt.fremdOderUnbekannt,
         'Fragen aus einem anderen Kontext als dem Quiz (geteilte Sammlung): ${fremdLokal.join(', ')}. '
-        'Ein Fragenimport in eine neue Testzusammenstellung ist eine Alternative, nicht automatisch.',
+        'Auf derselben Instanz kann das Quiz weiter auf die Quellsammlung verweisen; auf einer anderen Instanz kann Moodle '
+        'eine neue geteilte Sammlung anlegen. Änderungen oder Löschen in der Quellsammlung können das Quiz beeinflussen. '
+        'Die Unabhängigkeit von der Quelle ist nicht bestätigt. Ein Fragenimport in eine neue Testzusammenstellung '
+        'ist eine Alternative, nicht automatisch.',
         nichtEigene: fremdLokal);
+  }
+  if (zufall.isNotEmpty) {
+    return HerkunftBefund(HerkunftArt.pruefluecke,
+        'Herkunft nicht festlegbar: Zufallsfragen (${zufall.join(', ')}).');
   }
   if (verwendet.every((f) => f.lokal == true)) {
     return HerkunftBefund(HerkunftArt.eigene,

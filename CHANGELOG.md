@@ -1,6 +1,7 @@
 # Changelog
 
 ## 0.9.23
+- Wiederherstellung: Geteilte Fragensammlungen werden vor dem Start mit ihren Risiken genannt; unbestätigte Herkunft wird auch ohne Freigabedialog erklärt.
 - Wiederherstellung: Die Freigabe nennt nur noch die Aktivitäten, die im Archiv wirklich stehen; leere Zeilen „„“ ()“ aus den Einstellungen des Archivs entfallen, und ein Quiz scheitert nicht mehr an einem angeblich unlesbaren Typ.
 - Wiederherstellung: Dateien, die nur im Dateimanager einer Aktivität liegen, meldet die App als nicht lesbar (Prüflücke) statt als „fehlend im Ziel".
 - Wiederherstellung: Enthält das Archiv mehrere Tests, vergleicht die App die Fragen je Test; ein Test, den sie nicht zuordnen kann, steht einzeln als Prüflücke. Liegen alle Fragen im Test selbst, gilt ihre Herkunft auch ohne angegebene Sammlung als eigen, auch bei späteren Statusabfragen.

@@ -37,7 +37,7 @@ import 'wiederherstellung_fragen.dart';
 /// Vorgänge, die gerade laufen (Freigabe oder Abfrage) in dieser Sitzung der App.
 final Set<String> _laufend = {};
 
-/// Uhr und Wartezeit. Nur Testnähte (Ticket #18, Spec #17): Tests setzen sie auf
+/// Uhr und Wartezeit. Nur Testnähte: Tests setzen sie auf
 /// einen Zeitverlauf, damit Zeitlimit und Stillstand ohne echtes Warten laufen.
 DateTime Function() jetzt = DateTime.now;
 Future<void> Function(Duration d) schlafe = (d) => Future<void>.delayed(d);
@@ -89,7 +89,7 @@ class Vorgang {
   int? kontext;
 
   /// Letzter Fortschrittswert (0 bis 1) und der Zeitpunkt, seit dem er unverändert
-  /// ist. Daraus entsteht der Stillstandshinweis (Ticket #18).
+  /// ist. Daraus entsteht der Stillstandshinweis.
   double? fortschritt;
   DateTime? fortschrittSeit;
 
@@ -112,7 +112,7 @@ class Vorgang {
   List<int>? vorherCmids;
   List<ArchivAktivitaet>? wiederherstellungAktivitaeten;
 
-  /// Doppelstart-Schutz (Ticket #19): Inhalts- und Zielschlüssel (fingerabdruck) und
+  /// Doppelstart-Schutz: Inhalts- und Zielschlüssel (fingerabdruck) und
   /// bei einer bewusst wiederholten Wiederherstellung die Nummer des überholten Vorgangs.
   String? fingerabdruck;
   String? wiederholungVon;
@@ -690,7 +690,7 @@ Future<String> auswahlSichern(
 
 /// Fragt den Fortschritt ab, bis Moodle Ende oder Fehler meldet, und holt die
 /// Datei. Nach [gesamt] ohne Ende bleibt der Vorgang „laufend" und die letzte
-/// Beobachtung steht im Text. Stillstand (Ticket #18) wird am Anfang des Aufrufs
+/// Beobachtung steht im Text. Stillstand wird am Anfang des Aufrufs
 /// geprüft: seit der Frist ohne neuen Fortschritt, dann kein weiteres Warten.
 Future<String> _warten(
   MoodleZugang moodle,
@@ -820,21 +820,21 @@ Future<String> sicherungStatus(MoodleZugang moodle, Vorgaenge vorgaenge, {String
 }
 
 /// Eine Zeile je Vorgang für die Übersicht. Offene Vorgänge nennen genau einen
-/// Folgeaufruf mit ihrer Nummer (Befund 9).
+/// Folgeaufruf mit ihrer Nummer.
 String _zeile(Vorgang v) {
   if (v.wiederherstellung != null) {
     final verified = v.wiederherstellung == WiederherstellungStand.fertig ? ' · verified: ${v.verified}' : '';
     final hinweis = v.text.isEmpty ? '' : '\n${v.text}';
-    final folge = _offen(v.wiederherstellung) ? '\nFolgeaufruf: wiederherstellung_status ${v.id}' : '';
+    final folge = _offen(v) ? '\nFolgeaufruf: wiederherstellung_status ${v.id}' : '';
     return '${v.id} · Wiederherstellung in Kurs ${v.kurs} · ${v.wiederherstellung!.text} · ${v.datei}$verified$hinweis$folge';
   }
   final verified = v.stand == SicherungStand.fertig ? ' · verified: ${v.verified}' : '';
   final hinweis = v.text.isEmpty ? '' : '\n${v.text}';
   final wer = v.auswahl ?? 'cmid ${v.cmid}';
-  final folge = _offenSicherung(v.stand) ? '\nFolgeaufruf: sicherung_status ${v.id}' : '';
+  final folge = _offen(v) ? '\nFolgeaufruf: sicherung_status ${v.id}' : '';
   return '${v.id} · Kurs ${v.kurs} · $wer · ${v.stand.text} · ${v.datei}$verified$hinweis$folge';
 }
 
-bool _offen(WiederherstellungStand? s) => s != null && s != WiederherstellungStand.fertig && s != WiederherstellungStand.fehlgeschlagen;
-
-bool _offenSicherung(SicherungStand s) => s != SicherungStand.fertig && s != SicherungStand.fehlgeschlagen;
+bool _offen(Vorgang v) => v.wiederherstellung != null
+    ? v.wiederherstellung != WiederherstellungStand.fertig && v.wiederherstellung != WiederherstellungStand.fehlgeschlagen
+    : v.stand != SicherungStand.fertig && v.stand != SicherungStand.fehlgeschlagen;

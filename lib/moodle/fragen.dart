@@ -47,7 +47,7 @@ class Kategorie {
 Future<List<Kategorie>> kategorienLesen(MoodleZugang moodle, int sammlung) async {
   final r = await moodle.lesen('/question/bank/importquestions/import.php?cmid=$sammlung');
   final sel = html_parser.parse(r.text).querySelector('select[name="category"]');
-  if (sel == null) throw MoodleFehler('Keine Kategorieliste -- ist cmid $sammlung eine Fragensammlung?');
+  if (sel == null) throw MoodleFehler('Keine Kategorieliste für cmid $sammlung. sammlung muss eine Fragensammlung auf der aktuell angesprochenen Instanz sein. Mit fragensammlungen auf dieser Instanz ermitteln; außerdem die Importberechtigung prüfen.');
   return [
     for (final o in sel.querySelectorAll('option'))
       () {

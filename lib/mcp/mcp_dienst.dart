@@ -857,6 +857,7 @@ class McpDienst {
             ));
 
     // ---- Wiederherstellen einer Sicherungsdatei in einen bestehenden Kurs (E29, moodle/wiederherstellung.dart)
+    // MCP kennzeichnet das ganze Werkzeug, nicht den gewählten Zielweg: Ersetzen kann löschen.
     _werkzeug(server, 'wiederherstellen_datei',
         zerstoerend: true,
         titel: 'Datei in Kurs wiederherstellen',
@@ -898,7 +899,7 @@ class McpDienst {
           'kategorie_id': JsonSchema.integer(
               description: 'Nur bei neuer_kurs, optional: Kategorie-Nummer. Ohne Angabe die Vorgabe des Kursformulars.'),
           'sammlung': JsonSchema.integer(
-              description: 'Optional: cmid einer Zielsammlung für den Sachnummernvergleich (fragensammlungen). '
+              description: 'Optional: cmid einer Zielsammlung auf dieser Zielinstanz für den Sachnummernvergleich (fragensammlungen hier aufrufen). '
                   'Gleiche Nummern belegen keine eigene Quellherkunft; diese bleibt eine Prüflücke.'),
         },
         pflicht: ['datei', 'weg'],

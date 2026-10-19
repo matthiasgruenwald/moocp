@@ -74,7 +74,7 @@ Der Bericht prüft danach Bilder und Anhänge der neuen Aktivitäten gegen die S
 Startbezug bleibt eine ausdrückliche Prüflücke. Steht dort „nicht vollständig verifiziert", sag das so; repariert wird
 nichts von allein. Enthält die Datei einen Test, vergleicht die App außerdem Fragenzahl und
 Fragennamen, auch bei späteren Statusabfragen. Gleiche Sachnummern in der angegebenen
-Zielsammlung belegen keine eigene Quellherkunft; das bleibt eine Prüflücke. Unauflösbare
+Zielsammlung belegen keine eigene Quellherkunft; das bleibt eine Prüflücke. Ermittle diese Sammlung auf der Zielinstanz. Bei geteilten Sammlungen erläutere vor dem Start die mögliche Abhängigkeit vom Quellkurs auf derselben Instanz und die mögliche neue geteilte Sammlung zwischen Instanzen. Die Herkunft bleibt dabei unbestätigt. Unauflösbare
 Fragenversionen sind ebenfalls Prüflücken. Gib einen solchen Test als nicht vollständig
 verifiziert weiter.
 Bei einem Stillstand (kein Fortschritt seit 15 Minuten) gilt dasselbe wie bei der

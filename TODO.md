@@ -1,4 +1,6 @@
 # Features
+
+Größere Folgearbeiten zur sicheren Wiederherstellung sind in [Issue #26](https://github.com/matthiasgruenwald/moocp/issues/26) zur menschlichen Klärung gesammelt. Die dortige Reihenfolge gilt nach Abschluss des aktuellen PR.
 - Kompatiblität zu MacOS und Linux herstellen. Müssen einzelne Features wie auto update umgestaltet oder gar entfernt werden? Die Pfade für die Konfiguration und ablage der Skills - sind die gleich?
 - automatisches bauen und erstellen eines releases in github, mit Windows, linux und MacOS Executables (windows sogar installer) und changelog message als Release message
 - Codex CLI absichern und testen, in einer eigenen Sitzung: Eingerichtet wird es bisher nur nach Dokumentation, gelaufen ist es mit einer echten Version nie. Zu klären: Nach „Installieren" steht der Block `[mcp_servers.moodle]` in `~/.codex/config.toml` – sieht Codex die Werkzeuge, lädt es die Skills aus `~/.codex/skills` (sonst nur aus `~/.agents/skills`, dann den Ort in `CodexCli` ändern), und ab welcher Version geht HTTP ohne den alten Schalter `experimental_use_rmcp_client` (README nennt 0.77)? Öffnet Codex die Bilder von `bildschirmfoto` (PNG im Arbeitsordner) und sieht sie? Fragt Codex vor einem Werkzeugaufruf (README, „Worauf es ankommt")? Bricht Codex einen Werkzeugaufruf nach seinem Zeitlimit ab (`tool_timeout_sec`, Vorgabe wohl 60 Sekunden), auch während eine Freigabe offen ist? Dann schließt sich der Dialog nach einer Minute (E4); wie bei Bionic 35 Minuten eintragen (`tool_timeout_sec = 2100`, `bionicZeitlimit`) und in `CodexCli` mitprüfen.
@@ -42,13 +44,9 @@
   Knöpfe neu auf.
 - STACK: einen vorhandenen Fragetest ändern, löschen oder ergänzen. Er steht auf einer eigenen Seite (`questiontestedit.php`, nicht auf der Positivliste); bisher hilft nur, die Frage neu anzulegen.
 
-## Morgen früh zu testen (Issues #4 bis #10)
+## Verbleibende Prüfungen (Issues #4 bis #10)
 
-Umgesetzt, nicht durchgespielt. In der Umsetzungssitzung war der MCP-Server `moodle`
-nicht erreichbar (ECONNREFUSED); darum ist hier nichts live geprüft worden. Offline
-geprüft sind die Regeln und Abläufe mit Fakes (`flutter test` grün, `flutter analyze`
-ohne Befund). Gemessen ist nur, was in den Abschnitten zu #6 bis #8 ausdrücklich als
-gemessen steht.
+Offline geprüft sind die Regeln und Abläufe mit Fakes. Weitere Live-Messungen gelten nur im ausdrücklich dokumentierten Umfang. Die spätere ZZ-Messreihe belegt Aktivitätssicherung und Einfüge-Wiederherstellung von Quizzen; offene Fälle stehen unten und in Issue #26.
 
 Im Testkurs (Präfix `ZZ`, Quelle und Ziel, nie ein Produktivkurs) nachprüfen:
 
@@ -65,8 +63,7 @@ Im Testkurs (Präfix `ZZ`, Quelle und Ziel, nie ein Produktivkurs) nachprüfen:
   das dann als abgelehnt ein. Prüfen: Kommt bei einer Ablehnung wirklich der Text
   „in der App abgelehnt" zurück, und stoppt der Lauf dann die übrigen Ziele?
 - **#10 Wiederholungsschutz:** Dieselbe Datei für dasselbe Ziel gibt eine Rückfrage.
-  Ungemessen: Ob `erneut: true` im echten Ablauf nur den einen Aufruf betrifft, und
-  ob die Rückfrage bei einer frischen Sicherung (ohne `datei`) über den Quellkurs greift.
+  Offen bleibt die Messung der Rückfrage bei einer frischen Sicherung (ohne `datei`) über den Quellkurs; `erneut` bleibt entfallen.
   `wiederherstellen_datei` schützt denselben Datei-/Zielauftrag zusätzlich durch den gespeicherten Vorgang;
   dieser Schutz ist über MCP mit einem lokalen HTTP-Doppel geprüft.
 - **#10 Protokoll `uebertragungen.json`:** Ungemessen, ob ein Abbruch mitten im Lauf
@@ -80,11 +77,10 @@ Im Testkurs (Präfix `ZZ`, Quelle und Ziel, nie ein Produktivkurs) nachprüfen:
   fragt danach erneut. Offen, ob das für die Stufe „mittel" zu viel ist. Bei der
   Datei-Variante fehlt der Quellkurs, darum zeigt die Freigabe dort die einfachen
   Angaben statt der Zusammenfassung mit Quelle.
-- **#10 Entscheidungen offen:** `erneut: true` gilt für den ganzen Aufruf, nicht je
-  Ziel. Ob Coursepilot die Buchführung über die Übertragungen tatsächlich aus
+- **#10 Wiederholung:** `erneut` bleibt bewusst entfallen; eine Wiederholung läuft über `wiederherstellen_datei` mit `wiederholung_von`. Ob Coursepilot die Buchführung über die Übertragungen tatsächlich aus
   `uebertragungen.json` abgleicht, ist nicht geprüft; der Skill sagt nur, dass die
   Buchführung dort liegt.
-- **#9 Zielwege (Wiederherstellen):** Auf keiner Instanz durchgespielt; die löschenden
+- **#9 Zielwege (Wiederherstellen):** Nur `anderer_kurs_verschmelzen` durchgespielt; die löschenden
   Wege sind nie ausgeführt. Der Abbruch eines neuen Kurses fehlt (Abschnitt zu #9 unten).
 - **#8 Wiederherstellen in bestehenden Kurs:** Die offenen Punkte stehen im Abschnitt
   zu #8 unten; dort steht auch, was gemessen ist.
@@ -161,9 +157,9 @@ Offen benannt, nicht still aufgelöst. Entscheidung jeweils durch die Lehrkraft 
 - ~~**Abnahme von #11 gegen die Schnittstelle:**~~ Entschieden in [E29](docs/adr/0029-sicherungen-und-verzweigung.md): Verzweigung am Rand, nicht im Moodle-Kern. Die Schnittstelle wird vor #11 festgelegt.
 - **Codex und Browser:** Codex kann über `mcp__cua_repl` selbst einen Browser öffnen und steuern. Die Lehrkraft hat das Risiko bewusst akzeptiert; in der Dokumentation für Lehrkräfte nennen ([E29](docs/adr/0029-sicherungen-und-verzweigung.md)).
 
-## Aktivität sichern (Issue #6): UNGEMESSEN
+## Aktivität sichern (Issue #6): verbleibende Messlücken
 
-Umgesetzt, nicht auf einer Instanz durchgespielt (A10: kein Testkurs genannt). Die folgenden Punkte sind im Code als UNGEMESSEN markiert; sie werden im Testkurs mit `ZZ`-Proben gemessen, bevor die Sicherung als geprüft gilt.
+Mit ZZ-Quizzen eigener und geteilter Sammlung im Testkurs ausgeführt und zurückgelesen. Die folgenden verbleibenden Messlücken gelten weiterhin; die Messreihe belegt keine anderen Aktivitätstypen.
 
 - Antwort von `core_backup_get_async_backup_progress`: gemessen ist eine Liste mit `backupid`, `progress` (0 oder 1) und `status` (700 läuft, 1000 Ende). Ein Fehlerfeld (`error`/`errorcode`) gilt als fehlgeschlagen, alles Unbekannte als `unklar` (`bewerteFortschritt`, `lib/moodle/sicherung_regeln.dart`). Das Muster mit Zwischenständen ist nicht vollständig gemessen.
 - Downloadlink: `core_backup_get_async_backup_links_backup` meldet auf der Testinstanz `backup_controller_dbops_loading_invalid_controller` und ist deshalb nicht der Weg. Die App liest stattdessen `/backup/restorefile.php?contextid=<ctx>` und nimmt genau den Link für den eigenen Dateinamen (`sicherungsLinks`); keiner oder mehrere Treffer heißen `unklar`. Gemessen: Moodle benutzt den eigenen Dateinamen, und der Downloadlink hat kein itemid-Segment: `/pluginfile.php/<ctx>/user/backup/<datei>.mbz?forcedownload=1`. Daneben steht ein Link `restorefile.php?action=choosebackupfile&filename=<datei>`, den die App nicht benutzt. UNGEMESSEN: ob die Seite die Datei immer listet (Rechte, Papierkorb, Abstände). Die Seite listet auch die eigenen Sicherungen anderer Vorgänge; die App übernimmt nur den einen Link.
@@ -191,13 +187,13 @@ Umgesetzt (`sichern_auswahl`, `auswahlSichern` in `lib/moodle/sicherung.dart`), 
 - Positivliste und Sperrliste sind unverändert: der Kursweg `/backup/backup.php?id=<kurs>` ohne `cm` und die Schritte 1, 2 und 4 sind über die bestehenden Einträge erlaubt (Tests in `test/sicherung_regeln_test.dart`). Ob Moodle den Kursweg wie den Aktivitätsweg beantwortet, ist ungemessen.
 - Änderung im Kurs zwischen Schritt 2 und Schritt 4: die Prüfung vergleicht nur die Seite von Schritt 4 mit der Bestellung, nicht mit dem Stand von Schritt 2. Ob das bei gleichzeitigem Bearbeiten reicht, ist ungemessen.
 
-## Wiederherstellen in bestehenden Kurs (Issue #8): UNGEMESSEN
+## Wiederherstellen in bestehenden Kurs (Issue #8): verbleibende Messlücken
 
-Umgesetzt (`wiederherstellen_datei`, `wiederherstellung_status`, `lib/moodle/wiederherstellung.dart`, `lib/moodle/wiederherstellung_regeln.dart`), nicht auf einer Instanz durchgespielt. Die Prüfung der Datei (Größe, Pfade, Nutzerdaten, Bewertungen, Format) ist offline getestet (`test/wiederherstellung_regeln_test.dart`); der Ablauf gegen Moodle ist es nicht. Im Testkurs (Quellkurs und Zielkurs der Testinstanz, Präfix `ZZ`) zu messen, bevor die Wiederherstellung als geprüft gilt.
+Mit ZZ-Quizzen eigener und geteilter Sammlung im Quellkurs, in einem anderen Kurs derselben Instanz und auf einer anderen Instanz ausgeführt und zurückgelesen; jeweils über `anderer_kurs_verschmelzen`. Die Prüfung der Datei (Größe, Pfade, Nutzerdaten, Bewertungen, Format) ist offline getestet (`test/wiederherstellung_regeln_test.dart`); der Einfügeablauf gegen Moodle ist gemessen. Die folgenden Einschränkungen bleiben offen.
 
 - Sichtbarkeit der wiederhergestellten Aktivitäten: Gemessen (Testinstanz, Zielkurs, Live-Messung #8): Moodle stellt sie sichtbar wieder her. Die App verbirgt die neuen Cmids danach über `cm_hide` (wie `sichtbarkeit_setzen`) und liest zurück; `verborgen: verified` nur, wenn alle neuen verborgen sind. Ungemessen ist, ob das Verbergen rechtzeitig greift und ob Lernende in der Zwischenzeit zugreifen können.
 - Neue Abschnitte werden nach der Wiederherstellung nicht verborgen. Die App verbirgt nur die neuen Aktivitäten (`cm_hide`). Ungemessen, ob ein neuer Abschnitt in dieser Zeit sichtbar bleibt und ob Lernende ihn dann sehen.
-- Fortschritt: Die Kennung für `core_backup_get_async_backup_progress` ist die Restore-ID aus dem Prüfformular (Feld `restoreid`), nicht der Dateinamen-Hash `filename` aus der Weiterleitung. Der frühere Aufruf mit dem Hash wurde von Moodle mit „Ungültiger Parameterwert" abgelehnt (gemessen). Ungemessen: ob `operation=restore` mit dieser Kennung den Fortschritt liefert und ob die Antwort unter `backupid` dieselbe Kennung nennt.
+- Fortschritt: Die Kennung für `core_backup_get_async_backup_progress` ist die Restore-ID aus dem Prüfformular (Feld `restoreid`), nicht der Dateinamen-Hash `filename` aus der Weiterleitung. Der frühere Aufruf mit dem Hash wurde von Moodle mit „Ungültiger Parameterwert" abgelehnt (gemessen). Gemessen: Die Fortschrittsabfrage zeigt den laufenden Auftrag und später dessen Ende. Andere Status- und Fehlerfälle bleiben offen (Issue #26).
 - Schritt 2 (gemessen): Die Seite Sicherungsdetails ist ein schlichtes Formular ohne `mform`, das nur `contextid`, `filepath`, `filename`, `stage`, `sesskey` trägt. Ihr Weiter-Formular führt auf die Zielseite mit `stage=4`, und `target`, `targetid` und `search` sind vorausgefüllt. Die App setzt `target=4` und `targetid` = Kurs-ID und sendet dasselbe Formular. Danach folgen Einstellungen, Schema und Prüfung; sie sind gemessen und haben die Prüfungen bestanden.
 - Kurssuche: Ungemessen, wie der Zielkurs erscheint, wenn die Zielseite die Kurssuche verlangt (`searchcourses`); die App nimmt nur den bereits vorausgefüllten Kurs.
 - Kurskontext: Die Kontext-ID des Kurses wird aus `/course/view.php?id=<kurs>` gelesen (`Seitenangaben.aus`); ungemessen, ob diese Seite die Kontext-ID immer trägt.
@@ -214,7 +210,7 @@ Umgesetzt (`wiederherstellen_datei`, `wiederherstellung_status`, `lib/moodle/wie
 - Abbruch oder verlorene Antwort nach dem Absenden von Schritt 16: Die App liest den Stand nach und wiederholt nie blind. Ob Moodle den Lauf nach einem Abbruch der Sitzung tatsächlich weiterführt, ist ungemessen.
 - Freigabe-Test „Die Stufe steht in den Einstellungen …" schlug einmal im Gesamtlauf fehl und lief beim Wiederholen durch (Flake, nicht durch diese Änderung verursacht). Beobachten.
 
-## Freigabe ohne Zeitlimit des KI-Aufrufs
+## Freigabe ohne Zeitlimit des KI-Aufrufs (Folgearbeit: Issue #26)
 
 Die Freigabe wartet bis zu 30 Minuten, aber nur, solange die KI auf den Werkzeugaufruf wartet: Das Zeitlimit des MCP-Clients (vermutlich 60 Sekunden) schließt den Dialog (E4, `Freigaben.mitAbbruch`). Wer nicht am Fenster sitzt, verpasst die Frist, auch bei den Rückfragen, die bei jeder Stufe gelten (Wiederholung, E29). Lösung: Das Werkzeug kehrt sofort mit einer Nummer zurück („Freigabe liegt in der App“), der Dialog bleibt offen, und ein Statuswerkzeug meldet, ob geschrieben wurde, so wie bei Sicherung und Wiederherstellung. Offen: welche Werkzeuge es betrifft, wie ein später abgelehnter oder verfallener Vorgang gemeldet wird, damit die KI nie einen Lauf für gescheitert hält, der noch freigegeben werden kann (E4), und ein Test über den öffentlichen MCP-Aufruf.
 
@@ -225,9 +221,9 @@ Die Freigabe wartet bis zu 30 Minuten, aber nur, solange die KI auf den Werkzeug
 - Fertige Wiederherstellungen sperren, bis sie ausdrücklich wiederholt werden (konservativ, ungemessen ob gewollt).
 - Vorgänge ohne Fingerabdruck (vor diesem Stand) sperren nichts.
 
-## Wiederherstellen: alle Zielwege und Abbruch (Issue #9): UNGEMESSEN
+## Wiederherstellen: weitere Zielwege und Abbruch (Issue #9)
 
-Umgesetzt (`zielwegPruefen`, `Zielweg` in `lib/moodle/wiederherstellung_regeln.dart`; `wiederherstellen` in `lib/moodle/wiederherstellung.dart`; Positivliste je Weg in `lib/moodle/moodle_zugang.dart`), offline getestet (`test/wiederherstellung_weg_test.dart`). Nicht auf einer Instanz durchgespielt. Die Werte der fünf Wege (2, 1, 0, 4, 3) stammen aus `docs/plans/moodle-sicherung-formulare.md`; was dort nicht steht, ist unten als UNGEMESSEN geführt.
+Umgesetzt (`zielwegPruefen`, `Zielweg` in `lib/moodle/wiederherstellung_regeln.dart`; `wiederherstellen` in `lib/moodle/wiederherstellung.dart`; Positivliste je Weg in `lib/moodle/moodle_zugang.dart`), offline getestet (`test/wiederherstellung_weg_test.dart`). Gemessen ist nur der angebotene Weg `anderer_kurs_verschmelzen`; andere Wege sind nicht durchgespielt. Die Werte der fünf Wege (2, 1, 0, 4, 3) stammen aus `docs/plans/moodle-sicherung-formulare.md`; was dort nicht steht, ist unten als UNGEMESSEN geführt.
 
 - Löschende Wege (`aktueller_kurs_ersetzen` target 0, `anderer_kurs_ersetzen` target 3): nie ausgeführt. Ob Moodle vorhandene Inhalte vollständig entfernt und ob die Wiederherstellung danach ohne Rest läuft, ist ungemessen. Die Freigabe nennt den Kurs und sagt „vorhandene Inhalte werden gelöscht"; Test nur im Zielkurs der Testinstanz.
 - Neuer Kurs (`neuer_kurs` target 2): Feldnamen des Platzhalter-Schemas sind nur mit dem Präfix `setting_course_course_fullname` / `setting_course_course_shortname` angenommen; keine Treffer führen zu einem Fehler. Das Sichtbarkeitsfeld `setting_course_course_visible` (auf `0` gesetzt) ist ungemessen.
@@ -284,7 +280,6 @@ Nicht Teil dieses Umbaus (eigene Aufgabe):
 - `lib/mcp/mcp_dienst.dart` hat etwa 1700 Zeilen und trägt alle Werkzeugbeschreibungen und die Verdrahtung. Aufteilen nach Werkzeuggruppen, ohne Verhalten zu ändern.
 - Der Dateiname der lokalen Testzugangsdatei trägt noch den alten Namen der Testinstanz (Pfad in `docs/agents/testing.md`, `tool/mac_start.sh`, `lib/anmeldedaten.dart`). Umbenennen erst, wenn die Datei des Nutzers umbenannt ist, und alle drei Stellen zusammen.
 - Lesen von Formularen (`formularLesen`, Ticket #22): Die Sperre gilt nur im Prozess. Bricht ein Lesen mitten ab, bleibt der Ordner halb neu geschrieben, statt den vorherigen Stand zu behalten (Stagingordner und Austausch am Ende wären der Weg). Der gemeldete Fehler „Directory not empty“ ist nicht nachgestellt; ob es ihn noch gibt, muss im Test auf dem Gerät gemessen werden.
-- Fragenherkunft bei Quiz-Wiederherstellung: Das echte Format von `quiz.xml` und `questions.xml` und die Namen in der Ziel-Platzliste bleiben im Testkurs zu messen. Öffentliche MCP-Tests mit HTTP-Doppel prüfen Start, Status, Neustart, Quellvergleich und den Parameter `sammlung`; sie belegen kein reales Moodle-Format. Ein Nummernvergleich mit der Zielsammlung ist kein Nachweis eigener Quellherkunft. Dafür fehlt eine belastbare Zuordnung zu Quellprofil, Quellsammlung und Kontext; bis dahin bleibt jede solche Herkunft eine Prüflücke.
 - Flaky: `test/frage_lesen_ordner_test.dart` („Gleichzeitiges Lesen derselben Frage") ist im Vollauf einmal gescheitert (`FileSystemException: Directory not empty` beim Löschen des Ordners in `formular_lesen.dart`, `_formularLesenOhneSperre`). Allein läuft er grün; Ursache ungeprüft, vermutlich Wettlauf beim Aufräumen. Geprüft (Ticket #20): Die Testdateien teilen keinen Arbeitsordner, jede legt ihn mit `createTempSync` und eigenem Präfix an; der Wettlauf liegt innerhalb dieses einen Tests (gleichzeitige Lesevorgänge, Ordner-Sperre und Neuanlage in `formular_lesen.dart`). Gehört zu #22, nicht geändert.
 - Anhänge im Dateimanager (`mod_resource` und ähnliche): Ticket #21 liest nur Verweise im Bearbeitungsformular. Dateien, die nur im Dateimanager einer Aktivität liegen (`mod_resource`, `mod_folder`), sind dort eine Prüflücke („nicht lesbar"), bis eine erlaubte Leseseite in der Positivliste steht (`lib/moodle/moodle_zugang.dart`); danach im Testkurs messen.
 - Wiederherstellung, Feldvergleich schreibbarer Typen: Der Vergleich nach der Wiederherstellung prüft nur Zahl und Namen der Aktivitäten, Anhänge (Inhalt per SHA-1, nie Adressen oder Textlängen) und Fragennamen. Wort- und einstellungsgenau (Text, Einstellungen, Beschreibungen) wird noch nicht verglichen. Kommt er, muss er Instanzadressen vor dem Vergleich normalisieren: Quell- und Zieldomain haben verschiedene Länge, jedes Bild und jeder Link erzeugte sonst eine Differenz. Test dafür: kürzere Zieldomain, drei Bilder, keine Abweichung.
@@ -293,7 +288,10 @@ Nicht Teil dieses Umbaus (eigene Aufgabe):
 - Wiederherstellung (Ticket #21): Das Reparaturangebot bei nicht verifizierten Anhängen ist nur ein Hinweistext. Ein eigener, freigegebener Weg über `aktivitaet_aendern` fehlt; ohne ihn gibt es keine Reparatur.
 - Backup-Controller: Die Statuswerte 700, 800 und 900 (laut Moodle-Quelltext wartend, ausführend, mit Fehler beendet) wertet `bewerteFortschritt` nicht aus; nur `status` 1000 mit `progress` 1 gilt als Ende. Ob der Fortschrittsdienst 900 als `error` meldet, ist im Testkurs zu messen.
 - Die Sperre `ordnerSperre` in `aendern` (`lib/moodle/formular_schreiben.dart`) gilt auch während der Freigabe und hält andere Lesevorgänge dieses Ordners bis zu 30 Minuten auf. Sie umfasst bewusst Standprüfung bis Schreiben (Ticket #22); sie nur um den Schreib- und Lesevorgang zu legen, bräuchte nach der Freigabe eine erneute Standprüfung unter der Sperre. Erst mit einem Test dafür ändern.
-- Quellverweise der Art „Ticket #n" und „Befund n" in Kommentaren und Tests durch die Begründung ersetzen; die Nummern sagen einem späteren Leser nichts.
 - `lib/moodle/wiederherstellung.dart` und `lib/moodle/sicherung.dart` haben je etwa 800 Zeilen. Aufteilen (etwa Vorgangsspeicher, Archivprüfung, Gegenlesen), ohne Verhalten zu ändern.
-- `lib/mcp/mcp_dienst.dart`: `_offen` und `_offenSicherung` (sowie das Muster zur Vorgangsnummer in den Statusantworten) sind doppelt. Zu einer Stelle zusammenführen.
-- `uebertragen` hat den Parameter `erneut` nicht mehr, und `wiederherstellen_datei` meldet `zerstoerend: true`. Beides bewusst prüfen: ob der Entfall von `erneut` gewollt ist und ob die Kennzeichnung nur für die löschenden Wege gelten soll.
+
+MCP-Kennzeichnung: `wiederherstellen_datei` bleibt als ganzes Werkzeug `destructiveHint: true`, weil MCP keine vom Parameter `weg` abhängige Kennzeichnung bietet. In der App-Freigabe gilt die Löschwarnung nur für löschende Wege.
+
+Messstand Quiz-Einfügen: Die zurückgelesenen Quizze waren verborgen. Die Dauer einer möglichen Sichtbarkeit dazwischen bleibt ungeprüft. Laufender Fortschritt und Abschluss wurden beobachtet; der Cron auf der Zielinstanz wurde durch die Lehrkraft bestätigt. Bei geteilter Sammlung blieb auf derselben Instanz der Bezug zur Quelle erhalten; auf der anderen Instanz entstand eine geteilte Sammlung. Herkunft bleibt dabei unverifiziert. Keine offenen Ad-hoc-Aufgaben nach Abschluss laut Lehrkraft; ZZ-Proben und die zusätzliche Sammlung sind aufgeräumt.
+
+- Weitere Quellverweise der Art „Ticket #n“ und „Befund n“ außerhalb der bereinigten Sicherungs- und Herkunftslogik bei künftigen Änderungen durch die Begründung ersetzen.

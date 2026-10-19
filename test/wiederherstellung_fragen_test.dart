@@ -1,12 +1,35 @@
 // Fragenherkunft und Fragenvergleich vor und nach einer Quiz-Wiederherstellung
-// (Issue #20). Reine Regeln ohne Netz; die Aufruftests mit dem HTTP-Doppel
-// folgen, sobald das Archivformat der Fragen gemessen ist (TODO.md).
+// Reine Regeln ohne Netz; öffentliche Aufruftests stehen in wiederherstellung_mcp_test.dart.
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moocp/moodle/wiederherstellung_fragen.dart';
 
 void main() {
   group('Herkunft vor dem Start', () {
+    test('geteilte Sammlung nennt Quellabhängigkeit und bleibt unverifiziert', () {
+      final b = herkunftPruefen(
+        verwendet: [(name: 'ZZ Frage', sachnummer: 'ZZ-1', zufall: false, lokal: false)],
+        eigeneSachnummern: {'ZZ-1'},
+        eigeneAnzahl: 1,
+      );
+      expect(b.text, contains('auf die Quellsammlung verweisen'));
+      expect(b.text, contains('eine neue geteilte Sammlung'));
+      expect(herkunftVerifiziert([b]), isFalse);
+    });
+
+    test('Zufallsfrage verdeckt die belegte geteilte Herkunft einer festen Frage nicht', () {
+      final b = herkunftPruefen(
+        verwendet: [
+          (name: 'ZZ geteilt', sachnummer: 'ZZ-1', zufall: false, lokal: false),
+          (name: 'Zufallsfrage', sachnummer: null, zufall: true, lokal: null),
+        ],
+        eigeneSachnummern: const {},
+        eigeneAnzahl: 0,
+      );
+      expect(b.text, contains('auf die Quellsammlung verweisen'));
+      expect(herkunftVerifiziert([b]), isFalse);
+    });
+
     test('gleiche Sachnummern belegen ohne Quellkontext keine eigene Herkunft', () {
       final b = herkunftPruefen(
         verwendet: [
@@ -153,7 +176,7 @@ void main() {
     });
   });
 
-  // Befund 7: Herkunft fließt nur bei lauter eigenen Fragen in verified ein.
+  // Herkunft fließt nur bei lauter eigenen Fragen in verified ein.
   group('herkunftVerifiziert', () {
     test('alle Quizze eigene Herkunft: verifiziert', () {
       expect(herkunftVerifiziert([HerkunftBefund(HerkunftArt.eigene, 'ok')]), isTrue);

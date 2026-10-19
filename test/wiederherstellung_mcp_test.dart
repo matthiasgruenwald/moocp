@@ -278,7 +278,7 @@ void main() {
     await client.initialize();
   }
 
-  void writeArchive({bool quiz = false, bool image = false, bool lokal = false}) {
+  void writeArchive({bool quiz = false, bool image = false, bool lokal = false, bool geteilt = false}) {
     external.modul = quiz ? 'quiz' : 'page';
     external.title = quiz ? 'ZZ Quiz' : 'ZZ Blatt';
     final archive = Archive();
@@ -290,7 +290,7 @@ void main() {
           ? '<files><file><id>1</id><component>mod_page</component><filename>bild.png</filename><contenthash>0000000000000000000000000000000000000000</contenthash></file></files>'
           : '<files/>',
       if (quiz) 'activities/quiz_7/quiz.xml': '<activity contextid="5"><quiz><question_instance><question_reference><questionbankentryid>1</questionbankentryid><version>1</version></question_reference></question_instance></quiz></activity>',
-      if (quiz) 'questions.xml': '<questions>${lokal ? '<question_category id="1"><contextid>5</contextid></question_category>' : ''}<question_bank_entry id="1">${lokal ? '<questioncategoryid>1</questioncategoryid>' : ''}<idnumber>ZZ-1</idnumber><question_version><question_versions><version>1</version><questions><question><name>ZZ Frage</name></question></questions></question_versions></question_version></question_bank_entry></questions>',
+      if (quiz) 'questions.xml': '<questions>${lokal || geteilt ? '<question_category id="1"><contextid>${geteilt ? 6 : 5}</contextid></question_category>' : ''}<question_bank_entry id="1">${lokal || geteilt ? '<questioncategoryid>1</questioncategoryid>' : ''}<idnumber>ZZ-1</idnumber><question_version><question_versions><version>1</version><questions><question><name>ZZ Frage</name></question></questions></question_versions></question_version></question_bank_entry></questions>',
     }.entries) {
       archive.addFile(ArchiveFile.bytes(e.key, utf8.encode(e.value)));
     }
@@ -413,6 +413,7 @@ void main() {
       final (number, result) = await fehlerLauf({'error': 'failed', 'progress': 0.2}, imKurs: true);
       expect(result, contains('Moodle meldete einen Fehler'));
       expect(result, contains('Fragenherkunft nicht bestätigt'));
+      expect(result, isNot(contains('siehe Freigabe')));
       final store = Vorgaenge(folder.path, profilKennung: profile.kennung);
       final vg = (await store.finde(number))!;
       expect(vg.wiederherstellung, WiederherstellungStand.fertig);
@@ -610,6 +611,28 @@ void main() {
     expect(status, contains('Prüflücke'));
   });
 
+  test('geteilte Herkunft wird ohne sammlung vor dem Start gewarnt und bleibt unverifiziert', () async {
+    writeArchive(quiz: true, geteilt: true);
+    external.progress = {'progress': 1, 'status': 1000};
+    approvals.stufe = Bestaetigungen.mittel;
+    String? approval;
+    approvals.addListener(() {
+      final current = approvals.aktuell;
+      if (current == null) return;
+      expect(external.starts, 0);
+      approval = current.punkte.join(' ');
+      scheduleMicrotask(() {
+        external.completed = true;
+        approvals.entscheiden(true);
+      });
+    });
+    final result = await client.tool('wiederherstellen_datei', arguments);
+    expect(approval, contains('auf die Quellsammlung verweisen'));
+    expect(approval, contains('eine neue geteilte Sammlung'));
+    expect(result, contains('Fragenherkunft nicht bestätigt'));
+    expect(result, isNot(contains('verborgen: verified')));
+  });
+
   test('kollidierende Sachnummern in einer Zielsammlung bestätigen keine Quellherkunft', () async {
     writeArchive(quiz: true);
     external.progress = {'progress': 1, 'status': 1000};
@@ -627,6 +650,7 @@ void main() {
     final result = await client.tool('wiederherstellen_datei', {...arguments, 'sammlung': 90});
     expect(approval, contains('keine eigene Quellherkunft'));
     expect(result, contains('Fragenherkunft nicht bestätigt'));
+    expect(result, isNot(contains('siehe Freigabe')));
     expect(result, isNot(contains('verborgen: verified')));
   });
 

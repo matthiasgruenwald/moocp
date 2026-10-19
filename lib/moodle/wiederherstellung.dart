@@ -1,5 +1,5 @@
 // Die Wiederherstellung einer Sicherungsdatei (.mbz) in einen Kurs, über alle fünf
-// Zielwege des Assistenten (Issue #9). Die Regeln ohne Netz stehen in
+// Zielwege des Assistenten. Die Regeln ohne Netz stehen in
 // wiederherstellung_regeln.dart.
 //
 // Ablauf:
@@ -44,7 +44,7 @@ import 'wiederherstellung_regeln.dart';
 /// Vorgänge, die gerade laufen (Freigabe, Upload oder Abfrage) in dieser Sitzung.
 final Set<String> _laufendeWiederherstellungen = {};
 
-/// Fingerabdrücke, für die gerade eine Freigabe oder ein Vorgang läuft (Ticket #19).
+/// Fingerabdrücke, für die gerade eine Freigabe oder ein Vorgang läuft.
 /// Hält den Doppelstart-Schutz auch dann, wenn der Vorgang noch nicht gespeichert ist.
 final Set<String> _reserviert = {};
 
@@ -132,7 +132,7 @@ Future<String> wiederherstellen(
 
   // 4a. Der Zielweg steht fest: Der Fingerabdruck reserviert die Datei, bevor
   // die erste Moodle-Anfrage wartet. Zwei Aufrufe mit derselben Datei können so
-  // nicht beide durch die Prüfung (Befund 1, Befund 2).
+  // nicht beide durch die Prüfung.
   final fp = fingerabdruck(bytes, instanz: profilKennung == null ? instanz : 'profil:$profilKennung', kurs: kurs ?? 0, weg: zielweg);
   return _reservieren(fp, () async {
     // 4. Zielkurs (bestehend) bzw. Kategorie (neuer Kurs) und Kontext des Hochladens.
@@ -162,7 +162,7 @@ Future<String> wiederherstellen(
       kontext = await _kategorieKontext(moodle, kategorie);
     }
 
-    // 4b. Doppelstart-Schutz (Ticket #19, Spec #17): Vor der Freigabe prüfen, damit ein
+    // 4b. Doppelstart-Schutz: Vor der Freigabe prüfen, damit ein
     // abgewiesener Aufruf nichts fragt. Der Inhalt zählt, nicht der Dateiname.
     final bisher = await vorgaenge.alleFuerDoppelstart();
     final eintraege = doppelstartEintraege(bisher).map((e) {
@@ -228,7 +228,7 @@ Future<String> wiederherstellen(
         if (zielweg.loescht && zielweg.brauchtKurs)
           'Im Kurs „$kursName" werden vorhandene Inhalte gelöscht, bevor die Datei wieder hineinkommt.',
         if (aktivitaeten.isNotEmpty) 'Angelegt werden: ${aktivitaeten.join(', ')}',
-        // Fragenherkunft (Issue #20) vor dem Start; die Lesart ist UNGEMESSEN (TODO.md).
+        // Die Herkunftsrisiken müssen vor dem Start sichtbar sein.
         ...herkunft.zeilen,
         'Moodle stellt die neuen Aktivitäten sichtbar wieder her; die App verbirgt sie danach. Sie können '
             'kurzzeitig für Lernende sichtbar sein. Verborgen ist kein Schutz: Wer im Kurs Rechte hat, sieht sie und kann sie sichtbar machen.',
@@ -262,7 +262,7 @@ Future<String> wiederherstellen(
         herkunftEigen: herkunft.eigen);
     _laufendeWiederherstellungen.add(vg.id);
     // Die Nummer geht nur an den Aufrufer, damit er das Ergebnis je Ziel
-    // zuordnen kann (uebertragen, Issue #10). Ohne Rückruf unverändert.
+    // zuordnen kann (uebertragen). Ohne Rückruf unverändert.
     beiVorgang?.call(vg.id);
     try {
       return await _ausfuehren(moodle, vorgaenge, vg,
@@ -543,7 +543,7 @@ List<({String aktion, Felder felder})> restoreFormulare(Antwort r) {
 
 /// Fragt den Hintergrundauftrag ab. Dann liest sie den Kurs zurück. Bei neuer_kurs
 /// ist die Kursnummer unbekannt (UNGEMESSEN): dann wird nicht gegengelesen.
-/// Stillstand (Ticket #18) wird am Anfang des Aufrufs geprüft, wie bei der Sicherung.
+/// Stillstand wird am Anfang des Aufrufs geprüft, wie bei der Sicherung.
 Future<String> _warten(
   MoodleZugang moodle,
   Vorgaenge vorgaenge,
@@ -572,7 +572,7 @@ Future<String> _warten(
       final stand = bewerteFortschritt(antwort, restoreid);
       if (stand == SicherungStand.fertig) break;
       if (stand == SicherungStand.fehlgeschlagen) {
-        // Das Fehlerfeld entscheidet nicht (Ticket #18): Der Zielkurs wird frisch gelesen und
+        // Das Fehlerfeld entscheidet nicht: Der Zielkurs wird frisch gelesen und
         // geprüft, die App wiederholt und startet nichts neu.
         return await _nachFehler(moodle, vorgaenge, vg,
             beleg: (
@@ -633,8 +633,8 @@ Future<String> _warten(
   }
 }
 
-/// Die Zeilen zur Fragenherkunft in der Freigabe (Issue #20), vor dem Start. Ohne eigene
-/// Sammlung ist es eine Prüflücke, nie ein Nachweis. Die Sachnummern liest die App wie
+/// Die Zeilen zur Fragenherkunft in der Freigabe, vor dem Start. Ohne eigene
+/// Sammlung belegt nur ein eindeutig quizlokaler Kontext die Herkunft. Sachnummern liest die App wie
 /// fragen_lesen über Kategorien und Export.
 Future<({List<String> zeilen, bool eigen})> _herkunftZeilen(
     MoodleZugang moodle, ArchivBefund befund, int? sammlung) async {
@@ -655,7 +655,12 @@ Future<({List<String> zeilen, bool eigen})> _herkunftZeilen(
       );
     }
     return (
-      zeilen: const ['Fragenherkunft nicht geprüft: keine eigene Fragensammlung angegeben (Prüflücke).'],
+      zeilen: [
+        for (final e in befund.quizFragen.entries)
+          'Quiz ${e.key}: ${herkunftPruefen(verwendet: e.value, eigeneSachnummern: const {}, eigeneAnzahl: 0).text}',
+        if (befund.quizFragen.isEmpty || befund.quizUnlesbar.isNotEmpty)
+          'Fragenherkunft nicht geprüft: Quellfragen nicht vollständig lesbar (Prüflücke).',
+      ],
       eigen: false,
     );
   }
@@ -682,7 +687,7 @@ Future<({List<String> zeilen, bool eigen})> _herkunftZeilen(
     befunde.add(h);
     zeilen.add('Quiz ${e.key}: ${h.text}');
   }
-  // Unlesbare Quizze (Befund 7): Prüflücke statt Abbruch des Archivs.
+  // Unlesbare Quizze: Prüflücke statt Abbruch des Archivs.
   for (final q in befund.quizUnlesbar) {
     final h = HerkunftBefund(HerkunftArt.pruefluecke,
         'Herkunft nicht geprüft: quiz.xml oder questions.xml ist nicht lesbar (Prüflücke).');
@@ -753,7 +758,7 @@ Future<String> _gegenlesen(
   final alleVerborgen = zuordnungUnveraendert && zugeordnet.isNotEmpty &&
       zugeordnet.every((cmid) => jetzt.nachCmid[cmid]?.sichtbar == false);
   final liste = neue.map((a) => '„${a.name}" (${a.modul}${a.sichtbar ? ', sichtbar' : ', verborgen'})').join(', ');
-  // Ticket #21: Anhänge und Bilder der eindeutig zugeordneten Aktivitäten zurücklesen.
+  // Anhänge und Bilder der eindeutig zugeordneten Aktivitäten zurücklesen.
   // Nur bei eindeutiger Zuordnung; sonst bleibt die Prüfung aus (keine Raterei).
   final bestaetigt = zuordnungUnveraendert ? abschliessendZugeordnet : null;
   vorgaenge.pruefeBindung(vg);
@@ -781,7 +786,7 @@ Future<String> _gegenlesen(
   // Verglichen wird hier nie Text mit Adressen: Aktivitäten nach Typ und Titel, Anhänge nach
   // Inhalt (SHA-1), Fragen nach Name. Instanzadressen (Quell- und Zieldomain) spielen keine
   // Rolle. Ein Feldvergleich schreibbarer Typen müsste sie normalisieren (TODO.md).
-  // Fragenvergleich (Issue #20) nach dem Wiederherstellen: je Quiz aus dem Archiv, zugeordnet
+  // Fragenvergleich nach dem Wiederherstellen: je Quiz aus dem Archiv, zugeordnet
   // über den Titel (bei genau einem Quiz auf beiden Seiten auch ohne). Was sich nicht
   // eindeutig zuordnen lässt, ist je Quiz eine Prüflücke, nie Gleichheit.
   final archivQuizTitel = [for (final a in erwartet) if (a.modul == 'quiz') a.titel];
@@ -809,14 +814,15 @@ Future<String> _gegenlesen(
   // verified nur, wenn alle Prüfungen es erlauben: Verbergen, Anhänge und Fragenvergleich.
   final anhangOk = anhang == null || anhang.vollstaendig;
   final vergleichOk = vergleiche.every(quizVerifiziert);
-  // Befund 7: Fragenherkunft nur bei eigenen Fragen; Befund 8: nicht schreibbare Typen nie verifiziert.
+  // Nur eigene Fragen und lesbare Aktivitätstypen erlauben eine vollständige Verifikation.
   final herkunftOk = erwartet.every((a) => a.modul != 'quiz') || herkunftEigen;
   final schreibPruefluecke = nichtSchreibbarePruefluecke(erwartet.map((a) => a.modul));
   final verifiziert = alleVerborgen && anhangOk && vergleichOk && herkunftOk && schreibPruefluecke == null;
   final zusatz = [
     if (anhang != null) anhang.text,
     for (final v in vergleiche) v.text,
-    if (!herkunftOk) 'Fragenherkunft nicht bestätigt (siehe Freigabe).',
+    if (!herkunftOk) 'Fragenherkunft nicht bestätigt: Die Fragen sind nicht eindeutig als quizlokal nachgewiesen. '
+        'Sie können aus einer geteilten Sammlung stammen; Abhängigkeiten von der Quellsammlung bleiben ungeprüft.',
     ?schreibPruefluecke,
   ].join(' ');
   final text = zusatz.isEmpty ? basis : '$basis $zusatz';
