@@ -506,6 +506,6 @@ bool _sperrt(DoppelstartEintrag e, int kurs) => switch (e.stand) {
 String? nichtSchreibbarePruefluecke(Iterable<String> moduln) {
   final nein = {for (final m in moduln) if (!MoodleZugang.schreibbareModule.contains(m)) m}.toList()..sort();
   if (nein.isEmpty) return null;
-  return 'Prüflücke: ${nein.map((m) => 'Typ „$m"').join(', ')} ist nicht schreibbar. '
-      'Wiederhergestellt, aber nicht gegengeprüft; nicht verifiziert.';
+  return 'Prüflücke: Inhalt und Anhänge von ${nein.map((m) => 'Typ „$m"').join(', ')} sind nicht gegengeprüft '
+      '(der Typ ist nicht schreibbar, sein Formular wird nicht gelesen); nicht verifiziert.';
 }

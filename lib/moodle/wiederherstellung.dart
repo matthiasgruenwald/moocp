@@ -737,10 +737,16 @@ Future<String> _gegenlesen(
   // Nur bei eindeutiger Zuordnung; sonst bleibt die Prüfung aus (keine Raterei).
   final bestaetigt = zuordnungUnveraendert ? abschliessendZugeordnet : null;
   vorgaenge.pruefeBindung(vg);
-  final anhang = bestaetigt == null
+  // Nicht schreibbare Typen stehen nicht in der Positivliste: ihr Formular wird nicht gelesen.
+  // Die übrigen werden unabhängig davon geprüft; das Ungeprüfte nennt nichtSchreibbarePruefluecke.
+  final lesbar = bestaetigt == null
+      ? const <int>[]
+      : [for (final cmid in bestaetigt) if (MoodleZugang.schreibbareModule.contains(jetzt.nachCmid[cmid]!.modul)) cmid];
+  vorgaenge.pruefeBindung(vg);
+  final anhang = lesbar.isEmpty
       ? null
       : await anhaengePruefen(moodle, vorgaenge, vg, [
-          for (final cmid in bestaetigt)
+          for (final cmid in lesbar)
             (cmid: cmid, modul: jetzt.nachCmid[cmid]!.modul, titel: jetzt.nachCmid[cmid]!.name),
         ]);
   final basis = zugeordnet == null

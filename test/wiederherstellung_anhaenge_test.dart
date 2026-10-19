@@ -316,6 +316,28 @@ void main() {
       expect(nachher.text, contains('Quellaufnahme fehlt'));
     });
 
+    test('nicht schreibbarer Typ daneben: Anhänge der übrigen werden geprüft, die Prüflücke nennt nur das Ungeprüfte', () async {
+      final vg = Vorgaenge(ordner.path);
+      final v = await fertigerVorgang(vg);
+      await vg.aktualisieren(v, wiederherstellungAktivitaeten: [
+        (modul: 'page', titel: 'Infoblatt'),
+        (modul: 'lernlandkarte', titel: 'Karte'),
+      ]);
+      final moodle = _Moodle({
+        '/course/modedit.php?update=2': formular(2),
+        '/draftfile.php/12/user/draft/77/bild.png': _antwort(200, bild),
+      }, neueCmids: [(2, 'page', 'Infoblatt'), (3, 'lernlandkarte', 'Karte')]);
+
+      await wiederherstellungStatus(moodle, vg, id: v.id);
+      final nachher = await vg.finde(v.id);
+
+      expect(nachher!.text, contains('Anhänge und Bilder: verglichen, übereinstimmend.'));
+      expect(nachher.text, isNot(contains('HTTP 404')));
+      expect(nachher.text, contains('lernlandkarte'));
+      expect(nachher.text, contains('nicht gegengeprüft'));
+      expect(nachher.verified, isFalse);
+    });
+
     test('konkurrierende neue Aktivitäten: keine Zuordnung, keine Anhangsprüfung, nichts verborgen', () async {
       final vg = Vorgaenge(ordner.path);
       final v = await fertigerVorgang(vg);
