@@ -80,7 +80,7 @@ Future<String> _zeitlimit(Future<String> f, Duration z, String Function() weiter
 
 class McpDienst {
   McpDienst(this.einstellungen, this.moodle, this.protokoll, this.freigaben, this.arbeitsordner,
-      {required this.profil, this.sicherungsordner, this.antwortfrist = const Duration(minutes: 1)});
+      {required this.profil, this.sicherungsordner, this.uebertragungsprotokollPfad, this.antwortfrist = const Duration(minutes: 1)});
 
   final Einstellungen einstellungen;
 
@@ -96,6 +96,9 @@ class McpDienst {
   /// Speicherort und Antwortfrist des Servers; Hintergrundvorgänge laufen danach weiter.
   final String? sicherungsordner;
   final Duration antwortfrist;
+
+  /// Abweichender Protokollpfad für isolierte MCP-Vertragstests.
+  final String? uebertragungsprotokollPfad;
 
   StreamableMcpServer? _server;
   bool get laeuft => _server != null;
@@ -263,7 +266,8 @@ class McpDienst {
   /// uebertragung_lauf.dart; hier nur die Verdrahtung mit Moodle und Freigabe.
   /// Reihenfolge: prüfen, Wiederholungsschutz, eine Freigabe mit der
   /// Zusammenfassung, sichern (nur ohne datei), dann je Ziel wiederherstellen.
-  Future<String> _uebertragen(Vorgaenge vorgaenge, Map<String, dynamic> a) async {
+  Future<String> _uebertragen(Vorgaenge vorgaenge, Map<String, dynamic> a,
+      {required void Function(String werkzeug, String? id) beiVorgang}) async {
     final ziele = <ZielAngabe>[];
     for (final x in (a['ziele'] as List?) ?? const []) {
       final m = _karte(x);
@@ -283,7 +287,7 @@ class McpDienst {
     if (planung case PlanungRueckfrage(:final text)) return text;
     final geprueft = (planung as PlanungOk).ziele;
 
-    final protokoll = await Uebertragungsprotokoll.laden(p.join(einstellungenOrdner, 'uebertragungen.json'));
+    final protokoll = await Uebertragungsprotokoll.laden(uebertragungsprotokollPfad ?? p.join(einstellungenOrdner, 'uebertragungen.json'));
     final rueckfragen = <String>[];
     for (final z in geprueft) {
       final r = wiederholungsRueckfrage(protokoll.eintraege,
@@ -338,6 +342,7 @@ class McpDienst {
       datei = angegeben;
     } else {
       String? sicherungVid;
+      beiVorgang('sicherung_status', null);
       final sicherungText = await auswahlSichern(moodle, freigaben, vorgaenge,
           kurs: quellkurs!,
           name: _text(a, 'name_des_kurses'),
@@ -353,6 +358,7 @@ class McpDienst {
           zielOrdner: a['ziel_ordner'] as String?,
           beiVorgang: (id) {
             sicherungVid = id;
+            beiVorgang('sicherung_status', id);
           });
       final id = sicherungVid;
       if (id == null) return sicherungText;
@@ -367,6 +373,7 @@ class McpDienst {
     // Ein Ziel: eigener Vorgang, Stand aus dem Vorgang. Ohne Vorgangsnummer hat die
     // App abgelehnt (wiederherstellen legt den Vorgang erst nach der Freigabe an).
     Future<ZielErgebnis> lauf(PlanZiel z) async {
+      beiVorgang('wiederherstellung_status', null);
       String? vid;
       String text = '';
       try {
@@ -380,6 +387,7 @@ class McpDienst {
             loeschend: z.weg.loescht,
             beiVorgang: (id) {
               vid = id;
+              beiVorgang('wiederherstellung_status', id);
             });
       } on MoodleFehler catch (e) {
         if (vid == null) return ZielErgebnis(ZielStand.fehlgeschlagen, text: e.meldung);
@@ -1050,11 +1058,21 @@ class McpDienst {
               description: 'Nur ohne datei: Unterordner im Sicherungsordner, wie bei sichern_auswahl.'),
         },
         pflicht: ['ziele'],
-        ausfuehren: (a) => _zeitlimit(
-              _uebertragen(vorgaenge, a),
-              const Duration(minutes: 4),
-              () => 'Die Übertragung läuft weiter. Mit wiederherstellung_status und der Nummer des Ziels prüfen.',
-            ));
+        ausfuehren: (a) {
+          String? nummer;
+          var werkzeug = 'sicherung_status';
+          return _zeitlimit(
+            _uebertragen(vorgaenge, a, beiVorgang: (w, id) {
+              werkzeug = w;
+              nummer = id;
+            }),
+            antwortfrist * 4,
+            () => nummer == null
+                ? 'Die Übertragung wartet noch vor dem nächsten Start, etwa auf eine Freigabe. '
+                    'Für diesen Schritt gibt es noch keine Vorgangsnummer. Den Auftrag nicht erneut senden.'
+                : laufText('Die Übertragung', nummer, werkzeug),
+          );
+        });
 
     // ---- Bücher
     final buchCmid =JsonSchema.integer(description: 'cmid des Buchs, die Zahl hinter mod/book/view.php?id=');

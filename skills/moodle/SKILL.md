@@ -293,7 +293,7 @@ in deinem Kopf.
   der Nummer aus der Rückfrage, nicht `uebertragen`.
 - **Im Ergebnis sagen, was nicht zugesagt ist:** Eine Einfüge-Wiederherstellung kann
   Inhalte doppelt anlegen, und ein Aktualisieren bestehender Inhalte gibt es nicht.
-  Das nennst du im Bericht, auch wenn die Lehrkraft eine Aktualisierung erwartet.
+  Das nennst du im Bericht, auch wenn die Lehrkraft eine Aktualisierung erwartet. Gib die Prüfprobleme und Prüflücken auch bei einem fertigen Ziel weiter: „fertig“ bestätigt den Abschluss, nicht jede Inhaltsprüfung. Nach einem Zeitlimit nutze die genannte Nummer und das zugehörige Statuswerkzeug; je nach Phase ist das Sicherung oder Wiederherstellung.
   Bei fehlgeschlagenen oder unklaren Zielen nennst du die Nummer und sendest nicht
   erneut.
 - **Protokoll und Planung:** Jedes Ziel steht mit Stand und Zeit in

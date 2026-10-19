@@ -444,11 +444,11 @@ enum Zielweg {
   return (weg: gewaehlt, rueckfrage: null);
 }
 
-/// Doppelstart-Schutz (Ticket #19, Spec #17). Der Fingerabdruck hängt am Inhalt der
+/// Doppelstart-Schutz. Der Fingerabdruck hängt am Inhalt der
 /// Datei, nie am Namen: umbenannt bleibt es dieselbe Wiederherstellung. Kurs (0 bei
 /// neuem Kurs) und Zielweg gehören dazu, damit ein anderer Ziel-Lauf nicht gesperrt wird.
 /// Das Profil ([instanz]) gehört ebenfalls dazu: Dieselbe Datei auf zwei Instanzen
-/// sperrt sich nicht gegenseitig (Befund 3).
+/// sperrt sich nicht gegenseitig.
 String fingerabdruck(List<int> bytes, {required String instanz, required int kurs, required Zielweg weg}) =>
     '${sha256.convert(bytes)}|$instanz|$kurs|${weg.name}';
 
@@ -470,7 +470,7 @@ typedef DoppelstartEintrag = ({
 /// neuem Kurs (kurs 0), weil dort ein Platzhalterkurs bleiben kann. Ein von Moodle gemeldeter
 /// Fehler allein macht keinen Vorgang fehlgeschlagen: Er bleibt unklar (gesperrt), bis der
 /// Zielkurs geprüft ist. Nur der Kopf zählt: Ein Vorgang, auf den ein anderer mit
-/// wiederholungVon zeigt, ist überholt. Eine Wiederholung ist nur zulässig, wenn sie
+/// wiederholungVon zeigt, ist nur durch einen weiterhin sperrenden Nachfolger überholt. Eine Wiederholung ist nur zulässig, wenn sie
 /// genau den sperrenden Kopf nennt.
 String? doppelstartSperre(
   Iterable<DoppelstartEintrag> alle, {
@@ -479,7 +479,18 @@ String? doppelstartSperre(
   required int kurs,
 }) {
   final gleiche = [for (final e in alle) if (e.fingerabdruck == fingerabdruck) e];
-  final ueberholt = {for (final e in gleiche) if (e.wiederholungVon != null) e.wiederholungVon!};
+  final nachId = {for (final e in gleiche) e.id: e};
+  final ueberholt = <String>{};
+  for (final e in gleiche.where((e) => _sperrt(e, kurs))) {
+    // Gescheiterte Versuche lassen den Vorgänger gesperrt. Ein später gestarteter
+    // Nachfolger überholt die ganze Kette, auch über solche Zwischenversuche hinweg.
+    var von = e.wiederholungVon;
+    final besucht = <String>{e.id};
+    while (von != null && besucht.add(von)) {
+      ueberholt.add(von);
+      von = nachId[von]?.wiederholungVon;
+    }
+  }
   final sperrend = [
     for (final e in gleiche)
       if (!ueberholt.contains(e.id) && _sperrt(e, kurs)) e.id,

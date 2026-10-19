@@ -194,6 +194,31 @@ void main() {
       expect(neu.eintraege.first.zeit, DateTime(2026, 10, 18, 9));
     });
 
+    test('zwei vorab geladene Sitzungen erhalten beide Einträge', () async {
+      final pfad = '${ordner.path}/uebertragungen.json';
+      final a = await Uebertragungsprotokoll.laden(pfad);
+      final b = await Uebertragungsprotokoll.laden(pfad);
+      await a.eintragen(eintrag('a.mbz', 12));
+      await b.eintragen(eintrag('b.mbz', 34));
+      expect((await Uebertragungsprotokoll.laden(pfad)).eintraege.map((e) => e.kurs), [12, 34]);
+    });
+
+    test('gleichzeitige Sitzungen verlieren keine Einträge', () async {
+      final pfad = '${ordner.path}/uebertragungen.json';
+      final a = await Uebertragungsprotokoll.laden(pfad);
+      final b = await Uebertragungsprotokoll.laden(pfad);
+      await Future.wait([a.eintragen(eintrag('a.mbz', 12)), b.eintragen(eintrag('b.mbz', 34))]);
+      expect((await Uebertragungsprotokoll.laden(pfad)).eintraege.map((e) => e.kurs), unorderedEquals([12, 34]));
+    });
+
+    test('nach Laden beschädigtes Protokoll bleibt beim Eintragen unverändert', () async {
+      final pfad = '${ordner.path}/uebertragungen.json';
+      final a = await Uebertragungsprotokoll.laden(pfad);
+      File(pfad).writeAsStringSync('{kaputt');
+      await expectLater(a.eintragen(eintrag('a.mbz', 12)), throwsA(isA<StateError>()));
+      expect(File(pfad).readAsStringSync(), '{kaputt');
+    });
+
     test('beschädigte Datei wirft und wird nicht überschrieben', () async {
       final datei = File('${ordner.path}/uebertragungen.json');
       datei.writeAsStringSync('{kaputt');
@@ -331,6 +356,16 @@ void main() {
       expect(text, contains('Ein Aktualisieren bestehender Inhalte ist nicht zugesagt'));
       expect(text, contains('Nicht erneut gesendet'));
     });
+  });
+
+  test('Bericht erhält Prüfprobleme auch bei fertigen Zielen', () {
+    final text = uebertragungsBericht([
+      ZielBericht(ziel(12), ZielStand.fertig, '7', 'Fehlend: ZZ Frage. Fragenherkunft nicht bestätigt.'),
+      ZielBericht(ziel(34), ZielStand.fertig, '8', 'Anhang fehlt im Ziel; nicht verifiziert.'),
+    ]);
+    expect(text, contains('Fehlend: ZZ Frage'));
+    expect(text, contains('Fragenherkunft nicht bestätigt'));
+    expect(text, contains('Anhang fehlt im Ziel; nicht verifiziert'));
   });
 
   group('ZielStand', () {

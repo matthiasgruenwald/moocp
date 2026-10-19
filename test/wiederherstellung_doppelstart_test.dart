@@ -102,13 +102,35 @@ void main() {
       );
     });
 
-    test('überholte Vorgänge sperren nicht mehr: nur der neueste Kopf zählt', () {
+    test('vor Start gescheiterte Wiederholung entsperrt unklaren Vorgänger nicht', () {
       // a ist unklar, b ist seine Wiederholung und fehlgeschlagen vor dem Start.
       final alle = [
         _e('a', WiederherstellungStand.unklar),
         _e('b', WiederherstellungStand.fehlgeschlagen, von: 'a'),
       ];
-      expect(doppelstartSperre(alle, fingerabdruck: 'fp', wiederholungVon: null, kurs: 42), isNull);
+      expect(doppelstartSperre(alle, fingerabdruck: 'fp', wiederholungVon: null, kurs: 42), 'a');
+      expect(doppelstartSperre(alle, fingerabdruck: 'fp', wiederholungVon: 'a', kurs: 42), isNull);
+      expect(doppelstartSperre(alle, fingerabdruck: 'fp', wiederholungVon: 'b', kurs: 42), 'a');
+    });
+
+    test('mehrere gescheiterte Wiederholungen erhalten den letzten sperrenden Kopf', () {
+      final alle = [
+        _e('a', WiederherstellungStand.unklar),
+        _e('b', WiederherstellungStand.unklar, von: 'a'),
+        _e('c', WiederherstellungStand.fehlgeschlagen, von: 'b'),
+        _e('d', WiederherstellungStand.fehlgeschlagen, von: 'c'),
+      ];
+      expect(doppelstartSperre(alle, fingerabdruck: 'fp', wiederholungVon: null, kurs: 42), 'b');
+      expect(doppelstartSperre(alle, fingerabdruck: 'fp', wiederholungVon: 'b', kurs: 42), isNull);
+    });
+
+    test('gestarteter Nachfolger überholt auch eine gescheiterte Zwischenwiederholung', () {
+      final alle = [
+        _e('a', WiederherstellungStand.unklar),
+        _e('b', WiederherstellungStand.fehlgeschlagen, von: 'a'),
+        _e('c', WiederherstellungStand.laufend, von: 'b'),
+      ];
+      expect(doppelstartSperre(alle, fingerabdruck: 'fp', wiederholungVon: null, kurs: 42), 'c');
     });
 
     test('eine Wiederholung mit einer überholten Nummer bleibt gesperrt, der Kopf wird genannt', () {

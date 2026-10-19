@@ -1,6 +1,8 @@
 # Changelog
 
 ## 0.9.23
+- Übertragung: Prüfprobleme bleiben auch bei abgeschlossenen Zielen sichtbar; Zeitlimitantworten nennen den laufenden Vorgang und das passende Statuswerkzeug.
+- Wiederholungsschutz: Gescheiterte Wiederholungsversuche geben unklare Vorgänger nicht frei; parallele Übertragungen erhalten gegenseitig ihre Protokolleinträge.
 - Wiederherstellung: Geteilte Fragensammlungen werden vor dem Start mit ihren Risiken genannt; unbestätigte Herkunft wird auch ohne Freigabedialog erklärt.
 - Wiederherstellung: Die Freigabe nennt nur noch die Aktivitäten, die im Archiv wirklich stehen; leere Zeilen „„“ ()“ aus den Einstellungen des Archivs entfallen, und ein Quiz scheitert nicht mehr an einem angeblich unlesbaren Typ.
 - Wiederherstellung: Dateien, die nur im Dateimanager einer Aktivität liegen, meldet die App als nicht lesbar (Prüflücke) statt als „fehlend im Ziel".

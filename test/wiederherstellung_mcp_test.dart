@@ -32,6 +32,7 @@ class _Moodle {
   Object progress = <String, Object?>{'progress': 0.2};
   Completer<void>? hold;
   bool completed = false;
+  bool completeOnStart = false;
   List<String> weitereQuizze = [];
   static const restore = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
   Uri get basis => Uri.parse('http://127.0.0.1:${server.port}');
@@ -64,6 +65,7 @@ class _Moodle {
             data = {
               'courses': [
                 {'id': 12, 'fullname': 'ZZ Kurs', 'shortname': 'ZZ'},
+                {'id': 34, 'fullname': 'ZZ Ziel', 'shortname': 'ZZZ'},
               ],
             };
           case 'core_courseformat_get_state':
@@ -155,6 +157,7 @@ class _Moodle {
           final f = Uri.splitQueryString(body);
           if (f.containsKey('_qf__restore_review_form')) {
             starts++;
+            if (completeOnStart) completed = true;
             answer = page('Gestartet');
           } else if (f.containsKey('_qf__restore_schema_form')) {
             answer = form({'_qf__restore_review_form': '1', 'stage': '16', 'restore': restore});
@@ -271,6 +274,7 @@ void main() {
       folder.path,
       profil: profile,
       sicherungsordner: folder.path,
+      uebertragungsprotokollPfad: p.join(folder.path, 'uebertragungen.json'),
       antwortfrist: const Duration(seconds: 1),
     );
     await service.starten();
@@ -652,6 +656,64 @@ void main() {
     expect(result, contains('Fragenherkunft nicht bestätigt'));
     expect(result, isNot(contains('siehe Freigabe')));
     expect(result, isNot(contains('verborgen: verified')));
+  });
+
+  test('Sammelübertragung erhält Prüfprobleme eines abgeschlossenen Quiz', () async {
+    writeArchive(quiz: true, geteilt: true);
+    external.progress = {'progress': 1, 'status': 1000};
+    external.completeOnStart = true;
+    final result = await client.tool('uebertragen', {
+      'datei': 'test.mbz',
+      'ziele': [{'kurs': 12, 'name': 'ZZ Kurs', 'weg': 'aktueller_kurs_verschmelzen'}],
+    });
+    expect(result, contains('1 fertig'));
+    expect(result, contains('Fragenherkunft nicht bestätigt'));
+    expect(result, isNot(contains('verborgen: verified')));
+  });
+
+  test('Übertragungszeitlimit beim Sichern nennt Sicherungsnummer und Statuswerkzeug', () async {
+    external.hold = Completer<void>();
+    final result = await client.tool('uebertragen', {
+      'kurs': 12, 'name_des_kurses': 'ZZ Kurs', 'ganzer_kurs': true,
+      'ziele': [{'kurs': 34, 'name': 'ZZ Ziel', 'weg': 'anderer_kurs_verschmelzen'}],
+    });
+    expect(external.backupStarts, 1);
+    expect(external.starts, 0);
+    final nummer = RegExp(r'Nummer ([a-z0-9]+)').firstMatch(result)!.group(1)!;
+    expect(result, contains('sicherung_status'));
+    expect(result, isNot(contains('wiederherstellung_status')));
+    final v = await Vorgaenge(folder.path, profilKennung: profile.kennung).finde(nummer);
+    expect(v, isNotNull);
+    expect(v!.wiederherstellung, isNull);
+    external.progress = {'unexpected': true};
+    external.hold!.complete();
+    external.hold = null;
+    await client.waitStatus('sicherung_status', nummer, (t) => t.contains('Unklar'));
+  });
+
+  test('Übertragungszeitlimit beim Wiederherstellen nennt Zielnummer und Statuswerkzeug', () async {
+    external.hold = Completer<void>();
+    final result = await client.tool('uebertragen', {
+      'datei': 'test.mbz',
+      'ziele': [{'kurs': 12, 'name': 'ZZ Kurs', 'weg': 'aktueller_kurs_verschmelzen'}],
+    });
+    expect(external.starts, 1);
+    final nummer = RegExp(r'Nummer ([a-z0-9]+)').firstMatch(result)!.group(1)!;
+    expect(result, contains('wiederherstellung_status'));
+    final v = await Vorgaenge(folder.path, profilKennung: profile.kennung).finde(nummer);
+    expect(v!.wiederherstellung, WiederherstellungStand.laufend);
+    external.progress = {'progress': 1, 'status': 1000};
+    external.completed = true;
+    external.hold!.complete();
+    external.hold = null;
+    await client.waitStatus('wiederherstellung_status', nummer, (t) => t.contains('fertig'));
+    // Der Sammellauf muss auch seinen abschließenden Protokolleintrag gespeichert haben.
+    final log = File(p.join(folder.path, 'uebertragungen.json'));
+    for (var i = 0; i < 100 && !await log.exists(); i++) {
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+    }
+    expect(await log.exists(), isTrue);
+    expect(external.starts, 1);
   });
 
   test('Sicherung: Zeitlimit und Neustart erlauben spätere Dateiabholung ohne neuen Start', () async {
