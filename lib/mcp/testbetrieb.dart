@@ -59,7 +59,7 @@ class Testbetrieb {
         'dateien': [
           for (final datei in dateien)
             [
-              p.relative(datei.path, from: wurzel).replaceAll(r'\\', '/'),
+              p.relative(datei.path, from: wurzel).replaceAll(r'\', '/'),
               sha256.convert(datei.readAsBytesSync()).toString(),
             ],
         ],

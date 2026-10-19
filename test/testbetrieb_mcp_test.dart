@@ -31,6 +31,10 @@ class TestMoodle {
   // Moodle speichert die Hintergrunddatei bei jedem Speichern neu; ihr
   // Änderungsdatum steigt, der Inhalt bleibt (Messung an der Spike-Instanz).
   int? hintergrundDatum;
+  List<int> hintergrundBytes = [1, 2, 3];
+  List<int>? hintergrundBytesNachSpeichern;
+  int hintergrundStatus = 200;
+  int hintergrundGroesse = 3;
   bool einstellungBeimRuecklesenAendern = false;
   String svg = '<svg><circle id="p1"/></svg>';
   String karteneinstellung = 'vorher';
@@ -162,6 +166,7 @@ class TestMoodle {
             lernlandkarteSpeicherungen++;
             if (hintergrundDatum != null) {
               hintergrundDatum = hintergrundDatum! + 15;
+              hintergrundBytes = hintergrundBytesNachSpeichern ?? hintergrundBytes;
             }
             r.response.redirect(
               Uri.parse('/course/modedit.php?update=71'),
@@ -206,7 +211,7 @@ class TestMoodle {
           <input name="karteneinstellung" value="$karteneinstellung">
           <textarea name="introeditor[text]"></textarea><input name="introeditor[itemid]" value="$entwurfsId">
           <input type="hidden" name="backgroundfile" value="${entwurfsId + 1000}">
-          ${hintergrundDatum == null ? '' : '<div id="fitem_id_backgroundfile"><label class="col-form-label">Hintergrundbild</label></div><script>M.form_filemanager.init(Y, {"target":"id_backgroundfile","itemid":${entwurfsId + 1000},"client_id":"c","list":[{"type":"file","filepath":"/","filename":"bg.png","size":3,"datemodified":$hintergrundDatum,"url":"$basis/draftfile.php/bg.png"}]});</script>'}
+          ${hintergrundDatum == null ? '' : '<div id="fitem_id_backgroundfile"><label class="col-form-label">Hintergrundbild</label></div><script>M.form_filemanager.init(Y, {"target":"id_backgroundfile","itemid":${entwurfsId + 1000},"client_id":"c","list":[{"type":"file","filepath":"/","filename":"bg.png","size":$hintergrundGroesse,"datemodified":$hintergrundDatum,"url":"$basis/draftfile.php/5/user/draft/9/bg.png"}]});</script>'}
           <textarea name="svgcode">${const HtmlEscape().convert(svg)}</textarea>
           <input type="hidden" name="placestore" value='${const HtmlEscape().convert(formularPlacestore)}'>
           <input type="submit" name="submitbutton" value="Speichern"></form>''',
@@ -222,8 +227,9 @@ class TestMoodle {
           <input type="submit" name="submitbutton" value="Speichern"></form>''',
           );
         }
-      } else if (r.uri.path == '/draftfile.php/bg.png') {
-        r.response.add([1, 2, 3]);
+      } else if (r.uri.path.startsWith('/draftfile.php/')) {
+        r.response.statusCode = hintergrundStatus;
+        r.response.add(hintergrundBytes);
         await r.response.close();
         return;
       } else if (r.uri.path == '/mod/page/view.php') {
@@ -372,6 +378,39 @@ void main() {
       expect(geschrieben, contains('verified: true'));
     },
   );
+
+  Future<String> hintergrundSetzen() async {
+    extern.lernlandkarteVorhanden = true;
+    extern.hintergrundDatum = 1000;
+    freigaben.stufe = Bestaetigungen.keine;
+    await starten();
+    return client.tool('lernlandkarte_verknuepfungen_setzen', {
+      'cmid': 71,
+      'name': 'ZZ Karte',
+      'zuordnungen': [
+        {'ort': 'p1', 'aktuell': 70, 'ziel': 72},
+      ],
+    });
+  }
+
+  test('Hintergrund neu abgelegt, gleiche Bytes: verified', () async {
+    expect(await hintergrundSetzen(), contains('verified: true'));
+  });
+
+  test('Hintergrund mit ausgetauschten Bytes: nicht verified', () async {
+    extern.hintergrundBytesNachSpeichern = [9, 9, 9];
+    expect(await hintergrundSetzen(), contains('verified: false'));
+  });
+
+  test('Hintergrund nicht lesbar: nicht verified', () async {
+    extern.hintergrundStatus = 500;
+    expect(await hintergrundSetzen(), contains('verified: false'));
+  });
+
+  test('Hintergrund zu groß zum Lesen: nicht verified', () async {
+    extern.hintergrundGroesse = 500 * 1048576;
+    expect(await hintergrundSetzen(), contains('verified: false'));
+  });
 
   test('Lernlandkarte wird über MCP gelesen, ein Ziel freigegeben geschrieben und zurückgelesen', () async {
     extern.lernlandkarteVorhanden = true;

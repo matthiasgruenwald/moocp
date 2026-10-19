@@ -147,6 +147,8 @@ Future<String> lernlandkarteVerknuepfungenSetzen(
   final daten = karte['placestore'] as Map<String, dynamic>;
   final original = raw;
   final lesestand = await formularLesen(moodle, ziel, arbeitsordner);
+  // Gleich jetzt: das spätere Lesen schreibt in denselben Ordner.
+  final hintergrundVorher = _hintergrundHashes(lesestand);
   final orte = (daten['places'] as List).whereType<Map>().toList();
   final ids = orte.map((o) => '${o['id'] ?? ''}').toList();
   final struktur = await kursLesen(moodle, kurs);
@@ -296,7 +298,7 @@ Future<String> lernlandkarteVerknuepfungenSetzen(
       gelesen.name == vorher.name &&
       gelesen.kurs == kurs &&
       _gleicheFormularFelder(aktuell, rueckForm, nachSpeichern: true) &&
-      _gleicheHintergrund(lesestand, gelesen) &&
+      _gleicheHintergrund(hintergrundVorher, gelesen) &&
       _gleicheFelder(lesestand, gelesen) &&
       _gleicheEinstellungen(lesestand, gelesen, beschriftungenNeu: true);
   final verified = karteOk && formularOk;
@@ -304,9 +306,11 @@ Future<String> lernlandkarteVerknuepfungenSetzen(
 }
 
 /// Moodle schreibt beim Speichern die Beschriftung jedes Ortes neu, und zwar
-/// aus dem Namen der verknüpften Aktivität (gemessen an der Spike-Instanz,
-/// Karte 1968). Der Vergleich der Zuordnung läuft über `placestore`; die
-/// Beschriftung im SVG bleibt außen vor.
+/// aus dem Namen der verknüpften Aktivität (gemessen an der Spike-Instanz).
+/// Der Vergleich der Zuordnung läuft über `placestore`; die Beschriftung im SVG
+/// bleibt außen vor. Bewusst für alle Orte, nicht nur für die mit geändertem
+/// Ziel: Moodle schreibt beim Speichern auch unveränderte Orte neu, und die
+/// Zuordnung von Beschriftung zu Ort ist nur an einer Instanz gemessen.
 String? ohneOrtsbeschriftung(Object? svg) => svg is String
     ? svg.replaceAllMapped(
         RegExp(r'(<(?:title|text) id="(?:title|text)[^"]*"[^>]*>)[^<]*'),
@@ -354,21 +358,31 @@ bool _gleicheFormularFelder(
       liste(vorher) == liste(nachher);
 }
 
-/// Inhalt der Hintergrunddateien (SHA-256) vor und nach dem Speichern.
-bool _gleicheHintergrund(FormularGelesen vorher, FormularGelesen nachher) {
-  Map<String, String> hashes(FormularGelesen f) {
-    final wurzel = Directory(p.join(f.ordner, 'bereiche', 'backgroundfile'));
-    if (!wurzel.existsSync()) return {};
-    return {
-      for (final d in wurzel.listSync(recursive: true).whereType<File>())
-        p.relative(d.path, from: wurzel.path): sha256
-            .convert(d.readAsBytesSync())
-            .toString(),
-    };
+/// Inhalt der Hintergrunddateien (SHA-256) eines gelesenen Stands; null, wenn
+/// eine Datei nicht gelesen werden konnte (zu groß, Abruf gescheitert). Sie
+/// fehlte sonst in beiden Ständen und sähe „gleich" aus.
+String? _hintergrundHashes(FormularGelesen f) {
+  if (f.bereiche.any(
+    (b) => b.feld == 'backgroundfile' && b.nichtGelesen.isNotEmpty,
+  )) {
+    return null;
   }
+  final wurzel = Directory(p.join(f.ordner, 'bereiche', 'backgroundfile'));
+  if (!wurzel.existsSync()) return '{}';
+  final hashes = {
+    for (final d in wurzel.listSync(recursive: true).whereType<File>())
+      p.relative(d.path, from: wurzel.path): sha256
+          .convert(d.readAsBytesSync())
+          .toString(),
+  };
+  return const JsonEncoder().convert(hashes);
+}
 
-  return const JsonEncoder().convert(hashes(vorher)) ==
-      const JsonEncoder().convert(hashes(nachher));
+/// Hintergrund nach dem Speichern gegen den Stand von vorher ([vorher] aus
+/// [_hintergrundHashes]); nicht lesbar gilt nie als gleich.
+bool _gleicheHintergrund(String? vorher, FormularGelesen nachher) {
+  final jetzt = _hintergrundHashes(nachher);
+  return vorher != null && jetzt != null && vorher == jetzt;
 }
 
 bool _gleicheEinstellungen(
