@@ -873,7 +873,7 @@ class McpDienst {
             'Ein nach dem Start ausgetauschtes Quellarchiv oder fehlender Inhalts-Hash bleibt bei der Anhangprüfung eine Prüflücke. '
             'Dauert es länger als eine Minute, läuft es weiter: dann wiederherstellung_status mit der Nummer aufrufen. '
             'Nach dem Start wird nie neu gesendet. Dieselbe Datei für denselben Zielweg wird nicht ein zweites Mal '
-            'gestartet, solange ein Vorgang offen ist (auch nach dem Zeitlimit oder einem Neustart); die Antwort nennt '
+            'gestartet, solange dafür ein Vorgang offen ist, fertig wurde oder nach dem Start mit einem Fehler endete (ein zweiter Lauf legt Dubletten an; auch nach dem Zeitlimit oder einem Neustart), ein vor dem Start abgebrochener Vorgang sperrt nicht; die Antwort nennt '
             'dann seine Nummer, auch wenn das Profil umbenannt wurde. Eine bewusste Wiederholung nur mit wiederholung_von '
             'und dieser Nummer: Der aktuelle Hintergrundstand wird vor der Freigabe gelesen und mit Unsicherheiten '
             'und Dublettenrisiko angezeigt.',

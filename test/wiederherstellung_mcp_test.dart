@@ -347,6 +347,20 @@ void main() {
     expect(duplicate, contains(number));
     expect(external.starts, 1);
   });
+  test('ein ausdrücklicher Moodle-Fehler macht den Vorgang fehlgeschlagen und sperrt die Wiederholung', () async {
+    external.progress = {'error': 'failed', 'progress': 0.2};
+    final result = await client.tool('wiederherstellen_datei', arguments);
+    final number = RegExp(r'Nummer ([a-z0-9]+)').firstMatch(result)!.group(1)!;
+    expect(result, contains('fehlgeschlagen'));
+    final status = await client.tool('wiederherstellung_status', {'id': number});
+    expect(status, contains('fehlgeschlagen'));
+    expect(status, isNot(contains('unklar (')));
+    final store = Vorgaenge(folder.path, profilKennung: profile.kennung);
+    expect((await store.finde(number))!.wiederherstellung, WiederherstellungStand.fehlgeschlagen);
+    final duplicate = await client.tool('wiederherstellen_datei', arguments);
+    expect(duplicate, contains(number));
+    expect(external.starts, 1);
+  });
   test('Status-Zeitlimit nennt Werkzeug und Nummer; erneute Abfrage startet nichts', () async {
     external.progress = {'unexpected': true};
     final started = await client.tool('wiederherstellen_datei', arguments);

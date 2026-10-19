@@ -447,14 +447,18 @@ typedef DoppelstartEintrag = ({
   String? wiederholungVon,
   WiederherstellungStand? stand,
   int kurs,
+
+  /// Der Start in Moodle ist erfolgt (Schritt 16): Auch ein gemeldeter Fehler schließt dann
+  /// angelegte Inhalte nicht aus.
+  bool gestartet,
 });
 
 /// Die Nummer des offenen Vorgangs, der die neue Wiederherstellung sperrt, sonst null.
 ///
 /// Offen heißt: anstehend, hochgeladen, laufend, unklar oder fertig (Moodle kann die
 /// Wiederherstellung schon ausgeführt haben, oder sie ist noch nicht gegengelesen).
-/// Fehlgeschlagen sperrt nur bei neuem Kurs (kurs 0), weil dort ein Platzhalterkurs
-/// bleiben kann. Nur der Kopf zählt: Ein Vorgang, auf den ein anderer mit
+/// Fehlgeschlagen sperrt nur nach dem Start (Moodle kann schon Inhalte angelegt haben)
+/// und bei neuem Kurs (kurs 0), weil dort ein Platzhalterkurs bleiben kann. Nur der Kopf zählt: Ein Vorgang, auf den ein anderer mit
 /// wiederholungVon zeigt, ist überholt. Eine Wiederholung ist nur zulässig, wenn sie
 /// genau den sperrenden Kopf nennt.
 String? doppelstartSperre(
@@ -481,7 +485,7 @@ bool _sperrt(DoppelstartEintrag e, int kurs) => switch (e.stand) {
       WiederherstellungStand.unklar ||
       WiederherstellungStand.fertig =>
         true,
-      WiederherstellungStand.fehlgeschlagen => e.kurs == 0 && kurs == 0,
+      WiederherstellungStand.fehlgeschlagen => e.gestartet || (e.kurs == 0 && kurs == 0),
       null => false,
     };
 

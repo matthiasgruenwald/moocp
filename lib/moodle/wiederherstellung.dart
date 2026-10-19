@@ -174,7 +174,7 @@ Future<String> wiederherstellen(
       final altPasst = v.profilKennung == null && teile?.length == 4 &&
           teile![0] == neu[0] && teile[2] == neu[2] && teile[3] == neu[3];
       return (id: e.id, fingerabdruck: altPasst ? fp : e.fingerabdruck,
-          wiederholungVon: e.wiederholungVon, stand: e.stand, kurs: e.kurs);
+          wiederholungVon: e.wiederholungVon, stand: e.stand, kurs: e.kurs, gestartet: e.gestartet);
     }).toList();
     final sperre = doppelstartSperre(
       eintraege,
@@ -566,14 +566,14 @@ Future<String> _warten(
       final stand = bewerteFortschritt(antwort, restoreid);
       if (stand == SicherungStand.fertig) break;
       if (stand == SicherungStand.fehlgeschlagen) {
-        // Moodle hat den Fehler gemeldet: Der Kurs bleibt gesperrt (unklar), nur das
-        // Gegenlesen löst ihn auf. Freigegeben wird nur, was nachweislich vor dem
-        // Schreiben abbrach (AC #19).
-        await _uebergang(vorgaenge, vg, WiederherstellungStand.unklar,
-            text: 'Moodle meldet einen Fehler bei der Wiederherstellung. Kurs bitte prüfen; '
-                'nicht neu starten, sondern mit wiederherstellung_status prüfen.');
-        return 'Moodle meldet einen Fehler (Nummer ${vg.id}). Der Kurs bleibt gesperrt; '
-            'wiederherstellung_status prüft den Stand. Eine Wiederholung nur mit wiederholung_von.';
+        // Moodle hat den Fehler ausdrücklich gemeldet: fehlgeschlagen, aber der Start war
+        // schon erfolgt, also sperrt der Vorgang weiter (doppelstartSperre) und der
+        // Kurs ist zu prüfen. Ein Fehler hat Vorrang vor unvollständigen Fortschrittswerten.
+        await _uebergang(vorgaenge, vg, WiederherstellungStand.fehlgeschlagen,
+            text: 'Moodle meldet einen Fehler bei der Wiederherstellung. Bereits angelegte Inhalte sind '
+                'nicht ausgeschlossen; Kurs bitte prüfen.');
+        return 'Der Vorgang ist fehlgeschlagen (Nummer ${vg.id}): Moodle meldet einen Fehler. Bereits angelegte Inhalte sind nicht '
+            'ausgeschlossen; Kurs bitte prüfen. Der Vorgang bleibt gesperrt, eine Wiederholung nur mit wiederholung_von.';
       }
       if (stand == SicherungStand.unklar) {
         await _uebergang(vorgaenge, vg, WiederherstellungStand.unklar,
