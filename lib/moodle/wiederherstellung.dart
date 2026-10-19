@@ -572,14 +572,20 @@ Future<String> _warten(
       final stand = bewerteFortschritt(antwort, restoreid);
       if (stand == SicherungStand.fertig) break;
       if (stand == SicherungStand.fehlgeschlagen) {
-        // Moodle hat den Fehler ausdrücklich gemeldet: fehlgeschlagen, aber der Start war
-        // schon erfolgt, also sperrt der Vorgang weiter (doppelstartSperre) und der
-        // Kurs ist zu prüfen. Ein Fehler hat Vorrang vor unvollständigen Fortschrittswerten.
-        await _uebergang(vorgaenge, vg, WiederherstellungStand.fehlgeschlagen,
-            text: 'Moodle meldet einen Fehler bei der Wiederherstellung. Bereits angelegte Inhalte sind '
-                'nicht ausgeschlossen; Kurs bitte prüfen.');
-        return 'Der Vorgang ist fehlgeschlagen (Nummer ${vg.id}): Moodle meldet einen Fehler. Bereits angelegte Inhalte sind nicht '
-            'ausgeschlossen; Kurs bitte prüfen. Der Vorgang bleibt gesperrt, eine Wiederholung nur mit wiederholung_von.';
+        // Das Fehlerfeld entscheidet nicht (Ticket #18): Der Zielkurs wird frisch gelesen und
+        // geprüft, die App wiederholt und startet nichts neu.
+        return await _nachFehler(moodle, vorgaenge, vg,
+            beleg: (
+              art: fehlerArt(antwort, restoreid),
+              beendet: fehlerBeendet(antwort, restoreid),
+              fortschritt: fortschrittswert(antwort, restoreid),
+            ),
+            kontext: kontext,
+            kurs: kurs,
+            vorherCmids: vorherCmids,
+            erwartet: wiederherstellungAktivitaeten,
+            quizQuellen: quizQuellen,
+            herkunftEigen: herkunftEigen);
       }
       if (stand == SicherungStand.unklar) {
         await _uebergang(vorgaenge, vg, WiederherstellungStand.unklar,
@@ -701,6 +707,7 @@ Future<String> _gegenlesen(
   required List<ArchivAktivitaet> erwartet,
   Map<String, List<QuizFrage>>? quizQuellen,
   bool herkunftEigen = false,
+  FehlerBeleg? fehler,
 }) async {
   // Erneut aufrufbar (nach „unklar"): Verborgenes wird nicht noch einmal angefasst.
   vorgaenge.pruefeBindung(vg);
@@ -723,6 +730,19 @@ Future<String> _gegenlesen(
     for (final a in jetzt.nachCmid.values)
       if (!vorherCmids.contains(a.cmid)) a,
   ];
+  if (fehler != null && neue.isEmpty) {
+    // Nach einem gemeldeten Fehler: Nichts Neues im Kurs. Nur mit belegtem Prozessende ist das
+    // ein Fehlschlag; sonst kann der Hintergrundauftrag noch hängen.
+    if (!fehler.beendet) {
+      return _fehlerHaengt(vorgaenge, vg, fehler, kurs: kurs, befund: 'Im Zielkurs ist noch nichts Neues angekommen.');
+    }
+    await _uebergang(vorgaenge, vg, WiederherstellungStand.fehlgeschlagen,
+        text: 'Moodle meldete einen Fehler (${fehler.art}), der Prozess ist beendet und der Zielkurs enthält '
+            'nichts Neues. Eine Wiederholung ist gefahrlos.');
+    return 'Der Vorgang ist fehlgeschlagen (Nummer ${vg.id}): Moodle meldete einen Fehler (${fehler.art}), der Prozess '
+        'ist beendet, und im Zielkurs ist nachweislich nichts Neues (keine neuen Aktivitäten). Eine Wiederholung ist '
+        'gefahrlos, die Sperre ist frei.';
+  }
   final abschliessendZugeordnet = importierteCmidsEindeutig(
     erwartet: erwartet,
     vorher: vorherCmids.toSet(),
@@ -797,10 +817,102 @@ Future<String> _gegenlesen(
     ?schreibPruefluecke,
   ].join(' ');
   final text = zusatz.isEmpty ? basis : '$basis $zusatz';
+  if (fehler != null) {
+    // Moodle meldete einen Fehler: Ob er den Inhalt betrifft, zeigt nur der Vergleich mit der Quelle.
+    final abweichungen = [
+      if (zugeordnet == null || !zuordnungUnveraendert) _zahlAbweichung(erwartet, neue),
+      if (zuordnungUnveraendert && !alleVerborgen) 'Nicht alle neuen Aktivitäten sind verborgen.',
+      if (anhang != null && anhang.abweichend) anhang.text,
+      for (final v in vergleiche) if (v.art == VergleichArt.abweichung) v.text,
+    ];
+    if (abweichungen.isNotEmpty) {
+      final befund = 'Der Zielkurs weicht ab: ${abweichungen.join(' ')}';
+      if (!fehler.beendet) return _fehlerHaengt(vorgaenge, vg, fehler, kurs: kurs, befund: befund);
+      await _uebergang(vorgaenge, vg, WiederherstellungStand.unklar,
+          text: 'Moodle meldete einen Fehler (${fehler.art}); der Zielkurs ist unvollständig oder weicht ab. '
+              'Die Lehrkraft entscheidet.');
+      return 'Moodle meldete einen Fehler (${fehler.art}) und beendete den Prozess; der Zielkurs ist unvollständig '
+          'oder weicht ab (Nummer ${vg.id}). $befund Nichts wurde wiederholt. Der Vorgang bleibt gesperrt, bis die '
+          'Lehrkraft entscheidet. Optionen: (1) eine bewusste Wiederholung mit wiederholung_von=${vg.id} (neue Freigabe, '
+          'warnt vor Dubletten; schon vorhandene Teile würden doppelt), oder (2) das Fehlende einzeln anlegen '
+          '(bei Bildern aufwendiger).';
+    }
+    const kopf = 'Moodle meldete einen Fehler, der Inhalt ist aber vollständig und stimmt mit der Quelle überein '
+        '(soweit geprüft).';
+    final fertigText = '$kopf $text';
+    await _uebergang(vorgaenge, vg, WiederherstellungStand.fertig, text: fertigText, verified: verifiziert);
+    final befundZeile = verifiziert
+        ? 'verborgen: verified'
+        : 'nicht verifiziert: Prüflücken oder Ungeprüftes bleiben offen, siehe unten';
+    return '$kopf Wiederhergestellt (Nummer ${vg.id}): ${neue.isEmpty ? 'keine neuen Aktivitäten' : liste}. $befundZeile.'
+        '${zusatz.isEmpty ? '' : ' $zusatz'}';
+  }
   await _uebergang(vorgaenge, vg, WiederherstellungStand.fertig, text: text, verified: verifiziert);
   final befund = verifiziert ? 'verborgen: verified' : 'verborgen oder Anhänge/Vergleich nicht bestätigt, siehe Zustand oben';
   return 'Wiederhergestellt (Nummer ${vg.id}): ${neue.isEmpty ? 'keine neuen Aktivitäten' : liste}. $befund.'
       '${zusatz.isEmpty ? '' : ' $zusatz'}';
+}
+
+/// Was nach einem gemeldeten Fehler über den Prozess bekannt ist.
+typedef FehlerBeleg = ({String art, bool beendet, double? fortschritt});
+
+/// Zahl und Namen der neuen Aktivitäten gegen das Archiv: was fehlt, was zusätzlich ist.
+String _zahlAbweichung(List<ArchivAktivitaet> erwartet, List<KursAktivitaet> neue) {
+  final frei = [for (final a in neue) '${a.modul} „${a.name}"'];
+  final fehlend = <String>[];
+  for (final a in erwartet) {
+    if (!frei.remove('${a.modul} „${a.titel}"')) fehlend.add('${a.modul} „${a.titel}"');
+  }
+  return 'Erwartet ${erwartet.length} neue Aktivitäten, im Kurs ${neue.length}. '
+      '${fehlend.isEmpty ? '' : 'Fehlt: ${fehlend.join(', ')}. '}'
+      '${frei.isEmpty ? '' : 'Zusätzlich oder anders benannt: ${frei.join(', ')}. '}'.trimRight();
+}
+
+/// Ausgang c: Der Prozess ist nach dem gemeldeten Fehler nicht als beendet belegt. Der Vorgang
+/// bleibt gesperrt (unklar); die Antwort enthält den Nachfragetext an die Verwaltung.
+Future<String> _fehlerHaengt(Vorgaenge vorgaenge, Vorgang vg, FehlerBeleg fehler,
+    {required int? kurs, required String befund}) async {
+  final nachfrage = verwaltungsNachfrage(
+    nummer: vg.id,
+    start: vg.begonnen,
+    letzteBeobachtung: jetzt(),
+    zielkurs: kurs,
+    fehlerart: fehler.art,
+    fortschritt: fehler.fortschritt,
+  );
+  await _uebergang(vorgaenge, vg, WiederherstellungStand.unklar,
+      text: 'Moodle meldete einen Fehler (${fehler.art}); der Prozess ist nicht als beendet belegt. '
+          'Nachfrage an die Verwaltung nötig, nichts wiederholen.');
+  return 'Moodle meldet einen Fehler (Art: ${fehler.art}), aber der Prozess ist nicht als beendet belegt '
+      '(Nummer ${vg.id}). $befund Der Vorgang bleibt gesperrt; die App wiederholt nichts und startet nichts neu. '
+      'Nachfragetext an die Verwaltung (die Lehrkraft gibt ihn weiter, die App betritt den Adminbereich nie): '
+      '„$nachfrage“ Danach mit wiederherstellung_status erneut prüfen.';
+}
+
+/// Nach einem von Moodle gemeldeten Fehler: Der Zielkurs wird frisch gelesen und mit dem Archiv
+/// verglichen (Gegenlesen). Ohne Kursnummer (neuer Kurs) ist das nicht möglich.
+Future<String> _nachFehler(
+  MoodleZugang moodle,
+  Vorgaenge vorgaenge,
+  Vorgang vg, {
+  required FehlerBeleg beleg,
+  required int kontext,
+  required int? kurs,
+  required List<int> vorherCmids,
+  required List<ArchivAktivitaet> erwartet,
+  Map<String, List<QuizFrage>>? quizQuellen,
+  bool herkunftEigen = false,
+}) async {
+  // „Wird geprüft": gesperrt (unklar), bis das Ergebnis feststeht.
+  await _uebergang(vorgaenge, vg, WiederherstellungStand.unklar,
+      text: 'Moodle meldete einen Fehler (${beleg.art}); der Zielkurs wird geprüft.');
+  if (kurs == null) {
+    return _fehlerHaengt(vorgaenge, vg, beleg,
+        kurs: null, befund: 'Die Kursnummer des neuen Kurses ist nicht bekannt; der Zielkurs konnte nicht gelesen werden.');
+  }
+  return _gegenlesen(moodle, vorgaenge, vg,
+      kurs: kurs, vorherCmids: vorherCmids, erwartet: erwartet, quizQuellen: quizQuellen,
+      herkunftEigen: herkunftEigen, fehler: beleg);
 }
 
 /// Der Stand eines Wiederherstellungsvorgangs. Fragt nur ab, startet nie neu.

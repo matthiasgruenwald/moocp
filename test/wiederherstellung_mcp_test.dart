@@ -378,19 +378,98 @@ void main() {
     expect(duplicate, contains(number));
     expect(external.starts, 1);
   });
-  test('ein ausdrücklicher Moodle-Fehler macht den Vorgang fehlgeschlagen und sperrt die Wiederholung', () async {
-    external.progress = {'error': 'failed', 'progress': 0.2};
-    final result = await client.tool('wiederherstellen_datei', arguments);
-    final number = RegExp(r'Nummer ([a-z0-9]+)').firstMatch(result)!.group(1)!;
-    expect(result, contains('fehlgeschlagen'));
-    final status = await client.tool('wiederherstellung_status', {'id': number});
-    expect(status, contains('fehlgeschlagen'));
-    expect(status, isNot(contains('unklar (')));
-    final store = Vorgaenge(folder.path, profilKennung: profile.kennung);
-    expect((await store.finde(number))!.wiederherstellung, WiederherstellungStand.fehlgeschlagen);
-    final duplicate = await client.tool('wiederherstellen_datei', arguments);
-    expect(duplicate, contains(number));
-    expect(external.starts, 1);
+  String nummerAus(String text) => RegExp(r'Nummer ([a-z0-9]+)').firstMatch(text)!.group(1)!;
+
+  group('Moodle meldet einen Fehler: der Zielkurs entscheidet, nicht das Fehlerfeld', () {
+    /// Startet (Moodle antwortet zunächst nicht), lässt dann die Kursinhalte erscheinen und den
+    /// Fehler melden und liefert die Nummer und den Text der abschließenden Statusabfrage.
+    Future<(String, String)> fehlerLauf(Map<String, Object?> fortschritt,
+        {bool imKurs = false, List<String> weitere = const []}) async {
+      external.hold = Completer<void>();
+      final nummer = nummerAus(await client.tool('wiederherstellen_datei', arguments));
+      external.progress = fortschritt;
+      external.completed = imKurs;
+      external.weitereQuizze = weitere;
+      external.hold!.complete();
+      external.hold = null;
+      final text = await client.waitStatus('wiederherstellung_status', nummer,
+          (t) => !t.contains('läuft weiter') && !t.contains('läuft noch'));
+      return (nummer, text);
+    }
+
+    test('a) Inhalt vollständig und gleich: verified, Vorgang abgeschlossen, Grenzen bleiben genannt', () async {
+      final (number, result) = await fehlerLauf({'error': 'failed', 'progress': 0.2}, imKurs: true);
+      expect(result,
+          contains('Moodle meldete einen Fehler, der Inhalt ist aber vollständig und stimmt mit der Quelle überein (soweit geprüft)'));
+      final store = Vorgaenge(folder.path, profilKennung: profile.kennung);
+      final vg = (await store.finde(number))!;
+      expect(vg.wiederherstellung, WiederherstellungStand.fertig);
+      expect(vg.verified, isTrue);
+      expect(external.starts, 1, reason: 'die App startet nichts neu');
+    });
+
+    test('a) mit offener Prüflücke: nicht verified, der Text nennt das Ungeprüfte', () async {
+      writeArchive(quiz: true);
+      final (number, result) = await fehlerLauf({'error': 'failed', 'progress': 0.2}, imKurs: true);
+      expect(result, contains('Moodle meldete einen Fehler'));
+      expect(result, contains('Fragenherkunft nicht bestätigt'));
+      final store = Vorgaenge(folder.path, profilKennung: profile.kennung);
+      final vg = (await store.finde(number))!;
+      expect(vg.wiederherstellung, WiederherstellungStand.fertig);
+      expect(vg.verified, isFalse);
+    });
+
+    test('b) beendet, aber unvollständig: nennt das Fehlende, Optionen, nichts wiederholt, Sperre bleibt', () async {
+      final (number, result) = await fehlerLauf({'error': 'failed', 'progress': 0.2, 'status': 800},
+          imKurs: true, weitere: ['ZZ Fremdes Quiz']);
+      expect(result, contains('weicht ab'));
+      expect(result, contains('ZZ Fremdes Quiz'));
+      expect(result, contains('wiederholung_von=$number'));
+      expect(result, contains('einzeln anlegen'));
+      expect(result, contains('Bildern'));
+      final store = Vorgaenge(folder.path, profilKennung: profile.kennung);
+      expect((await store.finde(number))!.wiederherstellung, WiederherstellungStand.unklar);
+      final duplicate = await client.tool('wiederherstellen_datei', arguments);
+      expect(duplicate, contains(number));
+      expect(external.starts, 1);
+    });
+
+    test('c) Prozess nicht als beendet belegt, nichts im Kurs: Nachfragetext, Sperre bleibt', () async {
+      final (number, result) = await fehlerLauf({'error': 'backup_exception', 'progress': 0.2});
+      expect(result, contains('Moodle meldet einen Fehler'));
+      expect(result, contains('Hintergrundauftrag'));
+      expect(result, contains('Vorgang $number'));
+      expect(result, contains('backup_exception'));
+      expect(result, contains('Kurs 12'));
+      expect(result, contains('nicht wiederholt'));
+      expect(result, isNot(contains('fehlgeschlagen')));
+      expect(result, isNot(contains('ZZ Blatt')), reason: 'keine Inhalte in der Nachfrage');
+      final store = Vorgaenge(folder.path, profilKennung: profile.kennung);
+      expect((await store.finde(number))!.wiederherstellung, WiederherstellungStand.unklar);
+      final duplicate = await client.tool('wiederherstellen_datei', arguments);
+      expect(duplicate, contains(number));
+      expect(external.starts, 1);
+    });
+
+    test('c) nur Teile im Kurs und Prozess nicht beendet: ebenfalls Nachfragetext statt Urteil', () async {
+      final (number, result) = await fehlerLauf({'error': 'failed', 'progress': 0.5},
+          imKurs: true, weitere: ['ZZ Fremdes Quiz']);
+      expect(result, contains('Hintergrundauftrag'));
+      expect(result, contains('weicht ab'));
+      final store = Vorgaenge(folder.path, profilKennung: profile.kennung);
+      expect((await store.finde(number))!.wiederherstellung, WiederherstellungStand.unklar);
+    });
+
+    test('fehlgeschlagen nur mit Beleg: Prozess beendet und nichts Neues im Kurs; Wiederholung frei', () async {
+      final (number, result) = await fehlerLauf({'error': 'failed', 'progress': 0.2, 'status': 800});
+      expect(result, contains('fehlgeschlagen'));
+      expect(result, contains('nichts Neues'));
+      final store = Vorgaenge(folder.path, profilKennung: profile.kennung);
+      expect((await store.finde(number))!.wiederherstellung, WiederherstellungStand.fehlgeschlagen);
+      external.hold = null;
+      await client.tool('wiederherstellen_datei', arguments);
+      expect(external.starts, 2, reason: 'ohne Sperre darf neu gestartet werden');
+    });
   });
   test('Status-Zeitlimit nennt Werkzeug und Nummer; erneute Abfrage startet nichts', () async {
     external.progress = {'unexpected': true};

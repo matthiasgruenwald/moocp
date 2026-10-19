@@ -44,7 +44,11 @@ typedef ZielAbruf = ({String name, bool entwurf, int? status, String? sha1});
 
 /// Ergebnis für eine Aktivität oder für alle zusammen.
 class AnhangPruefung {
-  AnhangPruefung(this.befunde, {required this.vollstaendig});
+  AnhangPruefung(this.befunde, {required this.vollstaendig, this.abweichend = false});
+
+  /// Mindestens ein Fund ist ein Unterschied zur Quelle (geändert, fremd, fehlend im Ziel,
+  /// Fehlerstatus), nicht nur eine Prüflücke (unlesbar, Quelle fehlt, Dateimanager).
+  final bool abweichend;
 
   /// Leer, wenn alles übereinstimmt. Sonst je Fund ein Satz mit dem Namen.
   final List<String> befunde;
@@ -177,6 +181,7 @@ Future<({String? fehler, List<ZielAbruf> abrufe})> zielLesen(MoodleZugang moodle
 AnhangPruefung vergleicheAnhaenge({required List<QuellDatei>? quelle, required List<ZielAbruf> ziel,
     String? formularFehler}) {
   final befunde = <String>[];
+  var abweichend = false;
   if (formularFehler != null) befunde.add(formularFehler);
   if (quelle == null) {
     befunde.add('Quellaufnahme fehlt: Vergleich nicht möglich');
@@ -195,6 +200,7 @@ AnhangPruefung vergleicheAnhaenge({required List<QuellDatei>? quelle, required L
       continue;
     }
     if (z.status != 200) {
+      abweichend = true;
       if (z.entwurf) {
         befunde.add('„${z.name}": verwaiste Entwurfsadresse (HTTP ${z.status})');
       } else {
@@ -204,14 +210,17 @@ AnhangPruefung vergleicheAnhaenge({required List<QuellDatei>? quelle, required L
     }
     final erwartet = namen[z.name];
     if (erwartet == null) {
+      abweichend = true;
       befunde.add('„${z.name}": fremd, die Quellaufnahme kennt die Datei nicht');
       continue;
     }
     if (erwartet.length > 1) {
+      abweichend = true;
       befunde.add('„${z.name}": mehrdeutig, gleicher Name mit verschiedenem Inhalt in der Quelle');
       continue;
     }
     if (z.sha1 != erwartet.single) {
+      abweichend = true;
       befunde.add('„${z.name}": geändert, Inhalt weicht von der Quelle ab');
       continue;
     }
@@ -219,12 +228,13 @@ AnhangPruefung vergleicheAnhaenge({required List<QuellDatei>? quelle, required L
   }
   for (final name in namen.keys) {
     if (!gelesen.contains(name) && !ziel.any((z) => z.name == name)) {
+      if (!imManager.contains(name)) abweichend = true;
       befunde.add(imManager.contains(name)
           ? 'Prüflücke: „$name" liegt im Dateimanager und ist nicht lesbar'
           : '„$name": fehlend im Ziel');
     }
   }
-  return AnhangPruefung(befunde, vollstaendig: befunde.isEmpty);
+  return AnhangPruefung(befunde, vollstaendig: befunde.isEmpty, abweichend: abweichend);
 }
 
 /// Prüft die Anhänge der eindeutig zugeordneten Aktivitäten. Liest nur Quelle und
@@ -253,6 +263,7 @@ Future<AnhangPruefung> anhaengePruefen(MoodleZugang moodle, Vorgaenge vorgaenge,
 
   final befunde = <String>[];
   var vollstaendig = true;
+  var abweichend = false;
   for (final a in aktivitaeten) {
     final quelle = quelldateienAus(mbz, modul: a.modul, titel: a.titel);
     vorgaenge.pruefeBindung(vg);
@@ -260,8 +271,9 @@ Future<AnhangPruefung> anhaengePruefen(MoodleZugang moodle, Vorgaenge vorgaenge,
     final pruefung = vergleicheAnhaenge(quelle: quelle, ziel: ziel.abrufe, formularFehler: ziel.fehler);
     if (!pruefung.vollstaendig) {
       vollstaendig = false;
+      abweichend = abweichend || pruefung.abweichend;
       befunde.add('„${a.titel}": ${pruefung.befunde.join('; ')}');
     }
   }
-  return AnhangPruefung(befunde, vollstaendig: vollstaendig && aktivitaeten.isNotEmpty);
+  return AnhangPruefung(befunde, vollstaendig: vollstaendig && aktivitaeten.isNotEmpty, abweichend: abweichend);
 }

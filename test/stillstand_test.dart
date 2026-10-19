@@ -25,6 +25,8 @@ class _Moodle extends MoodleZugang {
 
   @override
   Future<Object?> dienst(String name, Map<String, Object?> args) async {
+    // Der Zielkurs ist leer: Gegenlesen findet nichts Neues.
+    if (name == 'core_courseformat_get_state') return {'cm': <Object?>[], 'section': <Object?>[]};
     final i = abfragen < antworten.length ? abfragen : antworten.length - 1;
     abfragen++;
     return antworten[i];
@@ -199,11 +201,14 @@ void main() {
 
     final text = await wiederherstellungStatus(_Moodle([_fortschritt(0.5, fehler: 'boom', id: 'r-1')]), vg, id: v.id);
 
-    // Ein ausdrücklicher Fehler heißt fehlgeschlagen, sperrt aber weiter: Angelegtes ist nicht ausgeschlossen.
+    // Das Fehlerfeld entscheidet nicht: Der Zielkurs wird geprüft. Er ist leer und das Ende des
+    // Prozesses nicht belegt, also bleibt der Vorgang gesperrt und die Verwaltung wird gefragt.
     expect(text, contains('Moodle meldet einen Fehler'));
-    expect(text, contains('fehlgeschlagen'));
+    expect(text, contains('nicht als beendet belegt'));
+    expect(text, contains('Hintergrundauftrag'));
     expect(text, contains('gesperrt'));
-    expect(text, contains('nicht ausgeschlossen'));
+    expect(text, isNot(contains('fehlgeschlagen')));
+    expect((await vg.finde(v.id))!.wiederherstellung, WiederherstellungStand.unklar);
   });
 
   test('erste Beobachtung setzt den Zeitpunkt auch ohne Fortschrittswert', () {
