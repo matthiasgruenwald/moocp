@@ -415,6 +415,26 @@ SicherungStand bewerteFortschritt(Object? antwort, String backupid) {
   return SicherungStand.unklar;
 }
 
+/// Ob Moodle den Vorgang als beendet mit Fehler führt (Status 800, `backup::STATUS_FINISHED_ERR`;
+/// ungemessen). Ein Fehlerfeld allein belegt das Ende nicht: Ohne diesen Status kann der
+/// Hintergrundauftrag noch laufen oder hängen.
+bool fehlerBeendet(Object? antwort, String backupid) {
+  final s = _eintrag(antwort, backupid)?['status'];
+  return s is num && s == 800;
+}
+
+/// Die Art des gemeldeten Fehlers, nur als kurzer Bezeichner (Fehlercode, sonst das Fehlerfeld,
+/// wenn es ein solcher ist). Freitext kann Inhalte tragen (E11) und wird nie übernommen.
+String fehlerArt(Object? antwort, String backupid) {
+  final eintrag = _eintrag(antwort, backupid);
+  final bezeichner = RegExp(r'^[A-Za-z0-9_.\-]{1,80}$');
+  for (final feld in ['errorcode', 'error']) {
+    final w = eintrag?[feld];
+    if (w is String && bezeichner.hasMatch(w)) return w;
+  }
+  return 'nicht benannt';
+}
+
 /// Die Downloadpfade (von /pluginfile.php an, mit Query) der Sicherung
 /// [dateiname] auf der Seite /backup/restorefile.php. Gesucht wird genau der
 /// eigene Dateiname; andere Sicherungen auf derselben Seite bleiben außen vor.

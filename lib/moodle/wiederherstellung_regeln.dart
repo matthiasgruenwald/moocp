@@ -459,18 +459,17 @@ typedef DoppelstartEintrag = ({
   String? wiederholungVon,
   WiederherstellungStand? stand,
   int kurs,
-
-  /// Der Start in Moodle ist erfolgt (Schritt 16): Auch ein gemeldeter Fehler schließt dann
-  /// angelegte Inhalte nicht aus.
-  bool gestartet,
 });
 
 /// Die Nummer des offenen Vorgangs, der die neue Wiederherstellung sperrt, sonst null.
 ///
 /// Offen heißt: anstehend, hochgeladen, laufend, unklar oder fertig (Moodle kann die
 /// Wiederherstellung schon ausgeführt haben, oder sie ist noch nicht gegengelesen).
-/// Fehlgeschlagen sperrt nur nach dem Start (Moodle kann schon Inhalte angelegt haben)
-/// und bei neuem Kurs (kurs 0), weil dort ein Platzhalterkurs bleiben kann. Nur der Kopf zählt: Ein Vorgang, auf den ein anderer mit
+/// Fehlgeschlagen heißt nur noch: vor dem Start abgebrochen, oder Prozess beendet und im
+/// Zielkurs nachweislich nichts Neues (siehe [fehlerBeendet]); das sperrt nicht, außer bei
+/// neuem Kurs (kurs 0), weil dort ein Platzhalterkurs bleiben kann. Ein von Moodle gemeldeter
+/// Fehler allein macht keinen Vorgang fehlgeschlagen: Er bleibt unklar (gesperrt), bis der
+/// Zielkurs geprüft ist. Nur der Kopf zählt: Ein Vorgang, auf den ein anderer mit
 /// wiederholungVon zeigt, ist überholt. Eine Wiederholung ist nur zulässig, wenn sie
 /// genau den sperrenden Kopf nennt.
 String? doppelstartSperre(
@@ -497,7 +496,7 @@ bool _sperrt(DoppelstartEintrag e, int kurs) => switch (e.stand) {
       WiederherstellungStand.unklar ||
       WiederherstellungStand.fertig =>
         true,
-      WiederherstellungStand.fehlgeschlagen => e.gestartet || (e.kurs == 0 && kurs == 0),
+      WiederherstellungStand.fehlgeschlagen => e.kurs == 0 && kurs == 0,
       null => false,
     };
 
@@ -508,4 +507,27 @@ String? nichtSchreibbarePruefluecke(Iterable<String> moduln) {
   if (nein.isEmpty) return null;
   return 'Prüflücke: Inhalt und Anhänge von ${nein.map((m) => 'Typ „$m"').join(', ')} sind nicht gegengeprüft '
       '(der Typ ist nicht schreibbar, sein Formular wird nicht gelesen); nicht verifiziert.';
+}
+
+/// Die Nachfrage an die Verwaltung der Moodle-Instanz, wenn der Hintergrundauftrag nach einem
+/// gemeldeten Fehler noch hängen könnte. Die Lehrkraft gibt sie weiter; die App betritt den
+/// Adminbereich nie (A9). Nur Nummer, Zeiten, Kursnummer und Fehlerart: keine Kursnamen, keine
+/// Inhalte, keine Personen (E11).
+String verwaltungsNachfrage({
+  required String nummer,
+  required DateTime start,
+  required DateTime? letzteBeobachtung,
+  required int? zielkurs,
+  required String fehlerart,
+  required double? fortschritt,
+}) {
+  String uhr(DateTime t) => '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+  final ziel = zielkurs == null ? 'in einem neuen Kurs (Nummer noch nicht bekannt)' : 'im Kurs $zielkurs';
+  final prozent = fortschritt == null ? 'unbekannt' : '${(fortschritt * 100).round()} %';
+  return 'Guten Tag, über die Lehrkraft-App wurde $ziel um ${uhr(start)} Uhr eine Wiederherstellung '
+      'angestoßen (Vorgang $nummer). Moodle meldet dazu den Fehler „$fehlerart"; die letzte Beobachtung '
+      '${letzteBeobachtung == null ? 'liegt nicht vor' : 'war um ${uhr(letzteBeobachtung)} Uhr'} (Fortschritt: $prozent). '
+      'Die Wiederherstellung wurde angestoßen und soll nicht wiederholt werden, damit keine Dubletten '
+      'entstehen. Was ist mit dem Hintergrundauftrag (Ad-hoc-Aufgabe, Cron) los: läuft er noch, ist er '
+      'abgebrochen oder hängt er?';
 }

@@ -174,7 +174,7 @@ Future<String> wiederherstellen(
       final altPasst = v.profilKennung == null && teile?.length == 4 &&
           teile![0] == neu[0] && teile[2] == neu[2] && teile[3] == neu[3];
       return (id: e.id, fingerabdruck: altPasst ? fp : e.fingerabdruck,
-          wiederholungVon: e.wiederholungVon, stand: e.stand, kurs: e.kurs, gestartet: e.gestartet);
+          wiederholungVon: e.wiederholungVon, stand: e.stand, kurs: e.kurs);
     }).toList();
     final sperre = doppelstartSperre(
       eintraege,

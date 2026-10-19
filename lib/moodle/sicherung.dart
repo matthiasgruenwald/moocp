@@ -402,7 +402,6 @@ List<DoppelstartEintrag> doppelstartEintraege(Iterable<Vorgang> alle) => [
           wiederholungVon: v.wiederholungVon,
           stand: v.wiederherstellung,
           kurs: v.kurs,
-          gestartet: v.backupid != null,
         ),
     ];
 

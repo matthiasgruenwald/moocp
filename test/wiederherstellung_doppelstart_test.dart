@@ -9,8 +9,8 @@ import 'package:moocp/moodle/sicherung.dart';
 import 'package:moocp/moodle/wiederherstellung_regeln.dart';
 
 DoppelstartEintrag _e(String id, WiederherstellungStand stand,
-        {String fp = 'fp', String? von, int kurs = 42, bool gestartet = false}) =>
-    (id: id, fingerabdruck: fp, wiederholungVon: von, stand: stand, kurs: kurs, gestartet: gestartet);
+        {String fp = 'fp', String? von, int kurs = 42}) =>
+    (id: id, fingerabdruck: fp, wiederholungVon: von, stand: stand, kurs: kurs);
 
 void main() {
   group('Fingerabdruck', () {
@@ -58,15 +58,10 @@ void main() {
       );
     });
 
-    test('von Moodle gemeldeter Fehler nach dem Start sperrt: angelegte Inhalte sind nicht ausgeschlossen', () {
+    test('fehlgeschlagen gilt nur mit Beleg (Prozess beendet, nichts Neues im Kurs) und sperrt dann nicht', () {
       expect(
-        doppelstartSperre([_e('a', WiederherstellungStand.fehlgeschlagen, gestartet: true)],
+        doppelstartSperre([_e('a', WiederherstellungStand.fehlgeschlagen)],
             fingerabdruck: 'fp', wiederholungVon: null, kurs: 42),
-        'a',
-      );
-      expect(
-        doppelstartSperre([_e('a', WiederherstellungStand.fehlgeschlagen, gestartet: true)],
-            fingerabdruck: 'fp', wiederholungVon: 'a', kurs: 42),
         isNull,
       );
     });
