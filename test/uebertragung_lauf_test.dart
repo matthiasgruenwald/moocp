@@ -117,17 +117,17 @@ void main() {
     test('dieselbe Datei und dasselbe Ziel: Rückfrage', () {
       final protokoll = [eintrag('a.mbz', 12, vorgang: '7')];
       final r = wiederholungsRueckfrage(protokoll,
-          profil: 'zielprofil', kurs: 12, datei: 'a.mbz', erneut: false);
+          profil: 'zielprofil', kurs: 12, datei: 'a.mbz');
       expect(r, isNotNull);
       expect(r, contains('Nichts wird erneut importiert'));
       expect(r, contains('Nummer 7'));
-      expect(r, contains('erneut: true'));
+      expect(r, contains('wiederherstellen_datei mit wiederholung_von=7'));
     });
 
     test('andere Datei: keine Rückfrage', () {
       final protokoll = [eintrag('a.mbz', 12)];
       expect(
-        wiederholungsRueckfrage(protokoll, profil: 'zielprofil', kurs: 12, datei: 'b.mbz', erneut: false),
+        wiederholungsRueckfrage(protokoll, profil: 'zielprofil', kurs: 12, datei: 'b.mbz'),
         isNull,
       );
     });
@@ -135,7 +135,7 @@ void main() {
     test('anderes Profil: keine Rückfrage', () {
       final protokoll = [eintrag('a.mbz', 12, profil: 'anderes')];
       expect(
-        wiederholungsRueckfrage(protokoll, profil: 'zielprofil', kurs: 12, datei: 'a.mbz', erneut: false),
+        wiederholungsRueckfrage(protokoll, profil: 'zielprofil', kurs: 12, datei: 'a.mbz'),
         isNull,
       );
     });
@@ -143,15 +143,7 @@ void main() {
     test('abgelehnte Versuche zählen nicht', () {
       final protokoll = [eintrag('a.mbz', 12, stand: ZielStand.abgelehnt)];
       expect(
-        wiederholungsRueckfrage(protokoll, profil: 'zielprofil', kurs: 12, datei: 'a.mbz', erneut: false),
-        isNull,
-      );
-    });
-
-    test('erneut: true hebt den Schutz auf', () {
-      final protokoll = [eintrag('a.mbz', 12)];
-      expect(
-        wiederholungsRueckfrage(protokoll, profil: 'zielprofil', kurs: 12, datei: 'a.mbz', erneut: true),
+        wiederholungsRueckfrage(protokoll, profil: 'zielprofil', kurs: 12, datei: 'a.mbz'),
         isNull,
       );
     });
@@ -160,12 +152,12 @@ void main() {
       final protokoll = [eintrag('neu1.mbz', 12, quellkurs: 56)];
       expect(
         wiederholungsRueckfrage(protokoll,
-            profil: 'zielprofil', kurs: 12, quellkurs: 56, erneut: false),
+            profil: 'zielprofil', kurs: 12, quellkurs: 56),
         isNotNull,
       );
       expect(
         wiederholungsRueckfrage(protokoll,
-            profil: 'zielprofil', kurs: 12, quellkurs: 34, erneut: false),
+            profil: 'zielprofil', kurs: 12, quellkurs: 34),
         isNull,
       );
     });
@@ -266,7 +258,7 @@ void main() {
       // Ein späterer Versuch für das erfolgreiche Ziel braucht eine Rückfrage.
       expect(
         wiederholungsRueckfrage(protokoll.eintraege,
-            profil: 'zielprofil', kurs: 12, datei: 'a.mbz', erneut: false),
+            profil: 'zielprofil', kurs: 12, datei: 'a.mbz'),
         isNotNull,
       );
     });

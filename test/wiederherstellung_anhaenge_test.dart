@@ -215,8 +215,10 @@ void main() {
 
     /// Ein fertiger Wiederherstellungsvorgang; das Archiv liegt im Sicherungsordner.
     Future<Vorgang> fertigerVorgang(Vorgaenge vg, {Uint8List? archiv}) async {
-      File('${ordner.path}/b.mbz').writeAsBytesSync(archiv ?? _archiv(bild: bild));
-      final v = await vg.neuWiederherstellung(kurs: 12, datei: 'b.mbz');
+      final bytes = archiv ?? _archiv(bild: bild);
+      File('${ordner.path}/b.mbz').writeAsBytesSync(bytes);
+      final v = await vg.neuWiederherstellung(kurs: 12, datei: 'b.mbz',
+          fingerabdruck: fingerabdruck(bytes, instanz: 'Test', kurs: 12, weg: Zielweg.aktuellerKursVerschmelzen));
       await vg.aktualisieren(v,
           wiederherstellung: WiederherstellungStand.laufend,
           backupid: 'r-1',

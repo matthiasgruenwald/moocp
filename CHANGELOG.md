@@ -1,16 +1,16 @@
 # Changelog
 
 ## 0.9.23
-- Wiederherstellung: Enthält die Sicherung ein Quiz, nennt die Freigabe die Fragenherkunft je Quiz, und nach dem Wiederherstellen vergleicht die App Anzahl und Namen der Fragen mit der Quelle; nur ein stimmender Vergleich gilt als bestätigt.
+- Wiederherstellung: Fragenvergleiche bleiben nach Neustarts erhalten; unklare Versionen und eine nicht belegte Quellherkunft bleiben ausdrücklich Prüflücken.
 - Formulare lesen: Ein Aktivitätstyp, den die App nicht ändern kann, steht mit „Prüflücke" im Ergebnis; die Verweise darin sind geprüft oder ausdrücklich als nicht geprüft benannt.
 - Sicherung und Wiederherstellung: Bleibt der Fortschritt 15 Minuten stehen, meldet die App einen Stillstand mit der letzten Beobachtung, nicht einen Fehler und nicht einen Erfolg.
 - Fragen lesen: Dasselbe Lesen mehrfach oder gleichzeitig bricht nicht mehr mit einem Ordnerfehler ab; der Ordner einer Frage gehört jeweils nur einem Lesen.
 - Moodle-Profile: Mehrere Instanzen lassen sich in einem Fenster verwalten; Anmeldung, Freigabestufe und KI-Werkzeug-Einrichtung gelten je Profil.
 - Moodle-Profile: Freigaben bleiben dem richtigen Profil zugeordnet; eine aktive Moodle-Adresse lässt sich erst nach der Abmeldung ändern.
 - Testmodus: Automatische Freigaben gelten nur für ausdrücklich zugeordnete Testprofile und deren Moodle-Adresse.
-- Wiederherstellung: Bilder und Anhänge der neuen Aktivitäten werden nach dem Wiederherstellen gegen die Sicherung geprüft; ein Unterschied oder eine fehlende Datei steht im Bericht als „nicht vollständig verifiziert", nichts wird stillschweigend repariert.
+- Wiederherstellung: Bilder und Anhänge werden gegen die ursprüngliche Sicherung geprüft; ein zwischenzeitlich ausgetauschtes Archiv, fehlende Dateien oder Unterschiede bleiben ausdrücklich unverifiziert.
 - Wiederherstellung: Nur eindeutig zugeordnete Aktivitäten aus der Sicherung werden verborgen; parallele oder mehrdeutige Neuanlagen bleiben unberührt und werden zur Prüfung gemeldet.
-- Wiederherstellung: Dieselbe Datei für denselben Zielweg startet nicht zweimal, solange ein Vorgang offen ist, auch nach dem Zeitlimit oder einem Neustart.
+- Sicherung und Wiederherstellung: Vorgänge bleiben bei mehreren KI-Sitzungen erhalten und bleiben an Profil und tatsächliche Moodle-Adresse gebunden; Umbenennen umgeht keine Wiederholungssperre, und vor einer bewussten Wiederholung zeigt die Freigabe den aktuellen Stand und das Dublettenrisiko.
 - MCP-Aufrufe: Ungültige Antworten und Transportfehler melden einen Fehlerstatus statt Erfolg.
 - macOS: Bildschirmfotos finden Edge, Chrome oder Chromium im Programmordner; eine Richtlinie, die die Fernsteuerung abschaltet, nennt die App.
 - macOS: Die App darf Verbindungen aufbauen (Netzwerkrechte im Entwicklungsbau). Fehlt der Benutzerordner, bricht die App mit einem Fehler ab, statt einen falschen Ort zu nehmen.

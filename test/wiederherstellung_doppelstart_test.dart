@@ -16,16 +16,23 @@ void main() {
   group('Fingerabdruck', () {
     test('gleicher Inhalt, Kurs und Weg ergeben denselben Schlüssel', () {
       expect(
-        fingerabdruck([1, 2, 3], kurs: 42, weg: Zielweg.anderKursErsetzen),
-        fingerabdruck([1, 2, 3], kurs: 42, weg: Zielweg.anderKursErsetzen),
+        fingerabdruck([1, 2, 3], instanz: 'profil-a', kurs: 42, weg: Zielweg.anderKursErsetzen),
+        fingerabdruck([1, 2, 3], instanz: 'profil-a', kurs: 42, weg: Zielweg.anderKursErsetzen),
       );
     });
 
     test('anderer Inhalt, anderer Kurs oder anderer Weg ergeben einen anderen Schlüssel', () {
-      final basis = fingerabdruck([1, 2, 3], kurs: 42, weg: Zielweg.anderKursErsetzen);
-      expect(fingerabdruck([1, 2, 4], kurs: 42, weg: Zielweg.anderKursErsetzen), isNot(basis));
-      expect(fingerabdruck([1, 2, 3], kurs: 43, weg: Zielweg.anderKursErsetzen), isNot(basis));
-      expect(fingerabdruck([1, 2, 3], kurs: 42, weg: Zielweg.anderKursVerschmelzen), isNot(basis));
+      final basis = fingerabdruck([1, 2, 3], instanz: 'profil-a', kurs: 42, weg: Zielweg.anderKursErsetzen);
+      expect(fingerabdruck([1, 2, 4], instanz: 'profil-a', kurs: 42, weg: Zielweg.anderKursErsetzen), isNot(basis));
+      expect(fingerabdruck([1, 2, 3], instanz: 'profil-a', kurs: 43, weg: Zielweg.anderKursErsetzen), isNot(basis));
+      expect(fingerabdruck([1, 2, 3], instanz: 'profil-a', kurs: 42, weg: Zielweg.anderKursVerschmelzen), isNot(basis));
+    });
+
+    test('dieselbe Datei auf zwei Profilen ergibt verschiedene Schlüssel (Befund 3)', () {
+      expect(
+        fingerabdruck([1, 2, 3], instanz: 'profil-a', kurs: 42, weg: Zielweg.anderKursErsetzen),
+        isNot(fingerabdruck([1, 2, 3], instanz: 'profil-b', kurs: 42, weg: Zielweg.anderKursErsetzen)),
+      );
     });
   });
 

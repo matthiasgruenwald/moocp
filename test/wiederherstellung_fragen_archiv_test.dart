@@ -70,15 +70,15 @@ const _questionsXml = '''
   <question_bank_entries>
     <question_bank_entry id="11">
       <idnumber>ZZ-0001</idnumber>
-      <question_version><question><name>ZZ Frage Eins</name></question></question_version>
+      <question_version><question_versions><version>1</version><questions><question><name>ZZ Frage Eins</name></question></questions></question_versions></question_version>
     </question_bank_entry>
     <question_bank_entry id="12">
       <idnumber>ZZ-0002</idnumber>
-      <question_version><question><name>ZZ Frage Zwei</name></question></question_version>
+      <question_version><question_versions><version>1</version><questions><question><name>ZZ Frage Zwei</name></question></questions></question_versions></question_version>
     </question_bank_entry>
     <question_bank_entry id="13">
       <idnumber></idnumber>
-      <question_version><question><name>ZZ Frage Fremd</name></question></question_version>
+      <question_version><question_versions><version>1</version><questions><question><name>ZZ Frage Fremd</name></question></questions></question_versions></question_version>
     </question_bank_entry>
   </question_bank_entries>
 </question_categories>
@@ -111,7 +111,7 @@ const _quizXml = '''
 ''';
 
 void main() {
-  group('Quizfragen aus dem Archiv lesen (UNGEMESSEN: Lesart festgelegt)', () {
+  group('Quizfragen aus dem Archiv lesen (Aufbau nach dem offiziellen Builder)', () {
     test('Sachnummer aus der Fragenbank, Zufallsfrage als zufall, fremde Frage ohne Sachnummer', () {
       final f = quizFragenAusXml(_quizXml, _questionsXml);
       expect(f.map((q) => q.name).toList(), ['ZZ Frage Eins', 'ZZ Frage Zwei', 'ZZ Frage Fremd', 'Zufallsfrage']);
@@ -120,6 +120,57 @@ void main() {
       expect(f[2].sachnummer, isNull, reason: 'leere Sachnummer zählt als fehlend');
       expect(f[3].zufall, isTrue);
       expect(f[0].zufall, isFalse);
+    });
+
+    test('referenzierte Version statt des ersten Namens; fehlende Version bleibt Prüflücke', () {
+      const bank = '<question_bank_entry id="11"><idnumber>ZZ-1</idnumber>'
+          '<question_version><question_versions><version>1</version><questions><question><name>Alt</name></question></questions></question_versions></question_version>'
+          '<question_version><question_versions><version>2</version><questions><question><name>Neu</name></question></questions></question_versions></question_version>'
+          '</question_bank_entry>';
+      String quiz(String version) => '<question_instance><question_reference>'
+          '<questionbankentryid>11</questionbankentryid><version>$version</version>'
+          '</question_reference></question_instance>';
+      expect(quizFragenAusXml(quiz('2'), bank).single.name, 'Neu');
+      for (final version in ['3', '', '0']) {
+        final quelle = quizFragenAusXml(quiz(version), bank);
+        expect(quelle.single.sachnummer, isNull);
+        expect(herkunftPruefen(verwendet: quelle, eigeneSachnummern: {'ZZ-1'}, eigeneAnzahl: 1).art,
+            HerkunftArt.pruefluecke);
+        expect(quizVerifiziert(fragenVergleichen(quelle: quelle,
+            ziel: [(name: quelle.single.name, zufall: false)])), isFalse);
+      }
+    });
+
+    test(r'Version $@NULL@$ heißt jüngste Version ohne Entwurf', () {
+      const bank = '<question_bank_entry id="11"><idnumber>ZZ-1</idnumber><question_version>'
+          '<question_versions><version>1</version><status>ready</status><questions><question><name>Alt</name></question></questions></question_versions>'
+          '<question_versions><version>2</version><status>ready</status><questions><question><name>Neu</name></question></questions></question_versions>'
+          '<question_versions><version>3</version><status>draft</status><questions><question><name>Entwurf</name></question></questions></question_versions>'
+          '</question_version></question_bank_entry>';
+      const quiz = r'<question_instance><question_reference><questionbankentryid>11</questionbankentryid>'
+          r'<version>$@NULL@$</version></question_reference></question_instance>';
+      expect(quizFragenAusXml(quiz, bank).single.name, 'Neu');
+    });
+
+    test('Kategoriekontext gegen Quizkontext: lokal, geteilt, unbekannt', () {
+      String bank(String ctx) => '<question_categories><question_category id="5"><contextid>$ctx</contextid>'
+          '<question_bank_entries><question_bank_entry id="11"><questioncategoryid>5</questioncategoryid>'
+          '<idnumber>ZZ-1</idnumber><question_version><question_versions><version>1</version><questions>'
+          '<question><name>A</name></question></questions></question_versions></question_version>'
+          '</question_bank_entry></question_bank_entries></question_category></question_categories>';
+      String quiz(String attr) => '<activity $attr><question_instance><question_reference>'
+          '<questionbankentryid>11</questionbankentryid><version>1</version></question_reference></question_instance></activity>';
+      final lokal = quizFragenAusXml(quiz('contextid="77"'), bank('77'));
+      expect(lokal.single.lokal, isTrue);
+      expect(herkunftPruefen(verwendet: lokal, eigeneSachnummern: const {}, eigeneAnzahl: 0).art, HerkunftArt.eigene);
+      final geteilt = quizFragenAusXml(quiz('contextid="77"'), bank('88'));
+      expect(geteilt.single.lokal, isFalse);
+      expect(herkunftPruefen(verwendet: geteilt, eigeneSachnummern: {'ZZ-1'}, eigeneAnzahl: 1).art,
+          HerkunftArt.fremdOderUnbekannt);
+      final unbekannt = quizFragenAusXml(quiz(''), bank('77'));
+      expect(unbekannt.single.lokal, isNull);
+      expect(herkunftPruefen(verwendet: unbekannt, eigeneSachnummern: {'ZZ-1'}, eigeneAnzahl: 1).art,
+          HerkunftArt.pruefluecke, reason: 'gleiche Sachnummer am Ziel beweist nichts');
     });
 
     test('Eintrag ohne Fragenbank: Sachnummer fehlt, Name nennt die Nummer', () {
@@ -167,13 +218,19 @@ void main() {
       expect(b.quizFragen, isEmpty);
     });
 
-    test('kaputtes quiz.xml im Archiv: abgelehnt, nichts hochgeladen', () async {
+    test('kaputtes quiz.xml: das Archiv bleibt gültig, das Quiz ist unlesbar (Prüflücke, Befund 7)', () async {
       final b = await archivPruefen(_mbz([
         _eintrag('moodle_backup.xml', _xml(_sicherungXml)),
         _eintrag('activities/quiz_21/quiz.xml', _xml('<activity><quiz>')),
       ]));
-      expect(b.ok, isFalse);
-      expect(b.grund, contains('quiz.xml'));
+      expect(b.ok, isTrue, reason: b.grund);
+      expect(b.quizUnlesbar, {'quiz_21'});
+      expect(b.quizFragen, isNot(contains('quiz_21')));
+    });
+
+    test('lesbares Quiz: nicht als unlesbar markiert', () async {
+      final b = await archivPruefen(archiv());
+      expect(b.quizUnlesbar, isEmpty);
     });
   });
 }

@@ -151,8 +151,16 @@ Future<String> fragenLesen(MoodleZugang moodle, String arbeitsordner,
 // frage_lesen
 // ---------------------------------------------------------------------------
 
-Future<String> frageLesen(MoodleZugang moodle, String arbeitsordner, {required int sammlung, required int frage}) async {
-  final g = await formularLesen(moodle, Formularziel.frage(sammlung, frage), arbeitsordner);
+/// Die Sperre des Ordners umfasst das Lesen, das frage.xml-Schreiben (Befund 6) und
+/// damit auch die Zeit bis zum Ende des Lesens; sonst lösche ein Parallelaufruf den Ordner.
+Future<String> frageLesen(MoodleZugang moodle, String arbeitsordner, {required int sammlung, required int frage}) {
+  final ziel = Formularziel.frage(sammlung, frage);
+  return ordnerSperre(ordnerSchluessel(ziel, arbeitsordner), () => _frageLesenOhneSperre(moodle, arbeitsordner, ziel, sammlung, frage));
+}
+
+Future<String> _frageLesenOhneSperre(
+    MoodleZugang moodle, String arbeitsordner, Formularziel ziel, int sammlung, int frage) async {
+  final g = await formularLesenOhneSperre(moodle, ziel, arbeitsordner);
   // Dazu die Frage als XML: vollständig, auch für Typen mit vielen Feldern.
   var xmlHinweis = '';
   try {

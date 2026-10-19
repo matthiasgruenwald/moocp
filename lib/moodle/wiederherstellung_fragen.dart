@@ -4,9 +4,9 @@
 // (test_lesen). Was nicht sicher auflösbar ist, wird Prüflücke, nie Gleichheit.
 //
 // Regeln:
-//   - Eigene Herkunft nur, wenn alle tatsächlich verwendeten Fragen über ihre
-//     Sachnummer in der eigenen Sammlung liegen UND die eigene Sammlung nicht leer
-//     ist. Eine leere eigene Sammlung ist kein Nachweis.
+//   - Sachnummern werden mit der angegebenen Zielsammlung verglichen. Selbst
+//     gleiche Nummern belegen ohne Quellprofil, Quellsammlung und Kontext keine
+//     eigene Quellherkunft. Eine leere Sammlung ist ebenfalls kein Nachweis.
 //   - Fremde oder unbekannte Herkunft wird mit den Namen der Fragen benannt, vor dem
 //     Start. Der XML-Import in eine neue Testzusammenstellung ist nur ein Vorschlag.
 //   - Zufallsfragen und Fragen ohne Sachnummer: Prüflücke, kein Gleichheitsvergleich.
@@ -14,14 +14,18 @@
 //     das Prüflücke. Das Vorhandensein des Quiz oder ein erfolgreicher
 //     Hintergrundauftrag geht nie in die Verifikation ein.
 //
-// UNGEMESSEN: wie Moodle die verwendeten Fragen im Archiv (quiz.xml, questions.xml)
-// und im Ziel (Platzliste) benennt. Die Eingaben kommen daher vom Aufrufer; siehe
-// TODO.md.
+// Das Archivformat folgt dem offiziellen Moodle-Builder (siehe quizFragenAusXml),
+// nicht einer Messung auf der Instanz. Ob die Quellfragen quizlokal waren, liest
+// der Parser nicht aus; siehe TODO.md.
 
 import 'package:xml/xml.dart';
 
 /// Eine tatsächlich verwendete Frage aus der Quelle.
-typedef QuizFrage = ({String name, String? sachnummer, bool zufall});
+///
+/// [lokal]: true, wenn die Kategorie der Frage im Archiv denselben Kontext hat wie das
+/// Quiz (quizlokale Fragen, mit dem Quiz gesichert); false bei einem anderen Kontext;
+/// null, wenn der Archivaufbau das nicht eindeutig hergibt.
+typedef QuizFrage = ({String name, String? sachnummer, bool zufall, bool? lokal});
 
 /// Eine Frage in der Zusammenstellung des Ziels.
 typedef ZielFrage = ({String name, bool zufall});
@@ -40,8 +44,14 @@ class HerkunftBefund {
   final List<String> nichtEigene;
 }
 
-/// Herkunft aus den tatsächlich verwendeten Fragen. [verwendet] null heißt: die
-/// Quelle wurde nicht gelesen.
+/// Vergleich der verwendeten Quellfragen mit Sachnummern der angegebenen
+/// Zielsammlung. Ohne belegte Quellidentität bleibt Gleichheit eine Prüflücke.
+/// [verwendet] null heißt: die Quelle wurde nicht gelesen.
+/// Befund 7: Herkunft darf nur in verified einfließen, wenn jedes Quiz eigene
+/// Fragen nachweist. Eine Prüflücke oder eine fremde Herkunft genügt zum Nein.
+bool herkunftVerifiziert(List<HerkunftBefund> befunde) =>
+    befunde.isNotEmpty && befunde.every((b) => b.art == HerkunftArt.eigene);
+
 HerkunftBefund herkunftPruefen({
   required List<QuizFrage>? verwendet,
   required Set<String> eigeneSachnummern,
@@ -56,7 +66,18 @@ HerkunftBefund herkunftPruefen({
     return HerkunftBefund(HerkunftArt.pruefluecke,
         'Herkunft nicht festlegbar: Zufallsfragen (${zufall.join(', ')}).');
   }
-  final ohneNummer = [for (final f in verwendet) if (f.sachnummer == null) f.name];
+  final fremdLokal = [for (final f in verwendet) if (f.lokal == false) f.name];
+  if (fremdLokal.isNotEmpty) {
+    return HerkunftBefund(HerkunftArt.fremdOderUnbekannt,
+        'Fragen aus einem anderen Kontext als dem Quiz (geteilte Sammlung): ${fremdLokal.join(', ')}. '
+        'Ein Fragenimport in eine neue Testzusammenstellung ist eine Alternative, nicht automatisch.',
+        nichtEigene: fremdLokal);
+  }
+  if (verwendet.every((f) => f.lokal == true)) {
+    return HerkunftBefund(HerkunftArt.eigene,
+        'Alle Fragen liegen im Kontext des Quiz und werden mit ihm gesichert.');
+  }
+  final ohneNummer = [for (final f in verwendet) if (f.lokal != true && f.sachnummer == null) f.name];
   if (ohneNummer.isNotEmpty) {
     return HerkunftBefund(HerkunftArt.pruefluecke,
         'Zuordnung nicht auflösbar, Frage ohne Sachnummer: ${ohneNummer.join(', ')}.');
@@ -71,7 +92,9 @@ HerkunftBefund herkunftPruefen({
       if (!eigeneSachnummern.contains(f.sachnummer)) f.name,
   ];
   if (fremd.isEmpty) {
-    return HerkunftBefund(HerkunftArt.eigene, 'Alle verwendeten Fragen stammen aus der eigenen Sammlung.');
+    return HerkunftBefund(HerkunftArt.pruefluecke,
+        'Die Sachnummern kommen auch in der angegebenen Zielsammlung vor. Das belegt keine eigene Quellherkunft: '
+        'Quellprofil, Quellsammlung und Kontext sind nicht nachgewiesen (Prüflücke).');
   }
   return HerkunftBefund(HerkunftArt.fremdOderUnbekannt,
       'Geteilte oder unbekannte Herkunft, nicht in der eigenen Sammlung: ${fremd.join(', ')}. '
@@ -100,7 +123,7 @@ FragenVergleich fragenVergleichen({
   required List<QuizFrage>? quelle,
   required List<ZielFrage>? ziel,
 }) {
-  if (quelle == null || quelle.isEmpty) {
+  if (quelle == null || quelle.isEmpty || quelle.any((f) => f.sachnummer == null)) {
     return FragenVergleich(VergleichArt.pruefluecke,
         'Vergleich nicht möglich: keine belastbare Aufnahme der Quellfragen.');
   }
@@ -150,35 +173,70 @@ List<String> _rest(List<String> a, List<String> b) {
 
 /// Die Fragen eines Quiz aus dem Archiv: activities/quiz_*/quiz.xml (question_instance
 /// mit question_reference/questionbankentryid, oder question_set_reference für Zufall)
-/// und die Fragenbank questions.xml (question_bank_entry mit idnummer und Name).
-/// [questionsXml] null: keine Fragenbank, dann hat keine Frage eine Sachnummer. UNGEMESSEN:
-/// das ist die festgelegte Lesart, nicht die gemessene Moodle-Ausgabe.
+/// und die Fragenbank questions.xml. Aufbau nach dem offiziellen Moodle-Builder
+/// (backup_stepslib.php, 5.1/5.2): question_bank_entry/question_version/question_versions
+/// mit version, status und questions/question/name. Eine Referenzversion NULL steht als
+/// `$@NULL@$` im Archiv und heißt: jüngste Version, die kein Entwurf ist. Leer, 0 oder
+/// eine fehlende Version bleibt eine Prüflücke. [questionsXml] null: keine Fragenbank,
+/// dann hat keine Frage eine Sachnummer.
 List<QuizFrage> quizFragenAusXml(String quizXml, String? questionsXml) {
-  final bank = <String, ({String? idnummer, String name})>{};
+  final bank = <String, ({String? idnummer, String? kontext, Map<int, String> versionen, Set<int> entwuerfe})>{};
+  final quizKontext = XmlDocument.parse(quizXml).rootElement.getAttribute('contextid');
   if (questionsXml != null) {
+    final kategorieKontexte = <String, String>{};
+    for (final k in XmlDocument.parse(questionsXml).findAllElements('question_category')) {
+      final id = k.getAttribute('id');
+      final kontext = k.getElement('contextid')?.innerText.trim();
+      if (id != null && kontext != null && kontext.isNotEmpty) kategorieKontexte[id] = kontext;
+    }
     for (final e in XmlDocument.parse(questionsXml).findAllElements('question_bank_entry')) {
       final id = e.getAttribute('id') ?? '';
+      final kategorie = e.getElement('questioncategoryid')?.innerText.trim();
+      final kontext = kategorie == null || kategorie.isEmpty ? null : kategorieKontexte[kategorie];
       final idnummer = e.getElement('idnumber')?.innerText.trim();
-      final namen = [for (final n in e.findAllElements('name')) n.innerText.trim()];
-      bank[id] = (
-        idnummer: idnummer == null || idnummer.isEmpty ? null : idnummer,
-        name: namen.isEmpty || namen.first.isEmpty ? 'Frage Nr. $id' : namen.first,
-      );
+      final versionen = <int, String>{};
+      final entwuerfe = <int>{};
+      final doppelt = <int>{};
+      for (final v in e.findAllElements('question_versions')) {
+        final nummer = int.tryParse(v.getElement('version')?.innerText.trim() ?? '');
+        final name = v.findAllElements('question').map((q) => q.getElement('name')?.innerText.trim()).firstOrNull;
+        if (nummer == null || name == null || name.isEmpty) continue;
+        // Doppelte Versionsnummern sind keine eindeutige Quelle.
+        if (versionen.containsKey(nummer)) doppelt.add(nummer);
+        versionen[nummer] = name;
+        if (v.getElement('status')?.innerText.trim() == 'draft') entwuerfe.add(nummer);
+      }
+      versionen.removeWhere((n, _) => doppelt.contains(n));
+      bank[id] = (idnummer: idnummer == null || idnummer.isEmpty ? null : idnummer, kontext: kontext, versionen: versionen, entwuerfe: entwuerfe);
     }
   }
   final fragen = <QuizFrage>[];
   for (final qi in XmlDocument.parse(quizXml).findAllElements('question_instance')) {
     if (qi.findAllElements('question_set_reference').isNotEmpty) {
-      fragen.add((name: 'Zufallsfrage', sachnummer: null, zufall: true));
+      fragen.add((name: 'Zufallsfrage', sachnummer: null, zufall: true, lokal: null));
       continue;
     }
     final ref = qi.findAllElements('questionbankentryid').map((n) => n.innerText.trim()).toList();
     final id = ref.isEmpty ? '' : ref.first;
     final eintrag = bank[id];
+    final version = qi.findAllElements('version').map((n) => n.innerText.trim()).firstOrNull;
+    String? name;
+    if (eintrag != null && version != null) {
+      if (version == r'$@NULL@$') {
+        final frei = eintrag.versionen.keys.where((n) => !eintrag.entwuerfe.contains(n));
+        if (frei.isNotEmpty) name = eintrag.versionen[frei.reduce((a, b) => a > b ? a : b)];
+      } else {
+        final nummer = int.tryParse(version);
+        if (nummer != null && nummer > 0) name = eintrag.versionen[nummer];
+      }
+    }
     if (eintrag == null) {
-      fragen.add((name: 'Frage Nr. $id (nicht in questions.xml)', sachnummer: null, zufall: false));
+      fragen.add((name: 'Frage Nr. $id (nicht in questions.xml)', sachnummer: null, zufall: false, lokal: null));
+    } else if (name == null || name.isEmpty) {
+      fragen.add((name: 'Frage Nr. $id (Version nicht auflösbar, Prüflücke)', sachnummer: null, zufall: false, lokal: null));
     } else {
-      fragen.add((name: eintrag.name, sachnummer: eintrag.idnummer, zufall: false));
+      final lokal = quizKontext == null || eintrag.kontext == null ? null : quizKontext == eintrag.kontext;
+      fragen.add((name: name, sachnummer: eintrag.idnummer, zufall: false, lokal: lokal));
     }
   }
   return fragen;

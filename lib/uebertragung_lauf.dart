@@ -193,17 +193,16 @@ class UebertragungsEintrag {
 /// Der Wiederholungsschutz: Ist für dieses Ziel schon etwas übertragen oder
 /// versucht worden, gibt es eine Rückfrage statt eines erneuten Imports.
 /// Trifft die Datei den Eintrag, sonst der Quellkurs (bei frischer Sicherung).
-/// Abgelehnte Versuche zählen nicht: nichts wurde geschrieben. [erneut] hebt
-/// den Schutz für den ganzen Aufruf auf.
+/// Abgelehnte Versuche zählen nicht: nichts wurde geschrieben. Eine bewusste
+/// Wiederholung geht nicht über uebertragen, sondern über wiederherstellen_datei
+/// mit wiederholung_von (Befund 4).
 String? wiederholungsRueckfrage(
   List<UebertragungsEintrag> protokoll, {
   required String profil,
   required int kurs,
   String? datei,
   int? quellkurs,
-  required bool erneut,
 }) {
-  if (erneut) return null;
   final treffer = [
     for (final e in protokoll)
       if (e.profil == profil &&
@@ -217,7 +216,8 @@ String? wiederholungsRueckfrage(
   final nummer = e.vorgang == null ? '' : ' (Nummer ${e.vorgang})';
   return 'Für Kurs $kurs ist schon einmal übertragen worden: Stand „${e.stand.text}", '
       'am ${e.zeit.toIso8601String()}$nummer. Nichts wird erneut importiert. Erst den Stand klären '
-      '(wiederherstellung_status mit der Nummer). Will die Lehrkraft die Übertragung trotzdem, uebertragen mit erneut: true.';
+      '(wiederherstellung_status mit der Nummer). Will die Lehrkraft die Wiederholung trotzdem, für diesen Kurs '
+      'wiederherstellen_datei mit wiederholung_von=${e.vorgang ?? '<Nummer>'} und nach Freigabe.';
 }
 
 /// Das Übertragungsprotokoll uebertragungen.json im Einstellungsordner. Jeder

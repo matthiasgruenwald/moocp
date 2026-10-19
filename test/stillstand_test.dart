@@ -199,7 +199,10 @@ void main() {
 
     final text = await wiederherstellungStatus(_Moodle([_fortschritt(0.5, fehler: 'boom', id: 'r-1')]), vg, id: v.id);
 
-    expect(text, contains('fehlgeschlagen'));
+    // Befund 5: Meldet Moodle den Fehler, bleibt der Kurs gesperrt (unklar), nie „fehlgeschlagen".
+    expect(text, contains('Moodle meldet einen Fehler'));
+    expect(text, contains('gesperrt'));
+    expect(text, isNot(contains('fehlgeschlagen')));
   });
 
   test('Frist und Fortschrittswert: Wert wird aus der Moodle-Antwort gelesen, Frist ist 15 Minuten', () {

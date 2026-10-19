@@ -217,17 +217,31 @@ AnhangPruefung vergleicheAnhaenge({required List<QuellDatei>? quelle, required L
 /// Formulare; schreibt nie.
 Future<AnhangPruefung> anhaengePruefen(MoodleZugang moodle, Vorgaenge vorgaenge, Vorgang vg,
     List<WiederhergestellteAktivitaet> aktivitaeten) async {
-  Uint8List? mbz;
+  final Uint8List mbz;
   try {
     mbz = await File(p.join(vorgaenge.ordner, vg.datei)).readAsBytes();
   } on FileSystemException {
-    mbz = null;
+    return AnhangPruefung(['Prüflücke: Quellaufnahme fehlt; die Sicherungsdatei ist nicht mehr vorhanden'],
+        vollstaendig: false);
+  }
+
+  // Der Dateiname ist veränderlich, die vor dem Hochladen aufgenommene Quelle
+  // hingegen nicht. Ein später ersetztes Archiv kann keinen Vergleich belegen.
+  final startHash = vg.fingerabdruck?.split('|').first;
+  if (startHash == null || !RegExp(r'^[0-9a-f]{64}$').hasMatch(startHash)) {
+    return AnhangPruefung(['Prüflücke: Quellaufnahme ist nicht an den Start-Inhalt gebunden (Inhalts-Hash fehlt)'],
+        vollstaendig: false);
+  }
+  if (sha256.convert(mbz).toString() != startHash) {
+    return AnhangPruefung(['Prüflücke: Quellaufnahme hat seit dem Start einen anderen Inhalt; Anhänge nicht verglichen'],
+        vollstaendig: false);
   }
 
   final befunde = <String>[];
   var vollstaendig = true;
   for (final a in aktivitaeten) {
-    final quelle = mbz == null ? null : quelldateienAus(mbz, modul: a.modul, titel: a.titel);
+    final quelle = quelldateienAus(mbz, modul: a.modul, titel: a.titel);
+    vorgaenge.pruefeBindung(vg);
     final ziel = await zielLesen(moodle, a.cmid);
     final pruefung = vergleicheAnhaenge(quelle: quelle, ziel: ziel.abrufe, formularFehler: ziel.fehler);
     if (!pruefung.vollstaendig) {
@@ -235,8 +249,5 @@ Future<AnhangPruefung> anhaengePruefen(MoodleZugang moodle, Vorgaenge vorgaenge,
       befunde.add('„${a.titel}": ${pruefung.befunde.join('; ')}');
     }
   }
-  if (mbz == null) {
-    befunde.insert(0, 'Quellaufnahme fehlt: Die Sicherungsdatei ist im Sicherungsordner nicht mehr vorhanden');
-  }
-  return AnhangPruefung(befunde, vollstaendig: vollstaendig && mbz != null && aktivitaeten.isNotEmpty);
+  return AnhangPruefung(befunde, vollstaendig: vollstaendig && aktivitaeten.isNotEmpty);
 }
