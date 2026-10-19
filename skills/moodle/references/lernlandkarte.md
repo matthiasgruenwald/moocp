@@ -35,6 +35,12 @@ keine Lernlandkarte an und bearbeitet keine übrigen Kartenbestandteile.
 
 ## Darstellung prüfen
 
+Nur Orte mit einem sichtbaren Ziel erscheinen in der Kartenansicht; ihre
+Beschriftung ist der Name des Ziels. Orte ohne Ziel oder mit verborgenem Ziel
+fehlen im Bild, die Wege bleiben. Fehlt ein Ort im Bildschirmfoto, prüfe
+zuerst Ziel und dessen Sichtbarkeit, nicht die Karte (gemessen auf einer
+Testinstanz, nicht auf jeder Plugin-Version bestätigt).
+
 Für die Darstellung rufe `bildschirmfoto(cmid, grund)` auf. Das Bild zeigt
 nur den Kartenbereich und immer die Bildschirmansicht; eine Druckansicht gibt
 es nicht. Im normalen Betrieb gibt die Lehrkraft jedes Bild in der App frei.

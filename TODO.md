@@ -270,8 +270,9 @@ Nicht Teil dieses Umbaus (eigene Aufgabe):
 - Installer, Signierung, Notarisierung und Release-Bau für den Mac. Der Mac bleibt bei E24 ein Entwicklungsbau.
 
 ## Lernlandkarte (Ticket #23): offene Punkte
-- Ändern (Verknüpfungen der Orte setzen) geht nicht: Der Typ der Lernlandkarte steht nicht in `schreibbareModule`, `aendern` lehnt vor jeder Freigabe ab. Ungemessen ist, unter welchem Modulnamen sie in Moodle läuft; der Ticket-Test nutzt einen erfundenen Typ.
-- Entscheidung der Lehrkraft offen: Werkzeug für die Lernlandkarte nachrüsten (mit Messung im Testkurs) oder Verknüpfungen in der Moodle-Oberfläche setzen (A6). Ein Plugin scheidet nach E23 aus.
+- Ändern der Ortsziele ist mit #31 umgesetzt (`lernlandkarte_verknuepfungen_setzen`). Modulname `learningmap` und der native Formularvertrag sind auf der Spike-Instanz mit eigenen ZZ-Proben gemessen; auf der zweiten Testinstanz steht der Lauf noch aus (Schreiben dort wurde in der Sitzung nicht freigegeben). Offen für den nächsten Lauf: Anlegen, zwei Zieländerungen, Rücklesen, Bildschirmfoto und Aufräumen im dortigen Testkurs.
+- Aufräumen: In einem Spike-Testkurs liegen etwa 25 verborgene ZZ-Proben (`ZZ #31 …`, Karten und Textseiten) aus Messläufen ohne Aufräumen, vor allem aus Läufen mit Messfehlern. Sie gelten nach einem App-Neustart nicht mehr als eigene Proben, ihr Löschen braucht die Freigabe in der App. Namen frisch lesen (`kurs_uebersicht`), nur `ZZ #31`-Objekte löschen.
+- Darstellung: Ein Ort erscheint in der Kartenansicht nur mit einem sichtbaren Ziel, seine Beschriftung ist dann der Name des Ziels (gemessen auf der Spike-Instanz; Orte ohne Ziel oder mit verborgenem Ziel fehlen im Bildschirmfoto, Wege bleiben sichtbar). Das Hintergrundbild einer App-Vorlage wird nicht gezeigt, weil die Vorlage nur ein Rechteck in der SVG zeichnet; ob die Vorlage das Bild einbinden soll, ist offen.
 - Auswahlfelder mit Zielen (etwa ein Ort) landen in `einstellungen.json` als Anzeigetext, nicht als Nummer. Zwei Aktivitäten mit gleichem Namen lassen sich dort nicht unterscheiden.
 - Verweise prüft die App nur in Textfeldern (`<feld>.html`), nicht in Auswahl- und Eingabefeldern.
 - Erhaltene, fehlende und „fremde" Ziele (in einem anderen Kurs) werden nicht unterschieden: `_zielTitel` liest nur den Titel. Titel werden für höchstens 10 Ziele außerhalb des Kurses abgerufen; darüber steht ein Hinweis.
