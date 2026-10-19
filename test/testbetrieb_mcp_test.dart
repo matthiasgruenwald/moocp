@@ -23,7 +23,9 @@ class TestMoodle {
   String inhalt = '<h3>ZZ Probe</h3><p>Vorher</p>';
   int objektKurs = 12;
   bool lernlandkarteVorhanden = false;
+  bool lernlandkarteAnlegen = false;
   int lernlandkarteSpeicherungen = 0;
+  String? kartenSichtbar;
   bool svgBeimRuecklesenAendern = false;
   bool einstellungBeimRuecklesenAendern = false;
   String svg = '<svg><circle id="p1"/></svg>';
@@ -31,6 +33,7 @@ class TestMoodle {
   int kartenkurs = 12;
   bool doppelterOrt = false;
   bool entferneNeuesKartenziel = false;
+  int entwurfsId = 100;
   String placestore =
       '{"places":[{"id":"p1","linkedActivity":70}],"paths":[{"id":"w1","from":"p1","to":"p1"}],"startingplaces":["p1"],"targetplaces":[]}';
   Uri get basis => Uri.parse('http://127.0.0.1:${server.port}');
@@ -131,7 +134,10 @@ class TestMoodle {
         if (r.method == 'POST') {
           final f = Uri.splitQueryString(body);
           if (f['modulename'] == 'learningmap') {
+            lernlandkarteVorhanden = true;
+            kartenSichtbar = f['visible'];
             placestore = f['placestore']!;
+            svg = f['svgcode']!;
             if (svgBeimRuecklesenAendern) svg = '<svg><circle id="fremd"/></svg>';
             if (einstellungBeimRuecklesenAendern) {
               karteneinstellung = 'nach dem Speichern geändert';
@@ -154,13 +160,30 @@ class TestMoodle {
           await r.response.close();
           return;
         }
-        if (r.uri.queryParameters['update'] == '71') {
+        if (r.uri.queryParameters['add'] == 'learningmap' &&
+            lernlandkarteAnlegen) {
+          placestore = '{"editmode":true,"mapid":"native-test-map"}';
+          antwort = seite('''<form class="mform" action="/course/modedit.php" method="post">
+          <input name="_qf__mod_learningmap_mod_form" value="1"><input name="sesskey" value="sk">
+          <input name="course" value="${r.uri.queryParameters['course']}"><input name="section" value="${r.uri.queryParameters['section']}">
+          <input name="modulename" value="learningmap"><input name="name" value="">
+          <select name="visible"><option value="0">Verborgen</option><option value="1" selected>Sichtbar</option></select>
+          <input name="karteneinstellung" value="vorher">
+          <textarea name="svgcode">&lt;svg&gt;&lt;circle id="p1"/&gt;&lt;/svg&gt;</textarea>
+          <input type="hidden" name="placestore" value='${const HtmlEscape().convert(placestore)}'>
+          <script>M.form_filemanager.init(Y, {"target":"id_backgroundfile","itemid":9});</script>
+          <input type="submit" name="submitbutton" value="Speichern"></form>''');
+        } else if (r.uri.queryParameters['update'] == '71') {
+          // Moodle vergibt bei jedem Laden neue Entwurfs-IDs; sie sind kein Stand.
+          entwurfsId++;
           antwort = seite(
             '''<form class="mform" action="/course/modedit.php" method="post">
           <input name="_qf__mod_learningmap_mod_form" value="1"><input name="sesskey" value="sk">
           <input name="course" value="$kartenkurs"><input name="update" value="71">
           <input name="modulename" value="learningmap"><input name="name" value="ZZ Karte">
           <input name="karteneinstellung" value="$karteneinstellung">
+          <textarea name="introeditor[text]"></textarea><input name="introeditor[itemid]" value="$entwurfsId">
+          <input type="hidden" name="backgroundfile" value="${entwurfsId + 1000}">
           <textarea name="svgcode">${const HtmlEscape().convert(svg)}</textarea>
           <input type="hidden" name="placestore" value='${const HtmlEscape().convert(formularPlacestore)}'>
           <input type="submit" name="submitbutton" value="Speichern"></form>''',
@@ -333,6 +356,56 @@ void main() {
       [
         {'id': 'w1', 'from': 'p1', 'to': 'p1'},
       ],
+    );
+  });
+
+
+  test('eigene ZZ-Lernlandkarte wird verborgen über MCP angelegt und zurückgelesen', () async {
+    extern.lernlandkarteAnlegen = true;
+    freigaben.stufe = Bestaetigungen.keine;
+    await starten();
+    await Directory('${ordner.path}/karte').create();
+    await File('${ordner.path}/karte/lernlandkarte.json').writeAsString(
+      jsonEncode({
+        'orte': [
+          {'id': 'p1', 'x': 120, 'y': 280, 'titel': 'Start'},
+          {'id': 'p2', 'x': 880, 'y': 280, 'titel': 'Ziel'},
+        ],
+        'wege': [
+          {'von': 'p1', 'nach': 'p2'},
+        ],
+      }),
+    );
+    final angelegt = await client.tool('aktivitaet_anlegen', {
+      'kurs': 12,
+      'abschnitt_id': 1,
+      'typ': 'learningmap',
+      'name': 'ZZ Karte',
+      'ordner': 'karte',
+    });
+    expect(angelegt, contains('verified: true'));
+    expect(angelegt, contains('verborgen'));
+    expect(extern.lernlandkarteSpeicherungen, 1);
+    expect(extern.kartenSichtbar, '0');
+    expect(
+      await client.tool('aktivitaet_lesen', {'cmid': 71}),
+      contains('Lernlandkarte (2 Orte, 1 Wege)'),
+    );
+    expect(extern.svg, contains('id="p2"'));
+    expect((jsonDecode(extern.placestore) as Map)['startingplaces'], ['p1']);
+    final link = await client.tool('lernlandkarte_verknuepfungen_setzen', {
+      'cmid': 71,
+      'name': 'ZZ Karte',
+      'zuordnungen': [
+        {'ort': 'p1', 'aktuell': 0, 'ziel': 72},
+      ],
+    });
+    expect(link, contains('verified: true'));
+    expect(link, contains('Debug-Testbetrieb: automatisch freigegeben'));
+    expect(
+      ((jsonDecode(extern.placestore) as Map)['places'] as List).first
+          ['linkedActivity'],
+      72,
     );
   });
 

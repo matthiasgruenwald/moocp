@@ -9,6 +9,24 @@ import 'formular_schreiben.dart';
 import 'kurs.dart';
 import 'moodle_zugang.dart';
 
+String _placestoreStruktur(Object? daten) {
+  if (daten is Map) {
+    final objekt = daten;
+    final keys = objekt.keys.map((k) => '$k').toList()..sort();
+    return keys.map((k) {
+      final wert = objekt[k];
+      final art = wert is List
+          ? 'Liste(${wert.length})'
+          : wert is Map
+          ? 'Objekt'
+          : wert?.runtimeType.toString() ?? 'null';
+      return '$k:$art';
+    }).join(', ');
+  }
+  if (daten is List) return 'Liste mit ${daten.length} Einträgen';
+  return daten?.runtimeType.toString() ?? 'null';
+}
+
 /// Die gespeicherten Kartendaten aus dem Lernlandkarten-Formular.
 ///
 /// SVG und Ortsdaten bleiben unverändert erhalten; die abgeleiteten Angaben
@@ -19,21 +37,59 @@ Map<String, Object?>? lernlandkarteLesen(dom.Element form) {
       .querySelector('input[name="placestore"]')
       ?.attributes['value'];
   if (svgcode == null || placestore == null) return null;
-  final daten = jsonDecode(placestore);
-  if (daten is! Map<String, dynamic> ||
-      daten['places'] is! List ||
-      daten['paths'] is! List) {
-    throw const FormatException(
-      'Das placestore-Format der Lernlandkarte ist unbekannt.',
+  Object? daten;
+  try {
+    daten = jsonDecode(placestore);
+  } on FormatException catch (e) {
+    final signatur = placestore.trimLeft().runes.take(24).map((r) {
+      if ('{}[]:,"'.runes.contains(r)) return String.fromCharCode(r);
+      if (r >= 48 && r <= 57) return '0';
+      if ((r >= 65 && r <= 90) || (r >= 97 && r <= 122)) return 'a';
+      if (r == 32 || r == 9 || r == 10 || r == 13) return ' ';
+      return '?';
+    }).join();
+    throw MoodleFehler(
+      'Das placestore-Format der Lernlandkarte ist kein gültiges JSON '
+      '(Parserposition ${e.offset ?? -1} von ${placestore.length}; Signatur: $signatur).',
     );
   }
+  final defaults = daten is Map<String, dynamic> &&
+      daten['mapid'] is String &&
+      daten['editmode'] is bool;
+  final orte = daten is Map<String, dynamic>
+      ? daten['places'] ?? (defaults ? const [] : null)
+      : null;
+  final wege = daten is Map<String, dynamic>
+      ? daten['paths'] ?? (defaults ? const [] : null)
+      : null;
+  final startorte = daten is Map<String, dynamic>
+      ? daten['startingplaces'] ?? const []
+      : null;
+  final zielorte = daten is Map<String, dynamic>
+      ? daten['targetplaces'] ?? const []
+      : null;
+  if (daten is! Map<String, dynamic> ||
+      orte is! List ||
+      wege is! List ||
+      startorte is! List ||
+      zielorte is! List) {
+    final struktur = _placestoreStruktur(daten);
+    throw MoodleFehler(
+      'Das placestore-Format der Lernlandkarte ist unbekannt (JSON-Struktur: $struktur).',
+    );
+  }
+  final speicher = Map<String, dynamic>.from(daten)
+    ..['places'] = orte
+    ..['paths'] = wege
+    ..['startingplaces'] = startorte
+    ..['targetplaces'] = zielorte;
   return {
     'svgcode': svgcode,
-    'orte': daten['places'],
-    'wege': daten['paths'],
-    'startorte': daten['startingplaces'] ?? const [],
-    'zielorte': daten['targetplaces'] ?? const [],
-    'placestore': daten,
+    'orte': orte,
+    'wege': wege,
+    'startorte': startorte,
+    'zielorte': zielorte,
+    'placestore': speicher,
   };
 }
 
@@ -76,14 +132,13 @@ Future<String> lernlandkarteVerknuepfungenSetzen(
       'Das Lernlandkarten-Formular enthält kein placestore-Feld.',
     );
   }
-  final daten = jsonDecode(raw);
-  if (daten is! Map<String, dynamic> ||
-      daten['places'] is! List ||
-      daten['paths'] is! List) {
+  final karte = lernlandkarteLesen(vorher.form);
+  if (karte == null) {
     throw MoodleFehler(
-      'Das Lernlandkarten-Formular hat ein unbekanntes placestore-Format; nichts geändert.',
+      'Das Lernlandkarten-Formular enthält keine lesbaren Kartendaten; nichts geändert.',
     );
   }
+  final daten = karte['placestore'] as Map<String, dynamic>;
   final original = raw;
   final lesestand = await formularLesen(moodle, ziel, arbeitsordner);
   final orte = (daten['places'] as List).whereType<Map>().toList();
@@ -213,7 +268,7 @@ Future<String> lernlandkarteVerknuepfungenSetzen(
       'neu lesen und die Entscheidung erneut prüfen.',
     );
   }
-  final store = jsonDecode(original) as Map<String, dynamic>;
+  final store = Map<String, dynamic>.from(daten);
   final places = (store['places'] as List).whereType<Map>().toList();
   for (final a in zuordnungen) {
     final place = places.singleWhere((o) => o['id'] == a['ort']);
@@ -230,8 +285,8 @@ Future<String> lernlandkarteVerknuepfungenSetzen(
   final rueckForm = await formularHolen(moodle, ziel.adresse);
   final gelesen = await formularLesen(moodle, ziel, arbeitsordner);
   final rueck = gelesen.lernlandkarte?['placestore'];
-  final karteOk = gelesen.lernlandkarte?['svgcode'] ==
-          lesestand.lernlandkarte?['svgcode'] &&
+  final karteOk = ohneOrtsbeschriftung(gelesen.lernlandkarte?['svgcode']) ==
+          ohneOrtsbeschriftung(lesestand.lernlandkarte?['svgcode']) &&
       const JsonEncoder().convert(rueck) == const JsonEncoder().convert(store);
   final formularOk = gelesen.name == vorher.name && gelesen.kurs == kurs &&
       _gleicheFormularFelder(aktuell, rueckForm) &&
@@ -241,19 +296,39 @@ Future<String> lernlandkarteVerknuepfungenSetzen(
   return 'Lernlandkarte „${gelesen.name}" zurückgelesen; Ortszuordnungen verified: $verified.';
 }
 
+/// Moodle schreibt beim Speichern die Beschriftung jedes Ortes neu, und zwar
+/// aus dem Namen der verknüpften Aktivität (gemessen an der Spike-Instanz,
+/// Karte 1968). Der Vergleich der Zuordnung läuft über `placestore`; die
+/// Beschriftung im SVG bleibt außen vor.
+String? ohneOrtsbeschriftung(Object? svg) => svg is String
+    ? svg
+        .replaceAllMapped(
+          RegExp(r'(<(?:title|text) id="(?:title|text)[^"]*"[^>]*>)[^<]*'),
+          (m) => m[1]!,
+        )
+    : null;
+
 bool _gleicheFelder(FormularGelesen vorher, FormularGelesen nachher) {
   final a = {for (final f in vorher.felder) f.feld: f.html};
   final b = {for (final f in nachher.felder) f.feld: f.html};
   return const JsonEncoder().convert(a) == const JsonEncoder().convert(b);
 }
 
+/// Gleicher Formularstand ohne Entwurfs-IDs. Der Hintergrund wird über seine
+/// Dateiliste geprüft, wie beim Ändern.
 bool _gleicheFormularFelder(Formular vorher, Formular nachher) {
   List<List<String>> stand(Formular f) => [
     for (final e in f.felder)
-      if (e.key != 'sesskey') [e.key, e.value],
+      if (e.key != 'sesskey' && !istEntwurfsId(e.key)) [e.key, e.value],
   ];
+  String liste(Formular f) => [
+    for (final e in (f.bereiche['backgroundfile']?['list'] as List? ?? const []))
+      if (e is Map)
+        '${e['filepath']}${e['filename']}:${e['size']}:${e['datemodified']}',
+  ].join('|');
   return const JsonEncoder().convert(stand(vorher)) ==
-      const JsonEncoder().convert(stand(nachher));
+          const JsonEncoder().convert(stand(nachher)) &&
+      liste(vorher) == liste(nachher);
 }
 
 bool _gleicheEinstellungen(FormularGelesen vorher, FormularGelesen nachher) {

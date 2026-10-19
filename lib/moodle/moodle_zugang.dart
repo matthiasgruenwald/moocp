@@ -251,6 +251,13 @@ class MoodleZugang {
     'checklist', 'wiki', 'board', 'kanban', 'url', 'resource',
   };
 
+  /// Module, die das allgemeine Werkzeug anlegen kann. Lernlandkarten
+  /// verwenden ihr eigenes, separat geprüftes Änderungswerkzeug.
+  static const Set<String> anlegbareModule = {
+    ...schreibbareModule,
+    'learningmap',
+  };
+
   /// Aktionen der Kursstruktur (core_courseformat_update_course), die die
   /// Werkzeuge benutzen. Andere -- etwa cm_stealth -- sind nicht gemessen.
   static const Set<String> kursAktionen = {
@@ -596,7 +603,7 @@ class MoodleZugang {
             'return',
             'sr',
           }) &&
-          schreibbareModule.contains(q['add']) &&
+          anlegbareModule.contains(q['add']) &&
           _zahl(q['course']) &&
           _zahl(q['section']),
     ),
@@ -611,9 +618,11 @@ class MoodleZugang {
             (schreibbareModule.contains(modul) &&
                     wertIn(f, '_qf__mod_${modul}_mod_form') != null ||
                 modul == 'learningmap' &&
-                    _zahl(wertIn(f, 'update')) &&
                     wertIn(f, '_qf__mod_learningmap_mod_form') != null &&
-                    wertIn(f, 'placestore') != null);
+                    wertIn(f, 'placestore') != null &&
+                    (wertIn(f, 'update') == null
+                        ? _zahl(wertIn(f, 'section'))
+                        : _zahl(wertIn(f, 'update'))));
       },
     ),
     // Sicherung: die Schritte 1, 2 und 4 des Assistenten, nur ohne

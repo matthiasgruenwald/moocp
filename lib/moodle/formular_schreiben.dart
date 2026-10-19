@@ -42,6 +42,7 @@ import 'formeln.dart';
 import 'formular.dart';
 import 'formular_lesen.dart';
 import 'kurs.dart';
+import 'lernlandkarte_entwurf.dart';
 import 'moodle_zugang.dart';
 import 'stack_skripte.dart';
 import 'zeilenvergleich.dart';
@@ -94,6 +95,12 @@ String normalisiert(String html) => html.replaceAll(
   RegExp(r'/draftfile\.php/\d+/user/draft/\d+/'),
   '/draftfile.php/U/user/draft/X/',
 );
+
+/// Entwurfs-IDs (`<feld>[itemid]` und der verborgene Wert des Hintergrunds)
+/// vergibt Moodle bei jedem Laden neu; sie gehören nicht zum Stand. Gemessen
+/// am 19.10.2026 an einer Lernlandkarte. Dateien prüft der Aufrufer selbst.
+bool istEntwurfsId(String schluessel) =>
+    schluessel.endsWith('[itemid]') || schluessel == 'backgroundfile';
 
 /// Größte Datei, die in der Freigabe noch zeilenweise verglichen wird.
 const int _vergleichGrenze = 256 * 1024;
@@ -794,14 +801,38 @@ Future<String> aktivitaetAnlegen(
   bool sichtbar = false,
   Map<String, Object?> einstellungen = const {},
 }) async {
-  if (!MoodleZugang.schreibbareModule.contains(typ)) {
+  if (!MoodleZugang.anlegbareModule.contains(typ)) {
     throw MoodleFehler(
       'Typ „$typ" kann die App nicht anlegen. Möglich: '
-      '${MoodleZugang.schreibbareModule.map((t) => '$t (${typName(t)})').join(", ")}.',
+      '${MoodleZugang.anlegbareModule.map((t) => '$t (${typName(t)})').join(", ")}.',
     );
   }
   final quelle = ordner == null ? null : imArbeitsordner(ordner, arbeitsordner);
   final inhalt = quelleLesen(quelle, kopf: elementKopfFuer(moodle));
+  Map<String, dynamic>? kartenVorlage;
+  ({String svgcode, String placestore})? erwarteteKarte;
+  if (typ == 'learningmap') {
+    final datei = quelle == null ? null : File(p.join(quelle, 'lernlandkarte.json'));
+    if (datei != null && datei.existsSync()) {
+      final Object? json;
+      try {
+        json = jsonDecode(datei.readAsStringSync(encoding: utf8));
+      } on FormatException {
+        throw MoodleFehler('lernlandkarte.json ist ungültiges JSON; nichts angelegt.');
+      }
+      if (json is! Map<String, dynamic>) {
+        throw MoodleFehler('lernlandkarte.json muss ein JSON-Objekt sein; nichts angelegt.');
+      }
+      kartenVorlage = json;
+      // Die gleiche Validierung läuft vor der Freigabe mit einer neutralen
+      // nativen Kennung; nach dem Laden des Formulars bleibt dessen mapid
+      // erhalten.
+      erwarteteKarte = lernlandkarteEntwurfErzeugen(
+        kartenVorlage,
+        '{"editmode":true,"mapid":"vorpruefung"}',
+      );
+    }
+  }
   final pflicht = pflichtfeld[typ];
   if (pflicht != null && (inhalt.felder[pflicht] ?? '').trim().isEmpty) {
     throw MoodleFehler(
@@ -840,6 +871,9 @@ Future<String> aktivitaetAnlegen(
           if (e.value.trim().isNotEmpty) '${e.key}: ${e.value.length} Zeichen',
         for (final e in einstellungen.entries)
           'Einstellung ${e.key}: ${e.value}',
+        if (kartenVorlage != null)
+          'Kartenvorlage: ${(kartenVorlage['orte'] as List).length} Orte, '
+              '${(kartenVorlage['wege'] as List).length} Wege; Ziele bleiben zunächst leer.',
       ],
       vergleich: const [],
       knopf: sichtbar ? 'Sichtbar anlegen' : 'Anlegen',
@@ -863,6 +897,22 @@ Future<String> aktivitaetAnlegen(
       '/course/modedit.php?add=$typ&type=&course=$kurs'
       '&section=${istSammlung ? 0 : abschnitt.nummer}&return=0&sr=0',
     );
+    if (typ == 'learningmap' &&
+        (f.modul != typ || f.kurs != kurs ||
+            wertIn(f.felder, 'section') != '${abschnitt.nummer}' ||
+            wertIn(f.felder, '_qf__mod_learningmap_mod_form') == null ||
+            wertIn(f.felder, 'placestore') == null ||
+            f.form.querySelector('textarea[name="svgcode"]') == null ||
+            f.form.querySelector('[name="visible"]') == null ||
+            (f.form.querySelector('select[name="visible"]') != null &&
+                f.form.querySelector('select[name="visible"] option[value="0"]') ==
+                    null) ||
+            !f.bereiche.containsKey('backgroundfile'))) {
+      throw MoodleFehler(
+        'Das native Moodle-Formular passt nicht zur angeforderten Lernlandkarte, '
+        'ihrem Kursabschnitt, Sichtbarkeit oder Hintergrundbild; nichts angelegt.',
+      );
+    }
     final (geschrieben, gesetzt) = await formularFuellen(
       moodle,
       f,
@@ -873,6 +923,14 @@ Future<String> aktivitaetAnlegen(
       name: f.form.querySelector('input[name="name"]') != null ? name : null,
       was: 'einer ${typName(typ)}',
     );
+    if (typ == 'learningmap' && kartenVorlage != null) {
+      erwarteteKarte = lernlandkarteEntwurfErzeugen(
+        kartenVorlage,
+        wertIn(f.felder, 'placestore')!,
+      );
+      setze(f.felder, 'svgcode', erwarteteKarte!.svgcode);
+      setze(f.felder, 'placestore', erwarteteKarte!.placestore);
+    }
     setze(f.felder, 'visible', sichtbar ? '1' : '0');
     await absenden(moodle, f);
     return (geschrieben, gesetzt);
@@ -892,6 +950,19 @@ Future<String> aktivitaetAnlegen(
   final (int cmid, String angelegt) = istSammlung
       ? await _neueSammlung(moodle, kurs, vorher)
       : await _neueAktivitaet(moodle, kurs, typ, vorher);
+  if (typ == 'learningmap') {
+    final struktur = await kursLesen(moodle, kurs);
+    final karte = struktur.nachCmid[cmid];
+    if (nameNormal(angelegt) != nameNormal(name) ||
+        karte?.modul != typ ||
+        karte?.name != angelegt ||
+        karte?.sichtbar != sichtbar) {
+      throw MoodleFehler(
+        'Die neue Lernlandkarte stimmt bei Name, Kurs oder Sichtbarkeit nicht '
+        'mit dem Auftrag überein; bitte kurs_uebersicht prüfen.',
+      );
+    }
+  }
   if (!sichtbar) moodle.selbstAngelegt.add(cmid);
 
   final g = await formularLesen(
@@ -905,7 +976,32 @@ Future<String> aktivitaetAnlegen(
     dateien: inhalt.dateien,
     bereiche: inhalt.bereiche,
     einstellungen: gesetzt,
+    name: name,
   );
+  if (typ == 'learningmap') {
+    probe.pruefe(g.modul == typ, 'Modultyp (gelesen ${g.modul})');
+    probe.pruefe(g.kurs == kurs, 'Kurs (gelesen ${g.kurs})');
+    probe.pruefe(
+      g.lernlandkarte != null,
+      'native svgcode-/placestore-Felder zurückgelesen',
+    );
+    if (erwarteteKarte != null) {
+      probe.pruefe(
+        lernlandkarteSvgVergleichswert(
+              '${g.lernlandkarte?['svgcode'] ?? ''}',
+            ) ==
+            lernlandkarteSvgVergleichswert(erwarteteKarte!.svgcode),
+        'Kartengrafik zurückgelesen',
+      );
+      probe.pruefe(
+        const JsonEncoder().convert(g.lernlandkarte?['placestore']) ==
+            const JsonEncoder().convert(
+              jsonDecode(erwarteteKarte!.placestore),
+            ),
+        'Orte und Wege zurückgelesen',
+      );
+    }
+  }
   return [
     'Angelegt: ${typName(typ)} „$angelegt" in $wo, cmid $cmid, '
         '${sichtbar ? "SICHTBAR" : "verborgen"}.',

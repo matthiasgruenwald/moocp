@@ -869,14 +869,14 @@ class McpDienst {
           'bereiche/files/). Eine Fragensammlung (qbank) legt Moodle immer im allgemeinen '
           'Abschnitt an, einerlei welcher angegeben ist. Einstellungen wie Fristen als Parameter (Schlüssel: nach dem '
           'Anlegen in einstellungen.json; Pflichtangaben eines Typs meldet Moodle). Legt '
-          'verborgen an; sichtbar nur nach Freigabe in der App. Liest danach zurück.',
+          'verborgen an; sichtbar nur nach Freigabe in der App. Lernlandkarten werden aus dem nativen Formular angelegt. Ein Ordner kann dafür zusätzlich lernlandkarte.json mit orte (id p1–p64, x 0–1000, y 0–560, optional titel) und wege (von/nach) enthalten; SVG und placestore erzeugt die App, Ziele bleiben leer. Das Hintergrundbild liegt in bereiche/backgroundfile/. Ortsziele ändert lernlandkarte_verknuepfungen_setzen nach Freigabe. Liest danach Name, Kurs, Sichtbarkeit und Kartendaten zurück.',
       parameter: {
         'kurs': _kurs,
         'abschnitt_id': JsonSchema.integer(
           description: 'Zielabschnitt: seine id aus kurs_uebersicht',
         ),
         'typ': JsonSchema.string(
-          enumValues: MoodleZugang.schreibbareModule.toList(),
+          enumValues: MoodleZugang.anlegbareModule.toList(),
           description: 'Aktivitätstyp',
         ),
         'name': JsonSchema.string(

@@ -253,7 +253,7 @@ class FormularGelesen {
         '${(lernlandkarte!['wege'] as List).length} Wege):',
       );
       final store = lernlandkarte!['placestore'] as Map;
-      final orte = store['places'] as List;
+      final orte = lernlandkarte!['orte'] as List;
       for (final ort in orte.whereType<Map>()) {
         final id = '${ort['id'] ?? '(ohne Kennung)'}';
         final rolle = lernlandkarteRolle(store, id);

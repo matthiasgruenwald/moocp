@@ -11,9 +11,12 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:html/parser.dart' as html_parser;
 import 'package:moocp/freigabe.dart';
 import 'package:moocp/moodle/formular_lesen.dart';
 import 'package:moocp/moodle/formular_schreiben.dart';
+import 'package:moocp/moodle/lernlandkarte.dart';
+import 'package:moocp/moodle/lernlandkarte_entwurf.dart';
 import 'package:moocp/moodle/moodle_zugang.dart';
 import 'package:moocp/protokoll.dart';
 import 'package:path/path.dart' as p;
@@ -186,6 +189,166 @@ void main() {
       arbeitsordner.path,
     );
     expect(g.zusammenfassung(), isNot(contains('Prüflücke')));
+  });
+
+  test('unbekanntes placestore-Format meldet nur seine Struktur', () {
+    final form = html_parser.parse('''<form>
+      <textarea name="svgcode">svg</textarea>
+      <input name="placestore" value='{"map":{"places":[]},"version":2}'>
+    </form>''').querySelector('form')!;
+
+    expect(
+      () => lernlandkarteLesen(form),
+      throwsA(
+        isA<MoodleFehler>()
+            .having(
+              (e) => e.meldung,
+              'Meldung',
+              contains('map:Objekt, version:int'),
+            )
+            .having((e) => e.meldung, 'Meldung', isNot(contains('[]'))),
+      ),
+    );
+  });
+
+  test('native neue Karte ohne Orte und Wege ist lesbar', () {
+    final form = html_parser.parse('''<form>
+      <textarea name="svgcode">&lt;svg/&gt;</textarea>
+      <input name="placestore" value='{"editmode":true,"mapid":"native-id"}'>
+    </form>''').querySelector('form')!;
+
+    final karte = lernlandkarteLesen(form)!;
+
+    expect(karte['orte'], isEmpty);
+    expect(karte['wege'], isEmpty);
+    expect(karte['startorte'], isEmpty);
+    expect(karte['zielorte'], isEmpty);
+    expect((karte['placestore'] as Map)['places'], isEmpty);
+    expect((karte['placestore'] as Map)['paths'], isEmpty);
+    expect(karte['svgcode'], '<svg/>');
+  });
+
+  test('native Kartenvorlage erzeugt sichere Orte, Wege und SVG', () {
+    final entwurf = lernlandkarteEntwurfErzeugen(
+      {
+        'orte': [
+          {'id': 'p1', 'x': 120, 'y': 280, 'titel': 'Start <eins>'},
+          {'id': 'p2', 'x': 880, 'y': 280, 'titel': 'Ziel & Rückblick'},
+        ],
+        'wege': [
+          {'von': 'p1', 'nach': 'p2'},
+        ],
+      },
+      '{"editmode":true,"mapid":"native-id","hidepaths":false}',
+    );
+
+    final store = jsonDecode(entwurf.placestore) as Map<String, dynamic>;
+    expect(store['mapid'], 'native-id');
+    expect(store['editmode'], true);
+    expect(store['hidepaths'], false);
+    expect(store['startingplaces'], ['p1']);
+    expect(store['targetplaces'], isEmpty);
+    expect(store['places'], [
+      {
+        'id': 'p1',
+        'linkId': 'a1',
+        'linkedActivity': null,
+        'placecolor': null,
+        'visitedcolor': null,
+      },
+      {
+        'id': 'p2',
+        'linkId': 'a2',
+        'linkedActivity': null,
+        'placecolor': null,
+        'visitedcolor': null,
+      },
+    ]);
+    expect(store['paths'], [
+      {'id': 'p1_2', 'from': 'p1', 'to': 'p2'},
+    ]);
+    expect(entwurf.svgcode, contains('id="pathsGroup"'));
+    expect(entwurf.svgcode, contains('id="placesGroup"'));
+    expect(entwurf.svgcode, contains('Start &lt;eins&gt;'));
+    expect(entwurf.svgcode, contains('Ziel &amp; Rückblick'));
+    expect(entwurf.svgcode, isNot(contains('<script')));
+    expect(
+      lernlandkarteSvgVergleichswert(
+        '<svg>\n  <g>\n    <circle/>\n  </g>\n</svg>',
+      ),
+      '<svg><g><circle/></g></svg>',
+    );
+  });
+
+  test('Kartenvorlage lehnt fremde IDs und ungültige Wege vor dem Schreiben ab', () {
+    expect(
+      () => lernlandkarteEntwurfErzeugen(
+        {
+          'orte': [
+            {'id': 'p1', 'x': 100, 'y': 100},
+            {'id': 'p2', 'x': 900, 'y': 100},
+          ],
+          'wege': [
+            {'von': 'p1', 'nach': 'other'},
+          ],
+        },
+        '{"editmode":true,"mapid":"native-id"}',
+      ),
+      throwsA(isA<MoodleFehler>()),
+    );
+    expect(
+      () => lernlandkarteEntwurfErzeugen(
+        {
+          'orte': [
+            {
+              'id': 'p1',
+              'x': 100,
+              'y': 100,
+              'linkedActivity': 99,
+            },
+          ],
+          'wege': [],
+        },
+        '{"editmode":true,"mapid":"native-id"}',
+      ),
+      throwsA(isA<MoodleFehler>()),
+    );
+  });
+
+  test('Ortsbeschriftung im SVG zählt beim Verknüpfen nicht, Geometrie schon', () {
+    const vorher = '<svg><g><circle id="p1" cx="200"/>'
+        '<title id="titlep1">ZZ Ort 1</title>'
+        '<text id="textp1" x="200">ZZ Ort 1</text></g></svg>';
+    const nachher = '<svg><g><circle id="p1" cx="200"/>'
+        '<title id="titlep1">ZZ #31 Ziel Probe</title>'
+        '<text id="textp1" x="200">ZZ #31 Ziel Probe</text></g></svg>';
+    const verschoben = '<svg><g><circle id="p1" cx="300"/>'
+        '<title id="titlep1">ZZ #31 Ziel Probe</title>'
+        '<text id="textp1" x="200">ZZ #31 Ziel Probe</text></g></svg>';
+
+    expect(ohneOrtsbeschriftung(nachher), ohneOrtsbeschriftung(vorher));
+    expect(ohneOrtsbeschriftung(verschoben), isNot(ohneOrtsbeschriftung(vorher)));
+    expect(ohneOrtsbeschriftung(null), isNull);
+  });
+
+  test('ungültiges placestore meldet nur Parserposition und Zeichensignatur', () {
+    final form = html_parser.parse('''<form>
+      <textarea name="svgcode">svg</textarea>
+      <input name="placestore" value="private-course-content">
+    </form>''').querySelector('form')!;
+
+    expect(
+      () => lernlandkarteLesen(form),
+      throwsA(
+        isA<MoodleFehler>()
+            .having((e) => e.meldung, 'Meldung', contains('Parserposition'))
+            .having(
+              (e) => e.meldung,
+              'Meldung',
+              isNot(contains('private-course-content')),
+            ),
+      ),
+    );
   });
 
   test('Ändern eines nicht schreibbaren Typs: nichts wird an Moodle geschickt, der Typ wird genannt', () async {

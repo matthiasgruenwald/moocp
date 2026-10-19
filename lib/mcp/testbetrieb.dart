@@ -1,7 +1,9 @@
 // Die begrenzte Testfreigabe sitzt vor dem echten Werkzeugablauf (E18/E20).
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:crypto/crypto.dart';
+import 'package:path/path.dart' as p;
 
 import '../freigabe.dart';
 import '../moodle/formular_lesen.dart';
@@ -20,19 +22,55 @@ class Testbetrieb {
   final String arbeitsordner;
   final _proben = <int, _Probe>{};
 
-  String _hash(Formular f) => sha256
-      .convert(
-        utf8.encode(
-          jsonEncode({
-            'felder': [
-              for (final e in f.felder)
-                if (!const {'sesskey', 'submitbutton', 'cancel'}.contains(e.key))
-                  [e.key, e.value],
+  Future<String> _hash(Formular f, int cmid) async {
+    final inhalt = <String, Object?>{
+      'felder': [
+        for (final e in f.felder)
+          if (!const {'sesskey', 'submitbutton', 'cancel'}.contains(e.key) &&
+              !istEntwurfsId(e.key))
+            [e.key, e.value],
+      ],
+    };
+    if (f.modul == 'learningmap') {
+      // Die Karte enthält auch eine Datei außerhalb von placestore/svgcode.
+      // Nur ihren Namen zu binden ließe einen Austausch des Hintergrunds
+      // unbemerkt; die Bytes liest ausschließlich der normale Moodle-Zugang.
+      final gelesen = await formularLesen(
+        moodle,
+        Formularziel.aktivitaet(cmid),
+        arbeitsordner,
+      );
+      final wurzel = p.join(gelesen.ordner, 'bereiche', 'backgroundfile');
+      final dateien = Directory(wurzel).existsSync()
+          ? Directory(wurzel).listSync(recursive: true).whereType<File>().toList()
+          : <File>[];
+      dateien.sort((a, b) => a.path.compareTo(b.path));
+      final nativeListe = f.bereiche['backgroundfile']?['list'];
+      inhalt['backgroundfile'] = {
+        'formular': [
+          for (final e in (nativeListe as List? ?? const []).whereType<Map>())
+            {
+              'filepath': e['filepath'],
+              'filename': e['filename'],
+              'size': e['size'],
+              'datemodified': e['datemodified'],
+            },
+        ],
+        'dateien': [
+          for (final datei in dateien)
+            [
+              p.relative(datei.path, from: wurzel).replaceAll(r'\\', '/'),
+              sha256.convert(datei.readAsBytesSync()).toString(),
             ],
-          }),
-        ),
-      )
-      .toString();
+        ],
+        'nichtGelesen': [
+          for (final b in gelesen.bereiche.where((b) => b.feld == 'backgroundfile'))
+            ...b.nichtGelesen,
+        ],
+      };
+    }
+    return sha256.convert(utf8.encode(jsonEncode(inhalt))).toString();
+  }
 
   Future<_Probe?> _probe(int cmid) async {
     final f = await formularHolen(moodle, '/course/modedit.php?update=$cmid');
@@ -47,7 +85,12 @@ class Testbetrieb {
         aktivitaet?.name != f.name) {
       return null;
     }
-    return (kurs: f.kurs!, name: f.name, modul: f.modul!, hash: _hash(f));
+    return (
+      kurs: f.kurs!,
+      name: f.name,
+      modul: f.modul!,
+      hash: await _hash(f, cmid),
+    );
   }
 
   bool _bindungPasst(Profil profil, Testzugang? zugang) =>
@@ -66,7 +109,7 @@ class Testbetrieb {
       return aufruf();
     }
     if (werkzeug == 'aktivitaet_anlegen' &&
-        args['typ'] == 'page' &&
+        const {'page', 'learningmap'}.contains(args['typ']) &&
         args['name'] is String &&
         (args['name'] as String).startsWith('ZZ') &&
         args['sichtbar'] != true &&
@@ -86,7 +129,7 @@ class Testbetrieb {
             .where(
               (c) =>
                   !vorher.contains(c.cmid) &&
-                  c.modul == 'page' &&
+                  c.modul == args['typ'] &&
                   c.name == args['name'] &&
                   !c.sichtbar,
             )

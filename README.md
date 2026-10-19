@@ -109,7 +109,7 @@ Die Aktivitäten in dieser Tabelle kann die KI lesen, anlegen und ändern – Te
 
 Alle anderen Aktivitäten – Forum, Glossar, H5P und weitere – kann die KI lesen (Beschreibung und Einstellungen), verschieben, duplizieren, sichtbar schalten und löschen, aber nicht anlegen oder ändern. Abschnitte kann die KI anlegen, umbenennen, mit einer Beschreibung versehen, verschieben, sichtbar schalten und löschen.
 
-Lernlandkarten sind eine begrenzte Ausnahme: aktivitaet_lesen zeigt SVG, Orte, Wege und Ziele; lernlandkarte_verknuepfungen_setzen ändert nach Freigabe nur ausdrücklich entschiedene Ziele vorhandener Aktivitäten desselben Kurses. Die App kann Lernlandkarten nicht allgemein anlegen oder bearbeiten.
+Lernlandkarten sind eine begrenzte Ausnahme: aktivitaet_anlegen legt eine verborgene Karte aus dem nativen Moodle-Formular an. Im Quellordner kann `lernlandkarte.json` eine skriptfreie Startgrafik enthalten: `orte` mit fortlaufenden IDs `p1`–`p64`, Koordinaten `x` (0–1000), `y` (0–560) und optionalem `titel`, sowie `wege` mit `von` und `nach`. IDs, SVG und placestore erzeugt die App; vorgegebene Aktivitätsziele werden abgewiesen. Das Hintergrundbild gehört in `bereiche/backgroundfile/`. `aktivitaet_lesen` zeigt SVG, Orte, Wege und Ziele; `lernlandkarte_verknuepfungen_setzen` ändert nach Freigabe nur ausdrücklich entschiedene Ziele vorhandener Aktivitäten desselben Kurses. Vorhandene Kartengrafik, Orte und Wege lassen sich nicht allgemein bearbeiten.
 
 **Fragetypen**, auch mit Bildern und Zeichnungen:
 
