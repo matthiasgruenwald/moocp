@@ -286,7 +286,7 @@ void main() {
           ? '<files><file><id>1</id><component>mod_page</component><filename>bild.png</filename><contenthash>0000000000000000000000000000000000000000</contenthash></file></files>'
           : '<files/>',
       if (quiz) 'activities/quiz_7/quiz.xml': '<quiz><question_instance><question_reference><questionbankentryid>1</questionbankentryid><version>1</version></question_reference></question_instance></quiz>',
-      if (quiz) 'questions.xml': '<question_bank_entry id="1"><idnumber>ZZ-1</idnumber><question_version><version>1</version><question><name>ZZ Frage</name></question></question_version></question_bank_entry>',
+      if (quiz) 'questions.xml': '<question_bank_entry id="1"><idnumber>ZZ-1</idnumber><question_version><question_versions><version>1</version><questions><question><name>ZZ Frage</name></question></questions></question_versions></question_version></question_bank_entry>',
     }.entries) {
       archive.addFile(ArchiveFile.bytes(e.key, utf8.encode(e.value)));
     }

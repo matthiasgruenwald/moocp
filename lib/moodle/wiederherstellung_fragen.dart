@@ -14,9 +14,9 @@
 //     das Prüflücke. Das Vorhandensein des Quiz oder ein erfolgreicher
 //     Hintergrundauftrag geht nie in die Verifikation ein.
 //
-// UNGEMESSEN: wie Moodle die verwendeten Fragen im Archiv (quiz.xml, questions.xml)
-// und im Ziel (Platzliste) benennt. Die Eingaben kommen daher vom Aufrufer; siehe
-// TODO.md.
+// Das Archivformat folgt dem offiziellen Moodle-Builder (siehe quizFragenAusXml),
+// nicht einer Messung auf der Instanz. Ob die Quellfragen quizlokal waren, liest
+// der Parser nicht aus; siehe TODO.md.
 
 import 'package:xml/xml.dart';
 
@@ -158,25 +158,32 @@ List<String> _rest(List<String> a, List<String> b) {
 
 /// Die Fragen eines Quiz aus dem Archiv: activities/quiz_*/quiz.xml (question_instance
 /// mit question_reference/questionbankentryid, oder question_set_reference für Zufall)
-/// und die Fragenbank questions.xml (question_bank_entry mit idnummer und Name).
-/// [questionsXml] null: keine Fragenbank, dann hat keine Frage eine Sachnummer. UNGEMESSEN:
-/// das ist die festgelegte Lesart, nicht die gemessene Moodle-Ausgabe.
+/// und die Fragenbank questions.xml. Aufbau nach dem offiziellen Moodle-Builder
+/// (backup_stepslib.php, 5.1/5.2): question_bank_entry/question_version/question_versions
+/// mit version, status und questions/question/name. Eine Referenzversion NULL steht als
+/// `$@NULL@$` im Archiv und heißt: jüngste Version, die kein Entwurf ist. Leer, 0 oder
+/// eine fehlende Version bleibt eine Prüflücke. [questionsXml] null: keine Fragenbank,
+/// dann hat keine Frage eine Sachnummer.
 List<QuizFrage> quizFragenAusXml(String quizXml, String? questionsXml) {
-  final bank = <String, ({String? idnummer, Map<String, String> versionen})>{};
+  final bank = <String, ({String? idnummer, Map<int, String> versionen, Set<int> entwuerfe})>{};
   if (questionsXml != null) {
     for (final e in XmlDocument.parse(questionsXml).findAllElements('question_bank_entry')) {
       final id = e.getAttribute('id') ?? '';
       final idnummer = e.getElement('idnumber')?.innerText.trim();
-      final versionen = <String, String>{};
-      for (final v in e.findAllElements('question_version')) {
-        final nummer = v.getElement('version')?.innerText.trim();
-        final name = v.getElement('question')?.getElement('name')?.innerText.trim();
-        if (nummer != null && nummer.isNotEmpty && name != null && name.isNotEmpty) {
-          // Doppelte Versionsnummern sind keine eindeutige Quelle.
-          versionen[nummer] = versionen.containsKey(nummer) ? '' : name;
-        }
+      final versionen = <int, String>{};
+      final entwuerfe = <int>{};
+      final doppelt = <int>{};
+      for (final v in e.findAllElements('question_versions')) {
+        final nummer = int.tryParse(v.getElement('version')?.innerText.trim() ?? '');
+        final name = v.findAllElements('question').map((q) => q.getElement('name')?.innerText.trim()).firstOrNull;
+        if (nummer == null || name == null || name.isEmpty) continue;
+        // Doppelte Versionsnummern sind keine eindeutige Quelle.
+        if (versionen.containsKey(nummer)) doppelt.add(nummer);
+        versionen[nummer] = name;
+        if (v.getElement('status')?.innerText.trim() == 'draft') entwuerfe.add(nummer);
       }
-      bank[id] = (idnummer: idnummer == null || idnummer.isEmpty ? null : idnummer, versionen: versionen);
+      versionen.removeWhere((n, _) => doppelt.contains(n));
+      bank[id] = (idnummer: idnummer == null || idnummer.isEmpty ? null : idnummer, versionen: versionen, entwuerfe: entwuerfe);
     }
   }
   final fragen = <QuizFrage>[];
@@ -189,7 +196,16 @@ List<QuizFrage> quizFragenAusXml(String quizXml, String? questionsXml) {
     final id = ref.isEmpty ? '' : ref.first;
     final eintrag = bank[id];
     final version = qi.findAllElements('version').map((n) => n.innerText.trim()).firstOrNull;
-    final name = version == null || version == '0' ? null : eintrag?.versionen[version];
+    String? name;
+    if (eintrag != null && version != null) {
+      if (version == r'$@NULL@$') {
+        final frei = eintrag.versionen.keys.where((n) => !eintrag.entwuerfe.contains(n));
+        if (frei.isNotEmpty) name = eintrag.versionen[frei.reduce((a, b) => a > b ? a : b)];
+      } else {
+        final nummer = int.tryParse(version);
+        if (nummer != null && nummer > 0) name = eintrag.versionen[nummer];
+      }
+    }
     if (eintrag == null) {
       fragen.add((name: 'Frage Nr. $id (nicht in questions.xml)', sachnummer: null, zufall: false));
     } else if (name == null || name.isEmpty) {

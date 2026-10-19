@@ -70,15 +70,15 @@ const _questionsXml = '''
   <question_bank_entries>
     <question_bank_entry id="11">
       <idnumber>ZZ-0001</idnumber>
-      <question_version><version>1</version><question><name>ZZ Frage Eins</name></question></question_version>
+      <question_version><question_versions><version>1</version><questions><question><name>ZZ Frage Eins</name></question></questions></question_versions></question_version>
     </question_bank_entry>
     <question_bank_entry id="12">
       <idnumber>ZZ-0002</idnumber>
-      <question_version><version>1</version><question><name>ZZ Frage Zwei</name></question></question_version>
+      <question_version><question_versions><version>1</version><questions><question><name>ZZ Frage Zwei</name></question></questions></question_versions></question_version>
     </question_bank_entry>
     <question_bank_entry id="13">
       <idnumber></idnumber>
-      <question_version><version>1</version><question><name>ZZ Frage Fremd</name></question></question_version>
+      <question_version><question_versions><version>1</version><questions><question><name>ZZ Frage Fremd</name></question></questions></question_versions></question_version>
     </question_bank_entry>
   </question_bank_entries>
 </question_categories>
@@ -111,7 +111,7 @@ const _quizXml = '''
 ''';
 
 void main() {
-  group('Quizfragen aus dem Archiv lesen (UNGEMESSEN: Lesart festgelegt)', () {
+  group('Quizfragen aus dem Archiv lesen (Aufbau nach dem offiziellen Builder)', () {
     test('Sachnummer aus der Fragenbank, Zufallsfrage als zufall, fremde Frage ohne Sachnummer', () {
       final f = quizFragenAusXml(_quizXml, _questionsXml);
       expect(f.map((q) => q.name).toList(), ['ZZ Frage Eins', 'ZZ Frage Zwei', 'ZZ Frage Fremd', 'Zufallsfrage']);
@@ -124,8 +124,8 @@ void main() {
 
     test('referenzierte Version statt des ersten Namens; fehlende Version bleibt Prüflücke', () {
       const bank = '<question_bank_entry id="11"><idnumber>ZZ-1</idnumber>'
-          '<question_version><version>1</version><question><name>Alt</name></question></question_version>'
-          '<question_version><version>2</version><question><name>Neu</name></question></question_version>'
+          '<question_version><question_versions><version>1</version><questions><question><name>Alt</name></question></questions></question_versions></question_version>'
+          '<question_version><question_versions><version>2</version><questions><question><name>Neu</name></question></questions></question_versions></question_version>'
           '</question_bank_entry>';
       String quiz(String version) => '<question_instance><question_reference>'
           '<questionbankentryid>11</questionbankentryid><version>$version</version>'
@@ -139,6 +139,17 @@ void main() {
         expect(quizVerifiziert(fragenVergleichen(quelle: quelle,
             ziel: [(name: quelle.single.name, zufall: false)])), isFalse);
       }
+    });
+
+    test(r'Version $@NULL@$ heißt jüngste Version ohne Entwurf', () {
+      const bank = '<question_bank_entry id="11"><idnumber>ZZ-1</idnumber><question_version>'
+          '<question_versions><version>1</version><status>ready</status><questions><question><name>Alt</name></question></questions></question_versions>'
+          '<question_versions><version>2</version><status>ready</status><questions><question><name>Neu</name></question></questions></question_versions>'
+          '<question_versions><version>3</version><status>draft</status><questions><question><name>Entwurf</name></question></questions></question_versions>'
+          '</question_version></question_bank_entry>';
+      const quiz = r'<question_instance><question_reference><questionbankentryid>11</questionbankentryid>'
+          r'<version>$@NULL@$</version></question_reference></question_instance>';
+      expect(quizFragenAusXml(quiz, bank).single.name, 'Neu');
     });
 
     test('Eintrag ohne Fragenbank: Sachnummer fehlt, Name nennt die Nummer', () {
