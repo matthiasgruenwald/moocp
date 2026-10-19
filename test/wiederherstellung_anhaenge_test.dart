@@ -279,6 +279,21 @@ void main() {
       expect(nachher.text, contains('Quellaufnahme fehlt'));
     });
 
+    test('unlesbares Archiv mit passendem Hash: Prüflücke „Quellaufnahme fehlt", nie verified', () async {
+      final vg = Vorgaenge(ordner.path);
+      final v = await fertigerVorgang(vg, archiv: Uint8List.fromList([1, 2, 3]));
+      final moodle = _Moodle({
+        '/course/modedit.php?update=2': formular(2),
+        '/draftfile.php/12/user/draft/77/bild.png': _antwort(200, bild),
+      }, neueCmids: [(2, 'page', 'Infoblatt')]);
+
+      await wiederherstellungStatus(moodle, vg, id: v.id);
+      final nachher = await vg.finde(v.id);
+
+      expect(nachher!.verified, isFalse);
+      expect(nachher.text, contains('Quellaufnahme fehlt'));
+    });
+
     test('konkurrierende neue Aktivitäten: keine Zuordnung, keine Anhangsprüfung, nichts verborgen', () async {
       final vg = Vorgaenge(ordner.path);
       final v = await fertigerVorgang(vg);

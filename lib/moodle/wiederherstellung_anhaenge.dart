@@ -70,6 +70,8 @@ List<QuellDatei>? quelldateienAus(Uint8List mbz, {required String modul, require
         if (f.isFile) f.name: Uint8List.fromList(f.content as List<int>),
     };
   } catch (_) {
+    // Jeder Fehler beim Entpacken heißt: keine Quellaufnahme. Der Aufrufer meldet null
+    // als Prüflücke („Quellaufnahme fehlt"), nie als leere Dateiliste.
     return null;
   }
 
