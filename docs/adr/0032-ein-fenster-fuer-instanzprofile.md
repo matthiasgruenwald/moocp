@@ -12,8 +12,14 @@ gehören jeweils zum ausgewählten Profil. Profilname und technischer MCP-Name
 stehen in der Fenstertitelzeile und in Freigabe-, Einrichtungs- und
 Einstellungsdialogen.
 
-Profile lassen sich in der Oberfläche hinzufügen und bearbeiten. Ein neues
-Profil bekommt einen eigenen Port, eindeutigen MCP-Namen und Arbeitsordner.
+Profile lassen sich in der Oberfläche hinzufügen, bearbeiten und löschen. Das
+Löschen erfordert eine Bestätigung, entfernt Anmeldung und gespeicherte
+Anmeldedaten, stoppt den MCP-Server und trägt den Eintrag des Profils aus
+Claude Code, Codex und LM Studio aus. Bleibt ein Eintrag stehen, nennt die App
+Werkzeug und Namen, damit die Lehrkraft ihn von Hand entfernt. Die
+Deinstallation entfernt die Einträge aller gespeicherten Profile.
+Mindestens ein Profil bleibt erhalten.
+Ein neues Profil bekommt einen eigenen Port, eindeutigen MCP-Namen und Arbeitsordner.
 Claude Code und Codex werden mit dem technischen Namen und Port des gerade
 ausgewählten Profils eingerichtet. Skills bleiben gemeinsam, da sie keine
 Instanzdaten enthalten.

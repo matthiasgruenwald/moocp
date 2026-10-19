@@ -26,6 +26,9 @@ enum EinstellungenErgebnis {
 
   /// Ein Update wird installiert: Die App muss sich jetzt beenden.
   beenden,
+
+  /// Das aktuell ausgewählte MCP-Profil entfernen.
+  profilLoeschen,
 }
 
 class EinstellungenDialog extends StatefulWidget {
@@ -37,6 +40,7 @@ class EinstellungenDialog extends StatefulWidget {
     required this.sitzungLaeuft,
     this.profilname = 'Moodle',
     this.mcpName = 'moodle',
+    this.profilLoeschenMoeglich = false,
     super.key,
   });
 
@@ -54,6 +58,7 @@ class EinstellungenDialog extends StatefulWidget {
   final bool sitzungLaeuft;
   final String profilname;
   final String mcpName;
+  final bool profilLoeschenMoeglich;
 
   @override
   State<EinstellungenDialog> createState() => _EinstellungenDialogState();
@@ -67,13 +72,17 @@ class _EinstellungenDialogState extends State<EinstellungenDialog> {
     try {
       await widget.einstellungen.speichern();
     } catch (e) {
-      widget.protokoll.eintrag(Art.fehler, 'Einstellungen nicht gespeichert (${e.runtimeType})');
+      widget.protokoll.eintrag(
+        Art.fehler,
+        'Einstellungen nicht gespeichert (${e.runtimeType})',
+      );
     }
     widget.protokoll.eintrag(
-        Art.info,
-        an
-            ? 'Update-Prüfung eingeschaltet: einmal täglich bei GitHub'
-            : 'Update-Prüfung ausgeschaltet: keine Anfrage an GitHub');
+      Art.info,
+      an
+          ? 'Update-Prüfung eingeschaltet: einmal täglich bei GitHub'
+          : 'Update-Prüfung ausgeschaltet: keine Anfrage an GitHub',
+    );
   }
 
   Future<void> _suchen() async {
@@ -101,72 +110,108 @@ class _EinstellungenDialogState extends State<EinstellungenDialog> {
       content: SizedBox(
         width: 560,
         child: SingleChildScrollView(
-          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Updates', style: Theme.of(context).textTheme.titleSmall),
-            if (!widget.updateMoeglich)
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Text(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Updates', style: Theme.of(context).textTheme.titleSmall),
+              if (!widget.updateMoeglich)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(
                     Platform.isWindows
                         ? 'Diese Version kann sich nicht selbst aktualisieren: Sie läuft nicht aus '
-                            'dem Installationsverzeichnis, oder die Prüfung ist über die Kommandozeile '
-                            'abgeschaltet ($keinUpdateSchalter).'
+                              'dem Installationsverzeichnis, oder die Prüfung ist über die Kommandozeile '
+                              'abgeschaltet ($keinUpdateSchalter).'
                         : 'Diese Version aktualisiert sich nicht selbst. Auf dem Mac prüft moocp nicht '
-                            'bei GitHub und lädt nichts herunter; eine neue Version kommt von Hand.',
-                    style: klein),
-              )
-            else ...[
-              CheckboxListTile(
-                dense: true,
-                contentPadding: EdgeInsets.zero,
-                controlAffinity: ListTileControlAffinity.leading,
-                value: an,
-                onChanged: _sucht ? null : (v) => _umschalten(v ?? false),
-                title: const Text('Einmal täglich bei GitHub nach einer neuen Version sehen'),
-                subtitle: Text(
+                              'bei GitHub und lädt nichts herunter; eine neue Version kommt von Hand.',
+                    style: klein,
+                  ),
+                )
+              else ...[
+                CheckboxListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  controlAffinity: ListTileControlAffinity.leading,
+                  value: an,
+                  onChanged: _sucht ? null : (v) => _umschalten(v ?? false),
+                  title: const Text(
+                    'Einmal täglich bei GitHub nach einer neuen Version sehen',
+                  ),
+                  subtitle: Text(
                     'GitHub erfährt dabei Ihre IP-Adresse und den Zeitpunkt. Nichts aus '
                     'Moodle wird übertragen.',
-                    style: klein),
-              ),
-              Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Text(
+                    style: klein,
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(
                     e.updateZuletzt == null
                         ? 'Noch nicht gesucht. Sie verwenden moocp ${widget.eigene}.'
                         : 'Zuletzt gesucht am ${e.updateZuletzt}. Sie verwenden moocp ${widget.eigene}.',
-                    style: klein),
+                    style: klein,
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: OutlinedButton(
+                    onPressed: _sucht ? null : _suchen,
+                    child: Text(
+                      _sucht ? 'Sucht …' : 'Jetzt nach Updates suchen',
+                    ),
+                  ),
+                ),
+              ],
+              const Divider(height: 32),
+              Text(
+                'KI-Werkzeuge',
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  'Claude Code, Codex CLI und LM Studio brauchen die Verbindung zu dieser App und '
+                  'die Skills in der Version, die zu ihr gehört. Dort wählen Sie auch, welche '
+                  'davon eingerichtet werden.',
+                  style: klein,
+                ),
               ),
               Padding(
                 padding: const EdgeInsets.only(top: 8),
                 child: OutlinedButton(
-                  onPressed: _sucht ? null : _suchen,
-                  child: Text(_sucht ? 'Sucht …' : 'Jetzt nach Updates suchen'),
+                  onPressed: _sucht
+                      ? null
+                      : () => Navigator.pop(
+                          context,
+                          EinstellungenErgebnis.einrichten,
+                        ),
+                  child: const Text('Verbindung und Skills prüfen'),
                 ),
               ),
+              if (widget.profilLoeschenMoeglich) ...[
+                const Divider(height: 32),
+                OutlinedButton.icon(
+                  key: const Key('delete-profile'),
+                  onPressed: _sucht
+                      ? null
+                      : () => Navigator.pop(
+                          context,
+                          EinstellungenErgebnis.profilLoeschen,
+                        ),
+                  icon: const Icon(Icons.delete_outline),
+                  label: const Text('MCP-Profil löschen'),
+                ),
+              ],
             ],
-            const Divider(height: 32),
-            Text('KI-Werkzeuge', style: Theme.of(context).textTheme.titleSmall),
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Text(
-                  'Claude Code, Codex CLI und LM Studio brauchen die Verbindung zu dieser App und '
-                  'die Skills in der Version, die zu ihr gehört. Dort wählen Sie auch, welche '
-                  'davon eingerichtet werden.',
-                  style: klein),
-            ),
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: OutlinedButton(
-                onPressed: _sucht ? null : () => Navigator.pop(context, EinstellungenErgebnis.einrichten),
-                child: const Text('Verbindung und Skills prüfen'),
-              ),
-            ),
-          ]),
+          ),
         ),
       ),
       actions: [
         FilledButton(
-          onPressed: _sucht ? null : () => Navigator.pop(context, EinstellungenErgebnis.fertig),
+          onPressed: _sucht
+              ? null
+              : () => Navigator.pop(context, EinstellungenErgebnis.fertig),
           child: const Text('Schließen'),
         ),
       ],

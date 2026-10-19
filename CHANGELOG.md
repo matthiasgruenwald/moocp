@@ -1,6 +1,8 @@
 # Changelog
 
 ## 0.9.23
+- Moodle-Profile: Ein nicht mehr benötigtes Profil lässt sich in den Einstellungen löschen; Anmeldung, gespeicherte Zugangsdaten und der Eintrag in Claude Code, Codex und LM Studio werden dabei entfernt, und bleibt einer stehen, sagt die App welcher.
+- Deinstallation: Die Einträge aller Moodle-Profile werden aus den KI-Werkzeugen entfernt, nicht nur der Eintrag „moodle“.
 - Übertragung: Prüfprobleme bleiben auch bei abgeschlossenen Zielen sichtbar; Zeitlimitantworten nennen den laufenden Vorgang und das passende Statuswerkzeug.
 - Wiederholungsschutz: Gescheiterte Wiederholungsversuche geben unklare Vorgänger nicht frei; parallele Übertragungen erhalten gegenseitig ihre Protokolleinträge.
 - Wiederherstellung: Geteilte Fragensammlungen werden vor dem Start mit ihren Risiken genannt; unbestätigte Herkunft wird auch ohne Freigabedialog erklärt.

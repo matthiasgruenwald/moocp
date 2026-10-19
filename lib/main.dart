@@ -176,8 +176,14 @@ class Instanz {
 
 /// Eingaben einer Anmeldung, festgehalten bevor sie asynchron beginnt.
 class AnmeldeAuftrag {
-  const AnmeldeAuftrag({required this.instanz, required this.profil, required this.adresse,
-    required this.benutzer, required this.passwort, required this.merken});
+  const AnmeldeAuftrag({
+    required this.instanz,
+    required this.profil,
+    required this.adresse,
+    required this.benutzer,
+    required this.passwort,
+    required this.merken,
+  });
   final Instanz instanz;
   final Profil profil;
   final String adresse;
@@ -218,10 +224,31 @@ Future<int> _claudeEntfernen() async {
     return (await einrichtungEntfernen(
       umgebung: Platform.environment,
       skills: skills,
+      mcpNamen: await _gespeicherteMcpNamen(),
     )).code;
   } catch (_) {
     return 3; // unbekannt, was geblieben ist: beides melden
   }
+}
+
+/// Die MCP-Namen aller gespeicherten Profile, immer mit `moodle`. Liest die
+/// Einstellungsdatei nur und schreibt sie nicht (anders als
+/// [Einstellungen.laden]): Die Deinstallation legt nichts neu an. Fehlt die
+/// Datei oder ist sie kaputt, bleibt es beim Namen `moodle`.
+Future<List<String>> _gespeicherteMcpNamen() async {
+  final namen = <String>{mcpName};
+  try {
+    final j = jsonDecode(
+      await einstellungenDatei.readAsString(),
+    ) as Map<String, dynamic>;
+    final standard = Einstellungen(moodleAdresse: '', schluessel: '');
+    namen.addAll(
+      Einstellungen.aus(j, standard).profile.map((pr) => pr.mcpName),
+    );
+  } catch (_) {
+    // Nichts zu lesen: nur der Standardname.
+  }
+  return namen.toList();
 }
 
 /// `moocp.exe --werkzeugliste`, für die Brücke (mcp/bruecke.dart), wenn die
@@ -511,6 +538,7 @@ class _HauptseiteState extends State<Hauptseite> with WindowListener {
         sitzungLaeuft: _dienst.laeuft,
         profilname: _profil.name,
         mcpName: _profil.mcpName,
+        profilLoeschenMoeglich: widget.einstellungen.profile.length > 1,
       ),
     );
     if (!mounted) return;
@@ -519,9 +547,113 @@ class _HauptseiteState extends State<Hauptseite> with WindowListener {
         await _beenden();
       case EinstellungenErgebnis.einrichten:
         await _einrichtungPruefen(immer: true);
+      case EinstellungenErgebnis.profilLoeschen:
+        await _profilLoeschen();
       case EinstellungenErgebnis.fertig:
       case null:
         break;
+    }
+  }
+
+  Future<void> _profilLoeschen() async {
+    if (_beschaeftigt || widget.einstellungen.profile.length < 2) return;
+    final profil = _profil;
+    final bestaetigt = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('MCP-Profil löschen?'),
+        content: Text(
+          '„${profil.name}“ (${profil.mcpName}) wird aus moocp entfernt. '
+          'Die Moodle-Anmeldung und gespeicherte Anmeldedaten dieses Profils werden gelöscht. '
+          'Der Eintrag „${profil.mcpName}“ wird auch aus Claude Code, Codex CLI und LM Studio entfernt, '
+          'soweit er dort steht.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Abbrechen'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Profil löschen'),
+          ),
+        ],
+      ),
+    );
+    if (bestaetigt != true || !mounted) return;
+    final index = _instanzen.indexWhere(
+      (i) => i.dienst.profil.kennung == profil.kennung,
+    );
+    if (index < 0) return;
+    final instanz = _instanzen[index];
+    final alteProfile = widget.einstellungen.profile;
+    final neueProfile = alteProfile
+        .where((p) => p.kennung != profil.kennung)
+        .toList();
+    widget.einstellungen.profile = neueProfile;
+    try {
+      await widget.einstellungen.speichern();
+    } catch (e) {
+      widget.einstellungen.profile = alteProfile;
+      widget.protokoll.eintrag(
+        Art.fehler,
+        'Profil nicht gelöscht: Einstellungen nicht gespeichert (${e.runtimeType})',
+      );
+      if (mounted) {
+        setState(
+          () => _meldung = 'Profil nicht gelöscht: Einstellungen konnten nicht gespeichert werden.',
+        );
+      }
+      return;
+    }
+    await instanz.dienst.stoppen();
+    instanz.moodle.abmelden();
+    try {
+      await Anmeldedaten.loeschen(
+        kennung: profil.kennung,
+        adresse: profil.adresse,
+      );
+    } catch (e) {
+      widget.protokoll.eintrag(
+        Art.fehler,
+        'Gespeicherte Anmeldedaten nicht gelöscht (${e.runtimeType})',
+      );
+    }
+    _instanzen.removeAt(index);
+    _profilIndex = index < _instanzen.length ? index : _instanzen.length - 1;
+    final eintraegeRest = await _werkzeugEintraegeEntfernen(profil);
+    if (!mounted) return;
+    setState(() {
+      _adresse.text = _profil.adresse;
+      _meldung = eintraegeRest.isEmpty
+          ? 'Profil „${profil.name}“ gelöscht.'
+          : 'Profil „${profil.name}“ gelöscht. Nicht entfernt, bitte von Hand austragen: '
+                '${eintraegeRest.join(', ')}.';
+    });
+  }
+
+  /// Entfernt den Eintrag des gelöschten Profils aus den KI-Werkzeugen. Gibt
+  /// zurück, was dort stehen blieb („Werkzeug (Name)"); die Gründe stehen
+  /// nicht im Protokoll, denn sie können nur Ausgaben der Programme sein (E11).
+  Future<List<String>> _werkzeugEintraegeEntfernen(Profil profil) async {
+    try {
+      final rest = await profilEintragEntfernen(
+        umgebung: Platform.environment,
+        name: profil.mcpName,
+      );
+      widget.protokoll.eintrag(
+        rest.isEmpty ? Art.info : Art.fehler,
+        rest.isEmpty
+            ? 'Profil gelöscht: Eintrag in den KI-Werkzeugen entfernt'
+            : 'Profil gelöscht: Eintrag in ${rest.length} KI-Werkzeug(en) bleibt stehen',
+      );
+      return rest;
+    } catch (e) {
+      widget.protokoll.eintrag(
+        Art.fehler,
+        'Einträge in den KI-Werkzeugen nicht entfernt (${e.runtimeType})',
+      );
+      return ['alle Werkzeuge (${profil.mcpName})'];
     }
   }
 
@@ -535,7 +667,10 @@ class _HauptseiteState extends State<Hauptseite> with WindowListener {
     final Anmeldedaten d;
     try {
       final geladen = await gespeicherteAnmeldedatenVerwenden(
-        laden: () => Anmeldedaten.laden(kennung: profil.kennung, adresse: profil.adresse),
+        laden: () => Anmeldedaten.laden(
+          kennung: profil.kennung,
+          adresse: profil.adresse,
+        ),
         zielIstAktiv: zielIstAktiv,
         anwenden: (daten) => setState(() {
           _merken = daten.merken;
@@ -733,7 +868,11 @@ class _HauptseiteState extends State<Hauptseite> with WindowListener {
   Future<void> _merkenAendern(bool an) async {
     setState(() => _merken = an);
     try {
-      await Anmeldedaten.merkenSetzen(an, kennung: _profil.kennung, adresse: _profil.adresse);
+      await Anmeldedaten.merkenSetzen(
+        an,
+        kennung: _profil.kennung,
+        adresse: _profil.adresse,
+      );
       widget.protokoll.eintrag(
         Art.anmeldung,
         an
@@ -759,14 +898,20 @@ class _HauptseiteState extends State<Hauptseite> with WindowListener {
     });
     final instanz = _aktiv;
     final profil = _profil;
-    bool zielIstAktiv() => mounted && index == _profilIndex &&
-        identical(_aktiv, instanz) && identical(_profil, profil);
+    bool zielIstAktiv() =>
+        mounted &&
+        index == _profilIndex &&
+        identical(_aktiv, instanz) &&
+        identical(_profil, profil);
     if (!await _einrichtungPruefen()) return;
     if (!zielIstAktiv()) return;
     final Anmeldedaten d;
     try {
       final geladen = await gespeicherteAnmeldedatenVerwenden(
-        laden: () => Anmeldedaten.laden(kennung: profil.kennung, adresse: profil.adresse),
+        laden: () => Anmeldedaten.laden(
+          kennung: profil.kennung,
+          adresse: profil.adresse,
+        ),
         zielIstAktiv: zielIstAktiv,
         anwenden: (daten) => setState(() {
           _merken = daten.merken;
@@ -830,9 +975,14 @@ class _HauptseiteState extends State<Hauptseite> with WindowListener {
       _profilIndex = _instanzen.length - 1;
       hinzugefuegt = true;
     } else {
-      final laufend = _instanzen.firstWhere((i) => i.dienst.profil.kennung == geaendert.kennung);
-      if (laufend.moodle.angemeldet && laufend.dienst.profil.adresse != geaendert.adresse) {
-        setState(() => _meldung = 'Die Moodle-Adresse kann während einer Anmeldung nicht geändert werden.');
+      final laufend = _instanzen.firstWhere(
+        (i) => i.dienst.profil.kennung == geaendert.kennung,
+      );
+      if (laufend.moodle.angemeldet &&
+          laufend.dienst.profil.adresse != geaendert.adresse) {
+        setState(
+          () => _meldung = 'Die Moodle-Adresse kann während einer Anmeldung nicht geändert werden.',
+        );
         return;
       }
       profile[index] = geaendert;
@@ -886,8 +1036,14 @@ class _HauptseiteState extends State<Hauptseite> with WindowListener {
 
   Future<void> _anmelden() async {
     if (_beschaeftigt) return;
-    final auftrag = AnmeldeAuftrag(instanz: _aktiv, profil: _profil, adresse: _adresse.text.trim(),
-        benutzer: _benutzer.text.trim(), passwort: _passwort.text, merken: _merken);
+    final auftrag = AnmeldeAuftrag(
+      instanz: _aktiv,
+      profil: _profil,
+      adresse: _adresse.text.trim(),
+      benutzer: _benutzer.text.trim(),
+      passwort: _passwort.text,
+      merken: _merken,
+    );
     final moodle = auftrag.instanz.moodle;
     final dienst = auftrag.instanz.dienst;
     final freigaben = auftrag.instanz.freigaben;
@@ -896,7 +1052,9 @@ class _HauptseiteState extends State<Hauptseite> with WindowListener {
     final benutzer = auftrag.benutzer;
     final passwort = auftrag.passwort;
     final merken = auftrag.merken;
-    freigaben.testmodus = Anmeldedaten.testzugangAktivFuer(profil.copyWith(adresse: adresse));
+    freigaben.testmodus = Anmeldedaten.testzugangAktivFuer(
+      profil.copyWith(adresse: adresse),
+    );
     setState(() {
       _beschaeftigt = true;
       _meldung = null;
@@ -1085,14 +1243,17 @@ class _HauptseiteState extends State<Hauptseite> with WindowListener {
                       spacing: 8,
                       children: [
                         OutlinedButton.icon(
-                          onPressed: _beschaeftigt || widget.instanzErstellen == null
+                          onPressed:
+                              _beschaeftigt || widget.instanzErstellen == null
                               ? null
                               : () => _profilBearbeiten(neu: true),
                           icon: const Icon(Icons.add),
                           label: const Text('Profil hinzufügen'),
                         ),
                         OutlinedButton.icon(
-                          onPressed: _beschaeftigt ? null : () => _profilBearbeiten(),
+                          onPressed: _beschaeftigt
+                              ? null
+                              : () => _profilBearbeiten(),
                           icon: const Icon(Icons.edit_outlined),
                           label: const Text('Profil bearbeiten'),
                         ),
@@ -1133,7 +1294,9 @@ class _HauptseiteState extends State<Hauptseite> with WindowListener {
                     crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       InkWell(
-                        onTap: _beschaeftigt ? null : () => _merkenAendern(!_merken),
+                        onTap: _beschaeftigt
+                            ? null
+                            : () => _merkenAendern(!_merken),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
@@ -1466,7 +1629,9 @@ class _FreigabeDialogeState extends State<FreigabeDialoge> {
   void didUpdateWidget(covariant FreigabeDialoge oldWidget) {
     super.didUpdateWidget(oldWidget);
     final freigabenGewechselt = oldWidget.freigaben != widget.freigaben;
-    final profilGewechselt = oldWidget.profilname != widget.profilname || oldWidget.mcpName != widget.mcpName;
+    final profilGewechselt =
+        oldWidget.profilname != widget.profilname ||
+        oldWidget.mcpName != widget.mcpName;
     if (!freigabenGewechselt && !profilGewechselt) return;
     if (freigabenGewechselt) {
       oldWidget.freigaben.removeListener(_zeigen);

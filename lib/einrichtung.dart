@@ -919,32 +919,55 @@ class Entfernt {
   int get code => (eintragBleibt.isEmpty ? 0 : 1) | (dateienBleiben.isEmpty ? 0 : 2);
 }
 
-/// Entfernt, was die App in den KI-Werkzeugen eingerichtet hat: den Eintrag
-/// „moodle" und die Skills [skills], in jedem Werkzeug. Danach wird
-/// nachgesehen, statt dem Ergebnis zu glauben.
+/// Entfernt, was die App in den KI-Werkzeugen eingerichtet hat: die
+/// Einträge [mcpNamen] (je Instanzprofil einer, E31) und die Skills
+/// [skills], in jedem Werkzeug. Danach wird nachgesehen, statt dem Ergebnis
+/// zu glauben.
 Future<Entfernt> einrichtungEntfernen({
   required Map<String, String> umgebung,
   required List<String> skills,
+  List<String> mcpNamen = const [mcpName],
   List<KiWerkzeug>? werkzeuge,
 }) async {
   final geblieben = <String>[];
   final eintraege = <String>[];
   for (final w in werkzeuge ?? alleWerkzeuge(umgebung)) {
-    await w.austragen();
+    for (final eintrag in mcpNamen) {
+      await w.austragen(name: eintrag);
+      if (await _eintragDa(w, eintrag)) {
+        eintraege.add(mcpNamen.length > 1 ? '${w.id} ($eintrag)' : w.id);
+      }
+    }
     for (final name in skills) {
       geblieben.addAll(skillEntfernen(Directory(p.join(w.skillOrdner.path, name))).map((f) => '${w.id}: $name/$f'));
     }
-    if (await _eintragDa(w)) eintraege.add(w.id);
   }
   return Entfernt(eintragBleibt: eintraege, dateienBleiben: geblieben);
 }
 
-/// Ob der Eintrag „moodle" (noch) steht, gleich mit welcher Adresse. Einen
+/// Entfernt den Eintrag eines gelöschten Profils in jedem Werkzeug und liest
+/// danach nach. Was stehen bleibt, kommt als Zeile „Werkzeug (Name)" zurück,
+/// damit die Lehrkraft es von Hand entfernen kann.
+Future<List<String>> profilEintragEntfernen({
+  required Map<String, String> umgebung,
+  required String name,
+  List<KiWerkzeug>? werkzeuge,
+}) async {
+  final geblieben = <String>[];
+  for (final w in werkzeuge ?? alleWerkzeuge(umgebung)) {
+    if (!await _eintragDa(w, name)) continue;
+    await w.austragen(name: name);
+    if (await _eintragDa(w, name)) geblieben.add('${w.name} ($name)');
+  }
+  return geblieben;
+}
+
+/// Ob der Eintrag [name] (noch) steht, gleich mit welcher Adresse. Einen
 /// halb geschriebenen Stand liest es kurz danach noch einmal; bleibt er
 /// unlesbar, zählt der Eintrag als vorhanden.
-Future<bool> _eintragDa(KiWerkzeug w) async {
+Future<bool> _eintragDa(KiWerkzeug w, [String name = mcpName]) async {
   for (var i = 0; i < 3; i++) {
-    final v = w.verbindung(0, '');
+    final v = w.verbindung(0, '', name: name);
     if (v != Verbindung.unlesbar) return v != Verbindung.fehlt;
     await Future<void>.delayed(const Duration(milliseconds: 500));
   }
