@@ -374,9 +374,19 @@ Future<String> _ausfuehren(
     }
 
     // Formular „Wiederherstellen" holen; der Entwurfsbereich ist sein Feld backupfile.
-    final f = await formularHolen(moodle, '/backup/restorefile.php?contextid=$kontext');
+    final f = await formularHolen(
+      moodle,
+      '/backup/restorefile.php?contextid=$kontext',
+      mitFeld: 'backupfile',
+    );
     final itemid = wertIn(f.felder, 'backupfile');
-    if (itemid == null) throw MoodleFehler('Das Formular nennt keinen Entwurfsbereich. Nichts geändert.');
+    if (itemid == null) {
+      // Nur Feldnamen, nie Werte (E11): Sie zeigen, welches Formular Moodle lieferte.
+      final namen = {for (final e in f.felder) e.key}.take(30).join(', ');
+      throw MoodleFehler(
+        'Das Formular nennt keinen Entwurfsbereich (Felder: $namen). Nichts geändert.',
+      );
+    }
     await hochladen(moodle, f, itemid, '/', name, bytes);
     await _uebergang(vorgaenge, vg, WiederherstellungStand.hochgeladen,
         vorherCmids: vorherCmids, wiederherstellungAktivitaeten: wiederherstellungAktivitaeten);
