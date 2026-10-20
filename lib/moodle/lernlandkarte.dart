@@ -294,9 +294,28 @@ Future<String> lernlandkarteVerknuepfungenSetzen(
   final rueckForm = await formularHolen(moodle, ziel.adresse);
   final gelesen = await formularLesen(moodle, ziel, arbeitsordner);
   final rueck = gelesen.lernlandkarte?['placestore'];
+  final erwarteteOrtsbeschriftungen = <String, String>{};
+  var beschriftungenBekannt = true;
+  for (final a in zuordnungen) {
+    final zielCmid = (a['ziel'] as num?)?.toInt();
+    final aktivitaet = zielCmid == null || zielCmid == 0
+        ? null
+        : struktur.nachCmid[zielCmid];
+    if (aktivitaet == null) {
+      beschriftungenBekannt = false;
+    } else {
+      erwarteteOrtsbeschriftungen['${a['ort']}'] = aktivitaet.name;
+    }
+  }
+  final svgGleich =
+      beschriftungenBekannt &&
+      _gleicheSvgMitNeubeschriftungen(
+        lesestand.lernlandkarte?['svgcode'],
+        gelesen.lernlandkarte?['svgcode'],
+        erwarteteOrtsbeschriftungen,
+      );
   final karteOk =
-      ohneOrtsbeschriftung(gelesen.lernlandkarte?['svgcode']) ==
-          ohneOrtsbeschriftung(lesestand.lernlandkarte?['svgcode']) &&
+      svgGleich &&
       const JsonEncoder().convert(rueck) == const JsonEncoder().convert(store);
   final formularOk =
       gelesen.name == vorher.name &&
@@ -309,12 +328,9 @@ Future<String> lernlandkarteVerknuepfungenSetzen(
   return 'Lernlandkarte „${gelesen.name}" zurückgelesen; Ortszuordnungen verified: $verified.';
 }
 
-/// Moodle schreibt beim Speichern die Beschriftung jedes Ortes neu, und zwar
-/// aus dem Namen der verknüpften Aktivität (gemessen an der Spike-Instanz).
-/// Der Vergleich der Zuordnung läuft über `placestore`; die Beschriftung im SVG
-/// bleibt außen vor. Bewusst für alle Orte, nicht nur für die mit geändertem
-/// Ziel: Moodle schreibt beim Speichern auch unveränderte Orte neu, und die
-/// Zuordnung von Beschriftung zu Ort ist nur an einer Instanz gemessen.
+/// Bestehende Aufrufer und Tests: entfernt Ortsbeschriftungen für eine reine
+/// Darstellung. Die Schreibprüfung verwendet stattdessen den engeren Vergleich
+/// [_gleicheSvgMitNeubeschriftungen].
 String? ohneOrtsbeschriftung(Object? svg) => svg is String
     ? svg.replaceAllMapped(
         RegExp(r'(<(?:title|text) id="(?:title|text)[^"]*"[^>]*>)[^<]*'),
@@ -323,9 +339,67 @@ String? ohneOrtsbeschriftung(Object? svg) => svg is String
     : null;
 
 bool _gleicheFelder(FormularGelesen vorher, FormularGelesen nachher) {
-  final a = {for (final f in vorher.felder) f.feld: f.html};
-  final b = {for (final f in nachher.felder) f.feld: f.html};
+  final a = {
+    for (final f in vorher.felder)
+      if (f.feld != 'svgcode' && f.feld != 'placestore')
+        f.feld: _vergleichHtml(f.feld, f.html),
+  };
+  final b = {
+    for (final f in nachher.felder)
+      if (f.feld != 'svgcode' && f.feld != 'placestore')
+        f.feld: _vergleichHtml(f.feld, f.html),
+  };
   return const JsonEncoder().convert(a) == const JsonEncoder().convert(b);
+}
+
+String _vergleichHtml(String feld, String wert) =>
+    (feld == 'introeditor[text]' || feld == 'introeditor')
+    ? wert.replaceAll(
+        RegExp(r'/draftfile\.php/\d+/user/draft/\d+/'),
+        '/draftfile.php/U/user/draft/X/',
+      )
+    : wert;
+
+/// Moodle darf nur die Beschriftung eines geänderten Orts aus dessen neuem
+/// Aktivitätsnamen erzeugen. Alle anderen SVG-Texte bleiben Teil des Vergleichs.
+bool _gleicheSvgMitNeubeschriftungen(
+  Object? vorher,
+  Object? nachher,
+  Map<String, String> erwarteteNamen,
+) {
+  if (vorher is! String || nachher is! String) return false;
+  var normalisiert = nachher;
+  for (final e in erwarteteNamen.entries) {
+    if (e.value.trim().isEmpty) return false;
+    var ortsbeschriftungVorhanden = false;
+    for (final tag in ['title', 'text']) {
+      final id = RegExp.escape(e.key);
+      final muster = RegExp('(<$tag id="$tag$id"[^>]*>)([^<]*)(</$tag>)');
+      final vorherTreffer = muster.allMatches(vorher).toList();
+      final nachherTreffer = muster.allMatches(normalisiert).toList();
+      if (vorherTreffer.length > 1 || nachherTreffer.length > 1) {
+        return false;
+      }
+      if (nachherTreffer.isEmpty) {
+        if (vorherTreffer.isNotEmpty) return false;
+        continue;
+      }
+      ortsbeschriftungVorhanden = true;
+      if (nachherTreffer.single.group(2) != e.value) return false;
+      final original = vorherTreffer.isEmpty
+          ? null
+          : vorherTreffer.single.group(2);
+      normalisiert = normalisiert.replaceRange(
+        nachherTreffer.single.start,
+        nachherTreffer.single.end,
+        original == null
+            ? ''
+            : '${nachherTreffer.single.group(1)}$original${nachherTreffer.single.group(3)}',
+      );
+    }
+    if (!ortsbeschriftungVorhanden) return false;
+  }
+  return vorher == normalisiert;
 }
 
 /// Gleicher Formularstand ohne Entwurfs-IDs. Der Hintergrund wird über seine
@@ -335,20 +409,15 @@ bool _gleicheFormularFelder(
   Formular nachher, {
   bool nachSpeichern = false,
 }) {
-  // Nach dem Speichern darf sich nur unterscheiden, was Moodle selbst neu
-  // schreibt: die Ortsbeschriftung im SVG und das Änderungsdatum der
-  // Hintergrunddatei (gemessen an der Spike-Instanz: jedes Speichern legt sie
-  // neu ab). Ihren Inhalt vergleicht _gleicheHintergrund. Beim Standvergleich
-  // vor dem Schreiben unterscheidet sich nichts.
+  // SVG-Beschriftungen prüft der Aufrufer anhand der Zielnamen. Moodle ändert
+  // außerdem das Änderungsdatum der Hintergrunddatei; ihren Inhalt vergleicht
+  // _gleicheHintergrund.
   List<List<String>> stand(Formular f) => [
     for (final e in f.felder)
-      if (e.key != 'sesskey' && !istEntwurfsId(e.key))
-        [
-          e.key,
-          nachSpeichern && e.key == 'svgcode'
-              ? ohneOrtsbeschriftung(e.value)!
-              : e.value,
-        ],
+      if (e.key != 'sesskey' &&
+          !istEntwurfsId(e.key) &&
+          !(nachSpeichern && e.key == 'svgcode'))
+        [e.key, _vergleichHtml(e.key, e.value)],
   ];
   String liste(Formular f) => [
     for (final e
@@ -394,17 +463,15 @@ bool _gleicheEinstellungen(
   FormularGelesen nachher, {
   bool beschriftungenNeu = false,
 }) {
-  Object? wert(String schluessel, Object? w) =>
-      beschriftungenNeu && schluessel == 'svgcode'
-      ? ohneOrtsbeschriftung(w)
-      : w;
   final a = {
     for (final e in vorher.einstellungen)
-      e.schluessel: wert(e.schluessel, e.wert),
+      if (!(beschriftungenNeu && e.schluessel == 'svgcode'))
+        e.schluessel: e.wert,
   };
   final b = {
     for (final e in nachher.einstellungen)
-      e.schluessel: wert(e.schluessel, e.wert),
+      if (!(beschriftungenNeu && e.schluessel == 'svgcode'))
+        e.schluessel: e.wert,
   };
   return const JsonEncoder().convert(a) == const JsonEncoder().convert(b);
 }

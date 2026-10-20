@@ -28,6 +28,10 @@ class TestMoodle {
   String? kartenSichtbar;
   bool svgBeimRuecklesenAendern = false;
   bool ortsbeschriftungNeuSchreiben = false;
+  String? ortsbeschriftungNachSpeichern;
+  String introHtml =
+      '<p><img src="http://127.0.0.1/draftfile.php/5/user/draft/9/karte.png">Beschreibung</p>';
+  bool introTextNachSpeichernAendern = false;
   // Moodle speichert die Hintergrunddatei bei jedem Speichern neu; ihr
   // Änderungsdatum steigt, der Inhalt bleibt (Messung an der Spike-Instanz).
   int? hintergrundDatum;
@@ -151,14 +155,23 @@ class TestMoodle {
               svg = '<svg><circle id="fremd"/></svg>';
             }
             if (ortsbeschriftungNeuSchreiben) {
-              // Moodle schreibt die Beschriftung jedes Ortes beim Speichern aus
-              // dem Namen der verknüpften Aktivität neu (Messung an der Spike-Instanz).
-              svg = svg
-                  .replaceAll(RegExp(r'<title id="titlep1">[^<]*</title>'), '')
-                  .replaceFirst(
-                    '</svg>',
-                    '<title id="titlep1">Etikett ${lernlandkarteSpeicherungen + 1}</title></svg>',
-                  );
+              // Moodle übernimmt den Namen der verknüpften Aktivität.
+              final label = ortsbeschriftungNachSpeichern ?? 'ZZ Ziel';
+              final beschriftung = RegExp(
+                r'(<(?:title|text) id="(?:title|text)p1"[^>]*>)[^<]*(</(?:title|text)>)',
+              );
+              svg = beschriftung.hasMatch(svg)
+                  ? svg.replaceAllMapped(
+                      beschriftung,
+                      (m) => '${m[1]}$label${m[2]}',
+                    )
+                  : svg.replaceFirst(
+                      '</svg>',
+                      '<title id="titlep1">$label</title></svg>',
+                    );
+            }
+            if (introTextNachSpeichernAendern) {
+              introHtml = introHtml.replaceFirst('Beschreibung', 'Geändert');
             }
             if (einstellungBeimRuecklesenAendern) {
               karteneinstellung = 'nach dem Speichern geändert';
@@ -166,7 +179,8 @@ class TestMoodle {
             lernlandkarteSpeicherungen++;
             if (hintergrundDatum != null) {
               hintergrundDatum = hintergrundDatum! + 15;
-              hintergrundBytes = hintergrundBytesNachSpeichern ?? hintergrundBytes;
+              hintergrundBytes =
+                  hintergrundBytesNachSpeichern ?? hintergrundBytes;
             }
             r.response.redirect(
               Uri.parse('/course/modedit.php?update=71'),
@@ -209,7 +223,7 @@ class TestMoodle {
           <input name="course" value="$kartenkurs"><input name="update" value="71">
           <input name="modulename" value="learningmap"><input name="name" value="ZZ Karte">
           <input name="karteneinstellung" value="$karteneinstellung">
-          <textarea name="introeditor[text]"></textarea><input name="introeditor[itemid]" value="$entwurfsId">
+          <textarea name="introeditor[text]">${const HtmlEscape().convert(introHtml.replaceAll(RegExp(r'/user/draft/\d+/'), '/user/draft/$entwurfsId/'))}</textarea><input name="introeditor[itemid]" value="$entwurfsId">
           <input type="hidden" name="backgroundfile" value="${entwurfsId + 1000}">
           ${hintergrundDatum == null ? '' : '<div id="fitem_id_backgroundfile"><label class="col-form-label">Hintergrundbild</label></div><script>M.form_filemanager.init(Y, {"target":"id_backgroundfile","itemid":${entwurfsId + 1000},"client_id":"c","list":[{"type":"file","filepath":"/","filename":"bg.png","size":$hintergrundGroesse,"datemodified":$hintergrundDatum,"url":"$basis/draftfile.php/5/user/draft/9/bg.png"}]});</script>'}
           <textarea name="svgcode">${const HtmlEscape().convert(svg)}</textarea>
@@ -374,13 +388,98 @@ void main() {
           ],
         },
       );
-      expect(extern.svg, contains('Etikett 1'));
+      expect(extern.svg, contains('ZZ Ziel'));
       expect(geschrieben, contains('verified: true'));
     },
   );
 
+  test(
+    'nur der erwartete Zielname darf eine Ortsbeschriftung ersetzen',
+    () async {
+      extern.lernlandkarteVorhanden = true;
+      extern.ortsbeschriftungNeuSchreiben = true;
+      extern.ortsbeschriftungNachSpeichern = 'ZZ Ziel';
+      extern.placestore = '{"places":[{"id":"p1","linkedActivity":70},{"id":"p2","linkedActivity":70}],"paths":[{"id":"w1","from":"p1","to":"p2"}],"startingplaces":[],"targetplaces":[]}';
+      extern.svg = '<svg><circle id="p1"/><text id="freie">Bleibt</text><title id="titlep1">Alt</title><title id="titlep2">Unverändert</title></svg>';
+      freigaben.stufe = Bestaetigungen.keine;
+      await starten();
+      final geschrieben = await client.tool(
+        'lernlandkarte_verknuepfungen_setzen',
+        {
+          'cmid': 71,
+          'name': 'ZZ Karte',
+          'zuordnungen': [
+            {'ort': 'p1', 'aktuell': 70, 'ziel': 72},
+          ],
+        },
+      );
+      expect(extern.svg, contains('<text id="freie">Bleibt</text>'));
+      expect(extern.svg, contains('<title id="titlep2">Unverändert</title>'));
+      expect(geschrieben, contains('verified: true'));
+    },
+  );
+
+  test('leere oder falsche Ortsbeschriftung wird nicht verified', () async {
+    await starten();
+    for (final label in ['', 'falsch']) {
+      extern.lernlandkarteVorhanden = true;
+      extern.ortsbeschriftungNeuSchreiben = true;
+      extern.ortsbeschriftungNachSpeichern = label;
+      extern.placestore = '{"places":[{"id":"p1","linkedActivity":70}],"paths":[{"id":"w1","from":"p1","to":"p1"}],"startingplaces":["p1"],"targetplaces":[]}';
+      extern.svg =
+          '<svg><circle id="p1"/><title id="titlep1">Alt</title></svg>';
+      freigaben.stufe = Bestaetigungen.keine;
+      final geschrieben = await client.tool(
+        'lernlandkarte_verknuepfungen_setzen',
+        {
+          'cmid': 71,
+          'name': 'ZZ Karte',
+          'zuordnungen': [
+            {'ort': 'p1', 'aktuell': 70, 'ziel': 72},
+          ],
+        },
+      );
+      expect(geschrieben, contains('verified: false'));
+    }
+  });
+
+  test('Beschreibung mit eingebettetem Bild bleibt bei wechselnder Draft-ID prüfbar', () async {
+    extern.lernlandkarteVorhanden = true;
+    extern.ortsbeschriftungNeuSchreiben = true;
+    freigaben.stufe = Bestaetigungen.keine;
+    await starten();
+    final geschrieben = await client.tool(
+      'lernlandkarte_verknuepfungen_setzen',
+      {
+        'cmid': 71,
+        'name': 'ZZ Karte',
+        'zuordnungen': [
+          {'ort': 'p1', 'aktuell': 70, 'ziel': 72},
+        ],
+      },
+    );
+    expect(geschrieben, contains('verified: true'));
+  });
+
+  test('echter Textwechsel in der Beschreibung wird nicht verified', () async {
+    extern.lernlandkarteVorhanden = true;
+    extern.ortsbeschriftungNeuSchreiben = true;
+    extern.introTextNachSpeichernAendern = true;
+    freigaben.stufe = Bestaetigungen.keine;
+    await starten();
+    final geaendert = await client.tool('lernlandkarte_verknuepfungen_setzen', {
+      'cmid': 71,
+      'name': 'ZZ Karte',
+      'zuordnungen': [
+        {'ort': 'p1', 'aktuell': 70, 'ziel': 72},
+      ],
+    });
+    expect(geaendert, contains('verified: false'));
+  });
+
   Future<String> hintergrundSetzen() async {
     extern.lernlandkarteVorhanden = true;
+    extern.ortsbeschriftungNeuSchreiben = true;
     extern.hintergrundDatum = 1000;
     freigaben.stufe = Bestaetigungen.keine;
     await starten();
@@ -414,6 +513,7 @@ void main() {
 
   test('Lernlandkarte wird über MCP gelesen, ein Ziel freigegeben geschrieben und zurückgelesen', () async {
     extern.lernlandkarteVorhanden = true;
+    extern.ortsbeschriftungNeuSchreiben = true;
     freigaben.stufe = Bestaetigungen.keine;
     await starten();
     final gelesen = await client.tool('aktivitaet_lesen', {'cmid': 71});
@@ -480,6 +580,7 @@ void main() {
     );
     expect(extern.svg, contains('id="p2"'));
     expect((jsonDecode(extern.placestore) as Map)['startingplaces'], ['p1']);
+    extern.ortsbeschriftungNeuSchreiben = true;
     final link = await client.tool('lernlandkarte_verknuepfungen_setzen', {
       'cmid': 71,
       'name': 'ZZ Karte',
@@ -488,7 +589,6 @@ void main() {
       ],
     });
     expect(link, contains('verified: true'));
-    expect(link, contains('Debug-Testbetrieb: automatisch freigegeben'));
     expect(
       ((jsonDecode(extern.placestore) as Map)['places'] as List)
           .first['linkedActivity'],

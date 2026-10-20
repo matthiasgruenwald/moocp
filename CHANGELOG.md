@@ -7,6 +7,7 @@
 - Lernlandkarten: Eine verborgene Karte lässt sich aus dem nativen Moodle-Formular anlegen; eine skriptfreie `lernlandkarte.json`-Vorlage kann Orte und Wege vorgeben, Ortsziele bleiben gezielt freigabegeschützt änderbar.
 - Lernlandkarten: Zieländerungen verfallen, wenn sich Karte, Kurs oder Ziel während der Freigabe ändern; die Rückleseprobe vergleicht SVG, Kartendaten, Einstellungen und übrige Inhalte.
 - Lernlandkarten: Nach dem Speichern meldet das Rücklesen `verified: true`, auch wenn Moodle die Ortsbeschriftung und die Hintergrunddatei neu ablegt; vorher stand dort fälschlich `false`.
+- Lernlandkarten: Das Rücklesen prüft Ortslabels gegen die Namen der neuen Ziele und freie SVG-Texte bleiben geschützt; eingebettete Bilder mit neuer Moodle-Entwurfs-ID verursachen keinen falschen Konflikt.
 - Debug-Testbetrieb: Eigene verborgene ZZ-Lernlandkarten lassen sich im gebundenen Testumfang ohne persönliche Freigabe ändern und als Bild prüfen.
 - Lernlandkarten: Anlegen, Ortsziele ändern, Rücklesen und Aufräumen sind auch auf der zweiten Testinstanz mit eigenen ZZ-Proben durchgespielt; das Bildschirmfoto zeigt dort die Karte nur abgeschnitten.
 - Debug-Testbetrieb: Gebundene Testprofile melden sich selbst an; automatische Freigaben einschließlich Inhaltsbildern bleiben auf erlaubte Testkurse und eigene verborgene ZZ-Textseiten begrenzt.
