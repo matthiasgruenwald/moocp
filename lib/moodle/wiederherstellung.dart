@@ -456,7 +456,11 @@ Future<String> _ausfuehren(
     await _uebergang(vorgaenge, vg, WiederherstellungStand.laufend,
         laufzeit: laufzeit, backupid: restoreid, kontext: kontext);
     try {
-      await moodle.senden(s16.aktion, s16.felder);
+      final start = await moodle.senden(s16.aktion, s16.felder);
+      if (start.status >= 400) {
+        throw MoodleFehler('Der Wiederherstellungsstart wurde mit HTTP ${start.status} beantwortet. '
+            'Der Ausgang ist unklar; mit wiederherstellung_status prüfen, nicht neu senden.');
+      }
     } catch (_) {
       await _uebergang(vorgaenge, vg, WiederherstellungStand.unklar,
           text: 'Der Start ist nicht bestätigt. wiederherstellung_status prüft erneut; nicht neu senden.');
