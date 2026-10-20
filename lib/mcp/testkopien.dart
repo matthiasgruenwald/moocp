@@ -288,7 +288,7 @@ extension Testkopien on Testbetrieb {
         store.putIfAbsent('version', () => 2024072201);
         store.putIfAbsent('strokeopacity', () => 1);
         for (final ort in (store['places'] as List).cast<Map>()) {
-          final ziel = (ort['linkedActivity'] as num?)?.toInt() ?? 0;
+          final ziel = ortsziel(ort['linkedActivity']) ?? 0;
           if (ziel != 0 && !ids.containsKey(ziel)) return null;
           ort['linkedActivity'] = ziel == 0
               ? null

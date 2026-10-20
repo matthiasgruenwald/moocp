@@ -1,6 +1,14 @@
 # Changelog
 
 ## 0.9.23
+- Formulare: Eine globale Moodle-Suche in der Kopfzeile stört das Lesen und Ändern von Aktivitäten nicht mehr.
+- Wiederherstellung und Unterrichtsverteilung: Sichtbarkeit und Voraussetzungen bleiben standardmäßig wie in der Quelle; Verbergen ist ausdrücklich wählbar, die Freigabe nennt die Wahl.
+- Sicherung und Wiederherstellung: Die normale Antwortfrist wird als laufende Hintergrundarbeit erklärt, mit Statusabfragen bis zu 30 Minuten.
+- Wiederherstellung: Hält Moodle nach dem Prüfen mit der Seite „Rollenzuordnungen“ an, bestätigt die App die Vorgabe einmal; vorher blieb der Vorgang ohne Fehlermeldung auf „wartet“ stehen.
+- Wiederherstellung: Das Protokoll zeigt den Aufbau der Antwort auf den Start und die Rohwerte des Fortschritts (nur Zahlen und Feldnamen), damit eine nicht startende Wiederherstellung erkennbar wird.
+- Lernlandkarten: Eine Karte, deren Ortsziele Moodle als Text speichert, lässt sich wieder lesen (vorher Fehler beim Lesen, auch beim Verschieben in eine andere Instanz).
+- Mac: Die App startet per Doppelklick auf `moocp-starten.command` und baut sich bei Bedarf selbst.
+- Lernlandkarten: Eine Karte ohne Wege meldet beim Rücklesen kein falsches `verified: false` mehr.
 - Lernlandkarten: Vorhandene Zielaktivitäten lassen sich mit Inhaltsbelegen vorschlagen; fachliche Zuordnungen brauchen auch bei „keine“ eine Entscheidung und verfallen bei verändertem Inhalt.
 - Lernlandkarten: Ein Minutenwechsel bei ausgeschaltetem Abschlusstermin verhindert keine bestätigte Zielzuordnung mehr.
 - Debug-Testbetrieb: Vollständig geprüfte Kopien eigener ZZ-Proben lassen sich auch im gebundenen zweiten Profil automatisch nachbearbeiten und als Bild prüfen.

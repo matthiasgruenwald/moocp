@@ -17,6 +17,9 @@ import 'mcp_client.dart';
 class TestMoodle {
   late HttpServer server;
   bool vorhanden = false;
+  bool globaleSuche = false;
+  String suchformularAttribute = 'class="mform d-flex flex-wrap align-items-center searchform-navbar" action="/search/index.php"';
+  bool bearbeitungsformularFehlt = false;
   Completer<void>? wartet;
   Completer<void>? fortsetzen;
   String name = 'ZZ Probe';
@@ -56,7 +59,8 @@ class TestMoodle {
   }
 
   String seite(String text) =>
-      '<script>M.cfg = {"sesskey":"sk","courseId":12,"contextid":"55"};</script>$text';
+      '<script>M.cfg = {"sesskey":"sk","courseId":12,"contextid":"55"};</script>'
+      '${globaleSuche ? '<form $suchformularAttribute><input type="hidden" name="context" value="55"><input name="q"><button type="submit">Suchen</button></form>' : ''}$text';
   Future<void> starten() async {
     server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     server.listen((r) async {
@@ -241,6 +245,7 @@ class TestMoodle {
           <input type="submit" name="submitbutton" value="Speichern"></form>''',
           );
         }
+        if (bearbeitungsformularFehlt) antwort = seite('');
       } else if (r.uri.path.startsWith('/draftfile.php/')) {
         r.response.statusCode = hintergrundStatus;
         r.response.add(hintergrundBytes);
@@ -373,6 +378,39 @@ void main() {
       await client.tool('kurs_uebersicht', {'kurs': 12}),
       isNot(contains('ZZ Probe')),
     );
+  });
+
+  for (final fall in <String, String?>{
+    'mit Suchklasse und Suchpfad': 'class="mform searchform-navbar" action="/search/index.php"',
+    'ohne Suchleiste': null,
+    'nur mit Suchpfad, Installationspräfix und Query': 'class="mform" action="/moodle/search/index.php?context=55"',
+    'nur mit Suchklasse': 'class="mform searchform-navbar" action="/suche"',
+  }.entries) {
+    test('Aktivität ${fall.key} wird über MCP gelesen und geändert', () async {
+      extern.globaleSuche = fall.value != null;
+      if (fall.value != null) extern.suchformularAttribute = fall.value!;
+      extern.vorhanden = true;
+      freigaben.stufe = Bestaetigungen.keine;
+      await starten();
+      final gelesen = await client.tool('aktivitaet_lesen', {'cmid': 70});
+      expect(gelesen, contains('Gelesen: ZZ Probe (page, cmid 70, Kurs 12)'));
+      final datei = File('${ordner.path}/cm-70/page.html');
+      expect(await datei.readAsString(), contains('Vorher'));
+      await datei.writeAsString('<h3>ZZ Probe</h3><p>Nachher</p>');
+      final gespeichert = await client.tool('aendern', {'ordner': 'cm-70'});
+      expect(gespeichert, contains('verified: true'));
+      expect(extern.inhalt, '<h3>ZZ Probe</h3><p>Nachher</p>');
+    });
+  }
+
+  test('globale Suche allein wird nicht als Bearbeitungsformular gemeldet', () async {
+    extern.globaleSuche = true;
+    extern.bearbeitungsformularFehlt = true;
+    extern.vorhanden = true;
+    await starten();
+    final gelesen = await client.tool('aktivitaet_lesen', {'cmid': 70});
+    expect(gelesen, contains('kein Bearbeitungsformular'));
+    expect(gelesen, isNot(contains('Gelesen:')));
   });
 
   test(

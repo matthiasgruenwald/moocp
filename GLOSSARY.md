@@ -117,7 +117,11 @@ Eine kleine HTML-Anwendung zum Ausprobieren oder Üben, die in einem abgeschotte
 _Nicht zu verwechseln mit_: Aktivität (eine Moodle-Aktivität wie Test oder Board).
 
 **Verborgen / sichtbar**
-Die Moodle-Sichtbarkeit einer Aktivität oder eines Abschnitts. Neu Angelegtes ist zunächst verborgen, bis die Lehrkraft es sichtbar schaltet.
+Die Moodle-Sichtbarkeit einer Aktivität oder eines Abschnitts. Verborgenes erscheint für Lernende nicht auf der Kursseite; Voraussetzungen können den Zugang zusätzlich einschränken.
+
+**Sichtbarkeitswahl bei Wiederherstellungen**
+Ob wiederhergestellte Inhalte ihre Sichtbarkeit aus der Quelle behalten („wie Quelle“) oder die neuen Aktivitäten nachträglich verborgen werden („verborgen“). Die Voraussetzungen der Quelle bleiben in beiden Fällen erhalten.
+_Code_: `WiederherstellungsSichtbarkeit`
 
 **Druckaufbereitung**
 Eine Funktion einer Moodle-Instanz, die Aufgabenblätter zum Drucken aufbereitet. Ob sie vorhanden ist, erkennt die App, sie wird nicht eingestellt.

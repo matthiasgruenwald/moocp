@@ -95,8 +95,8 @@ class KartenZielkontext {
       return orte.single;
     }
 
-    final aktuell = (place(karte)['linkedActivity'] as num?)?.toInt() ?? 0;
-    final quelle = (place(quellKarte)['linkedActivity'] as num?)?.toInt() ?? 0;
+    final aktuell = ortsziel(place(karte)['linkedActivity']) ?? 0;
+    final quelle = ortsziel(place(quellKarte)['linkedActivity']) ?? 0;
     Map<String, Object?> quellInhalt;
     if (quelle == 0) {
       quellInhalt = {'status': 'kein Quellziel'};

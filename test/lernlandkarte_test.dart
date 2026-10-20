@@ -32,6 +32,9 @@ class _Doppel {
   /// Anfragen, die Moodle als Speichern eines Formulars erhalten hat.
   final List<String> speichern = [];
 
+  /// Moodle speichert `linkedActivity` je nach Weg als Zahl oder als Text.
+  bool zielAlsText = false;
+
   static const benutzer = 'e.mustermann';
   static const passwort = 'test-geheim-23';
   static const sesskey = 'sk23';
@@ -39,7 +42,12 @@ class _Doppel {
   /// Die tatsächlichen Feldarten: editor-Beschreibung, rohe SVG-Textarea,
   /// verborgenes placestore-JSON und ein Auswahlfeld ohne Namen.
   /// Verweise sind absolut mit der Instanzadresse, so wie Moodle sie speichert.
-  String get karte =>
+  String get karte => _karte.replaceAll(
+    '"linkedActivity":101',
+    zielAlsText ? '"linkedActivity":"101"' : '"linkedActivity":101',
+  );
+
+  String get _karte =>
       '''<form class="mform" method="post" action="/course/modedit.php">
 <input type="hidden" name="sesskey" value="$sesskey">
 <input type="hidden" name="modulename" value="learningmap">
@@ -180,6 +188,25 @@ void main() {
     ) as Map;
     expect(karte['svgcode'], contains('<circle id="p1"/>'));
     expect((karte['orte'] as List).single['linkedActivity'], 101);
+  });
+
+  test('Lernlandkarte: ein als Text gespeichertes Ortsziel wird wie eine Zahl gelesen', () async {
+    doppel.zielAlsText = true;
+    final g = await formularLesen(
+      zugang,
+      Formularziel.aktivitaet(31),
+      arbeitsordner.path,
+    );
+    final text = g.zusammenfassung();
+    expect(text, contains('Aktivität 101'));
+    expect(text, contains('ZZ Seite'));
+    expect(ortsziel('101'), 101);
+    expect(ortsziel(' 101 '), 101);
+    expect(ortsziel(101), 101);
+    expect(ortsziel(101.0), 101);
+    expect(ortsziel(''), isNull);
+    expect(ortsziel(null), isNull);
+    expect(ortsziel({'id': 1}), isNull);
   });
 
   test('Lesen eines schreibbaren Typs: keine Prüflücke', () async {

@@ -35,6 +35,12 @@ class _Moodle {
   Completer<void>? hold;
   bool completed = false;
   bool completeOnStart = false;
+  bool sichtbar = false;
+  int verbergen = 0;
+  bool rollenSeite = false;
+  String? rollenSonderfall;
+  bool uploadFormularFehlt = false;
+  int rollenBestaetigt = 0;
   List<String> weitereQuizze = [];
   static const restore = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
   Uri get basis => Uri.parse('http://127.0.0.1:${server.port}');
@@ -73,7 +79,7 @@ class _Moodle {
           case 'core_courseformat_get_state':
             data = {
               'cm': [
-                if (completed) {'id': 70, 'module': modul, 'name': title, 'visible': 0, 'sectionid': 1},
+                if (completed) {'id': 70, 'module': modul, 'name': title, 'visible': sichtbar ? 1 : 0, 'sectionid': 1},
                 if (completed)
                   for (var i = 0; i < weitereQuizze.length; i++)
                     {'id': 71 + i, 'module': 'quiz', 'name': weitereQuizze[i], 'visible': 0, 'sectionid': 1},
@@ -86,6 +92,12 @@ class _Moodle {
                 },
               ],
             };
+          case 'core_courseformat_update_course':
+            final args = call['args'] as Map;
+            if (args['action'] != 'cm_hide') throw StateError('Unerwartete Kursaktion');
+            verbergen++;
+            sichtbar = false;
+            data = {};
           case 'core_backup_get_async_backup_progress':
             progressReads++;
             final waiting = hold;
@@ -146,18 +158,32 @@ class _Moodle {
           await r.response.close();
           return;
         }
-        final upload = form({'_qf__course_restore_form': '1', 'backupfile': '9'}, path: path);
+        final upload = uploadFormularFehlt ? '' : form({'_qf__course_restore_form': '1', 'backupfile': '9'}, path: path);
+        final anderesFormular = form({'anderes_feld': 'technisch'}, path: path);
         final link = linkAvailable
             ? '<a href="/pluginfile.php/55/user/backup/1/download.mbz?forcedownload=1">download.mbz</a>'
             : '';
-        answer = '$upload<script>var repo = {"id":4,"type":"upload"};</script>$link';
+        answer = '$anderesFormular$upload<script>var repo = {"id":4,"type":"upload"};</script>$link';
       } else if (path == '/backup/restore.php') {
         if (r.method == 'GET') {
           answer = form({'contextid': '55', 'filename': 'abc', 'stage': '2'});
         } else {
           writes++;
           final f = Uri.splitQueryString(body);
-          if (f.containsKey('_qf__restore_review_form')) {
+          if (f.containsKey('_qf__restore_review_form') && rollenSeite) {
+            answer = form({
+              'restore': restore, 'stage': '32', 'substage': 'rolemapping',
+              'mapping5': rollenSonderfall == 'leer' ? '' : '5',
+              if (rollenSonderfall == 'zusatzfeld') 'unerwartet': '1',
+            });
+          } else if (f.containsKey('substage')) {
+            rollenBestaetigt++;
+            starts++;
+            if (completeOnStart) completed = true;
+            answer = rollenSonderfall == 'erneut'
+                ? form({'restore': restore, 'stage': '32', 'substage': 'rolemapping', 'mapping5': '5'})
+                : page('Gestartet');
+          } else if (f.containsKey('_qf__restore_review_form')) {
             starts++;
             if (completeOnStart) completed = true;
             answer = page('Gestartet');
@@ -312,12 +338,49 @@ void main() {
     expect(tool['annotations']['destructiveHint'], true);
   });
 
+  test('fehlendes Upload-Formular wird vor dem Hochladen mit Feldnamen gemeldet', () async {
+    external.uploadFormularFehlt = true;
+    final result = await client.tool('wiederherstellen_datei', arguments);
+    expect(result, contains('kein Formular mit dem Feld backupfile'));
+    expect(result, contains('anderes_feld'));
+    expect(result, isNot(contains('technisch')));
+    expect(external.writes, 0);
+    expect(external.starts, 0);
+  });
+
+  test('Wiederherstellung behält ohne Sichtbarkeitswahl die Quelle und benennt die Prüfgrenze', () async {
+    external.sichtbar = true;
+    external.completeOnStart = true;
+    external.progress = {'progress': 1, 'status': 1000};
+    approvals.stufe = Bestaetigungen.mittel;
+    String? freigabe;
+    approvals.addListener(() {
+      if (approvals.aktuell == null) return;
+      freigabe = approvals.aktuell!.punkte.join(' ');
+      scheduleMicrotask(() => approvals.entscheiden(true));
+    });
+    final result = await client.tool('wiederherstellen_datei', arguments);
+    expect(external.sichtbar, isTrue, reason: result);
+    expect(external.verbergen, 0);
+    expect(freigabe, contains('Sichtbarkeit: wie Quelle'));
+    expect(result, contains('verified: true'));
+    expect(result, contains('Sichtbarkeit und Voraussetzungen nicht gegengeprüft'));
+    expect(result, isNot(contains('verborgen: verified')));
+    final duplicate = await client.tool('wiederherstellen_datei', {...arguments, 'sichtbarkeit': 'verborgen'});
+    expect(duplicate, contains('schon im Vorgang'));
+    expect(external.starts, 1);
+  });
+
   test('Start, Zeitlimit, Profilumbenennung und Neustart behalten Wiederholungsschutz', () async {
     external.hold = Completer<void>();
     final result = await client.tool('wiederherstellen_datei', arguments);
     expect(external.starts, 1, reason: result);
     final number = RegExp(r'Nummer ([a-z0-9]+)').firstMatch(result)!.group(1)!;
     expect(result, contains('wiederherstellung_status'));
+    expect(result, contains('normale Antwortfrist'));
+    expect(result, contains('kein Fehler'));
+    expect(result, contains('30 Minuten'));
+    expect(result, contains('nicht erneut senden'));
     external.progress = {'error': 'failed', 'progress': 0.2};
     external.hold!.complete();
     external.hold = null;
@@ -329,6 +392,98 @@ void main() {
     final duplicate = await client.tool('wiederherstellen_datei', arguments);
     expect(duplicate, contains(number));
     expect(external.starts, 1);
+  });
+
+  for (final wahl in ['wie_quelle', 'verborgen']) {
+    test('Sichtbarkeitswahl $wahl bleibt bei späterer Statusabfrage nach Neustart erhalten', () async {
+      external.progress = {'unexpected': true};
+      external.sichtbar = true;
+      final gestartet = await client.tool('wiederherstellen_datei', {...arguments, 'sichtbarkeit': wahl});
+      final nummer = RegExp(r'Nummer ([a-z0-9]+)').firstMatch(gestartet)!.group(1)!;
+      await service.stoppen();
+      client.http.close(force: true);
+      await startService();
+      external.completed = true;
+      external.progress = {'progress': 1, 'status': 1000};
+      final status = await client.tool('wiederherstellung_status', {'id': nummer});
+      expect(external.sichtbar, wahl == 'wie_quelle', reason: status);
+      expect(external.verbergen, wahl == 'verborgen' ? 1 : 0);
+      expect(status, contains('verified: true'));
+      final nochmal = await client.tool('wiederherstellung_status', {'id': nummer});
+      expect(nochmal, contains(wahl == 'wie_quelle'
+          ? 'Sichtbarkeit und Voraussetzungen nicht gegengeprüft' : 'Neu im Kurs'));
+      expect(external.starts, 1);
+      expect(external.verbergen, wahl == 'verborgen' ? 1 : 0);
+    });
+  }
+
+  for (final wahl in [null, 'verborgen']) {
+    test('Übertragung nennt Sichtbarkeitswahl $wahl in Gesamt- und Zielfreigabe und führt sie aus', () async {
+      external.sichtbar = true;
+      external.completeOnStart = true;
+      external.progress = {'progress': 1, 'status': 1000};
+      approvals.stufe = Bestaetigungen.mittel;
+      final freigaben = <String>[];
+      approvals.addListener(() {
+        if (approvals.aktuell == null) return;
+        freigaben.add(approvals.aktuell!.punkte.join(' '));
+        scheduleMicrotask(() => approvals.entscheiden(true));
+      });
+      final result = await client.tool('uebertragen', {
+        'datei': 'test.mbz',
+        'sichtbarkeit': ?wahl,
+        'ziele': [{'kurs': 12, 'name': 'ZZ Kurs', 'weg': 'aktueller_kurs_verschmelzen'}],
+      });
+      expect(result, contains('1 fertig'));
+      expect(external.sichtbar, wahl == null);
+      expect(freigaben, hasLength(2));
+      expect(freigaben.every((f) => f.contains('Sichtbarkeit: ${wahl ?? 'wie Quelle'}')), isTrue);
+    });
+  }
+
+  test('Altvorgang ohne gespeicherte Sichtbarkeitswahl bleibt beim bisherigen Verbergen', () async {
+    external.progress = {'unexpected': true};
+    external.sichtbar = true;
+    final gestartet = await client.tool('wiederherstellen_datei', arguments);
+    final nummer = RegExp(r'Nummer ([a-z0-9]+)').firstMatch(gestartet)!.group(1)!;
+    await service.stoppen();
+    client.http.close(force: true);
+    final datei = File(p.join(folder.path, 'vorgaenge.json'));
+    final alt = (jsonDecode(await datei.readAsString()) as List).cast<Map>();
+    for (final v in alt) { v.remove('sichtbarkeit'); }
+    await datei.writeAsString(jsonEncode(alt));
+    await startService();
+    external.completed = true;
+    external.progress = {'progress': 1, 'status': 1000};
+    final status = await client.tool('wiederherstellung_status', {'id': nummer});
+    expect(status, contains('verborgen: verified'));
+    expect(external.sichtbar, isFalse);
+    expect(external.verbergen, 1);
+  });
+
+  test('ungültige Sichtbarkeitswahl startet weder Wiederherstellung noch Übertragung', () async {
+    final vorher = external.requests;
+    for (final werkzeug in ['wiederherstellen_datei', 'uebertragen']) {
+      final request = await client.http.postUrl(Uri.parse('http://127.0.0.1:${profile.port}/mcp'));
+      request.headers
+        ..set('Authorization', 'Bearer test')
+        ..set('Accept', 'application/json, text/event-stream')
+        ..set('Mcp-Session-Id', client.session!)
+        ..contentType = ContentType.json;
+      request.write(jsonEncode({
+        'jsonrpc': '2.0', 'id': ++client.id, 'method': 'tools/call',
+        'params': {'name': werkzeug, 'arguments': {
+          ...arguments,
+          'sichtbarkeit': 'sichtbar',
+          'ziele': [{'kurs': 12, 'name': 'ZZ Kurs', 'weg': 'aktueller_kurs_verschmelzen'}],
+        }},
+      }));
+      final result = jsonDecode(await utf8.decoder.bind(await request.close()).join()) as Map;
+      expect(result['error']['code'], -32602);
+      expect(result['error']['message'], contains('sichtbarkeit'));
+    }
+    expect(external.requests, vorher);
+    expect(external.writes, 0);
   });
   String nummerAus(String text) => RegExp(r'Nummer ([a-z0-9]+)').firstMatch(text)!.group(1)!;
 
@@ -618,6 +773,38 @@ void main() {
     expect(result, contains('Fragenherkunft nicht bestätigt'));
     expect(result, isNot(contains('verborgen: verified')));
   });
+
+  test('Moodle hält mit der Rollenzuordnung an: die Vorgabe wird einmal bestätigt, dann läuft die Wiederherstellung', () async {
+    writeArchive(quiz: true, geteilt: true);
+    external.progress = {'progress': 1, 'status': 1000};
+    external.completeOnStart = true;
+    external.rollenSeite = true;
+    final result = await client.tool('uebertragen', {
+      'datei': 'test.mbz',
+      'ziele': [{'kurs': 12, 'name': 'ZZ Kurs', 'weg': 'aktueller_kurs_verschmelzen'}],
+    });
+    expect(external.rollenBestaetigt, 1);
+    expect(external.starts, 1);
+    expect(result, contains('1 fertig'));
+  });
+
+  for (final fall in ['leer', 'zusatzfeld', 'erneut']) {
+    test('Rollenzuordnung $fall wird nicht blind bestätigt oder wiederholt', () async {
+      external.rollenSeite = true;
+      external.rollenSonderfall = fall;
+      external.progress = {'unexpected': true};
+      final result = await client.tool('wiederherstellen_datei', arguments);
+      expect(external.rollenBestaetigt, fall == 'erneut' ? 1 : 0);
+      expect(result, contains(switch (fall) {
+        'leer' => 'Unklar',
+        'zusatzfeld' => 'Gesperrt',
+        _ => 'Rollenzuordnung erneut',
+      }));
+      final v = (await Vorgaenge(folder.path, profilKennung: profile.kennung).alle()).single;
+      expect(v.wiederherstellung, WiederherstellungStand.unklar);
+      expect(v.verified, isFalse);
+    });
+  }
 
   test('Übertragungszeitlimit beim Sichern nennt Sicherungsnummer und Statuswerkzeug', () async {
     external.hold = Completer<void>();

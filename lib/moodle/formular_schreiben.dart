@@ -273,7 +273,14 @@ class Formular {
   };
 }
 
-Future<Formular> formularHolen(MoodleZugang moodle, String adresse) async {
+/// [mitFeld] wählt unter mehreren Formularen der Seite das, das dieses Feld
+/// trägt; fehlt es, bricht die Auswahl ab. Ohne Feldwahl gilt das Hauptformular
+/// (E17: die Seite ist maßgeblich, nicht die Reihenfolge der Formulare).
+Future<Formular> formularHolen(
+  MoodleZugang moodle,
+  String adresse, {
+  String? mitFeld,
+}) async {
   final r = await moodle.lesen(adresse);
   // Erst der Status: Eine Fehlerseite trägt eigene Formulare -- etwa den
   // Schalter „Bearbeiten einschalten". Ohne diese Prüfung wurde das erstbeste
@@ -285,8 +292,21 @@ Future<Formular> formularHolen(MoodleZugang moodle, String adresse) async {
       'Ziel, und ist es für diesen Zweck die richtige Adresse?',
     );
   }
-  final form = hauptformular(html_parser.parse(r.text));
+  final doc = html_parser.parse(r.text);
+  final form = mitFeld == null
+      ? hauptformular(doc)
+      : doc.querySelectorAll('form')
+          .where((f) => f.querySelector('[name="$mitFeld"]') != null)
+          .firstOrNull;
   if (form == null) {
+    if (mitFeld != null) {
+      // Nur Feldnamen, keine Inhalte oder Formularwerte (E11).
+      final namen = doc.querySelectorAll('form [name]')
+          .map((e) => e.attributes['name']!)
+          .toSet().take(30).join(', ');
+      throw MoodleFehler('Moodle liefert kein Formular mit dem Feld $mitFeld '
+          '(Felder: $namen). Nichts geändert.');
+    }
     throw MoodleFehler(
       'Moodle liefert kein Bearbeitungsformular (HTTP ${r.status}). Gibt es das '
       'Ziel, und darf diese Sitzung es bearbeiten?',

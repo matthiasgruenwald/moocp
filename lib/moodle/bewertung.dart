@@ -36,6 +36,7 @@ import 'package:path/path.dart' as p;
 
 import '../freigabe.dart';
 import 'formular.dart';
+import 'formular_lesen.dart' show hauptformular;
 import 'formular_schreiben.dart';
 import 'kurs.dart';
 import 'moodle_zugang.dart';
@@ -205,7 +206,7 @@ Future<Schema?> _schema(MoodleZugang moodle, int cmid) async {
   }
   final adresse = '${u.path}?areaid=$areaid';
   final r = await moodle.lesen(adresse);
-  final form = html_parser.parse(r.text).querySelector('form.mform');
+  final form = hauptformular(html_parser.parse(r.text));
   if (form == null) throw MoodleFehler('Definitionsformular nicht lesbar ($adresse).');
   final felder = formularFelder(form);
   final kriterien = <String, Map<String, Object?>>{};

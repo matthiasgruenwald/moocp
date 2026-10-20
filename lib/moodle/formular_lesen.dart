@@ -259,7 +259,7 @@ class FormularGelesen {
       for (final ort in orte.whereType<Map>()) {
         final id = '${ort['id'] ?? '(ohne Kennung)'}';
         final rolle = lernlandkarteRolle(store, id);
-        final ziel = (ort['linkedActivity'] as num?)?.toInt();
+        final ziel = ortsziel(ort['linkedActivity']);
         final titel = ziel == null ? null : lernlandkarteTitel[ziel];
         final status = ziel == null ? null : lernlandkarteZielstatus[ziel];
         final anzahl = orte
@@ -444,7 +444,7 @@ Future<Map<int, (String, String)>> _zielTitel(
   for (final c in rest) {
     try {
       final r = await moodle.lesen('/course/modedit.php?update=$c');
-      final form = html_parser.parse(r.text).querySelector('form.mform');
+      final form = hauptformular(html_parser.parse(r.text));
       String? wert(String n) => form
           ?.querySelectorAll('input')
           .where((e) => e.attributes['name'] == n)
@@ -516,11 +516,20 @@ int _jsonEnde(String s, int start) {
 
 /// Das Moodle-Formular einer Seite. Einzeln in dieser Reihenfolge suchen: Ein
 /// Selektor mit Komma liefert das erste Formular im Dokument, das irgendeinen
-/// trifft -- und das ist auf Moodle-Seiten oft die Suche in der Kopfzeile.
-dom.Element? hauptformular(dom.Document d) =>
-    d.querySelector('form.mform') ??
-    d.querySelector('form#mform1') ??
-    d.querySelector('form[action*="edit"]');
+/// trifft. Die globale Suche in der Kopfzeile kann selbst eine mform sein.
+dom.Element? hauptformular(dom.Document d) {
+  for (final selektor in const ['form.mform', 'form#mform1', 'form[action*="edit"]']) {
+    for (final form in d.querySelectorAll(selektor)) {
+      final pfad = Uri.tryParse(form.attributes['action'] ?? '')?.path ?? '';
+      if (form.classes.contains('searchform-navbar') ||
+          pfad == 'search/index.php' || pfad.endsWith('/search/index.php')) {
+        continue;
+      }
+      return form;
+    }
+  }
+  return null;
+}
 
 /// Name, der im Formular steht: das Feld name, sonst ein Titel- oder
 /// Fragenname-Feld.
@@ -734,7 +743,7 @@ Future<FormularGelesen> formularLesenOhneSperre(
     final orte = (karte['orte'] as List).whereType<Map>();
     verlinkt.addAll(
       orte
-          .map((ort) => (ort['linkedActivity'] as num?)?.toInt())
+          .map((ort) => ortsziel(ort['linkedActivity']))
           .whereType<int>(),
     );
   }

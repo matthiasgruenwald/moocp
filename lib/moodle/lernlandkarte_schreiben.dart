@@ -70,7 +70,7 @@ Future<String> lernlandkarteVerknuepfungenSetzen(
     final place = orte.singleWhere((o) => o['id'] == ort);
     final erwartet = (a['aktuell'] as num?)?.toInt();
     final aktuell = erwartet == 0 ? null : erwartet;
-    if ((place['linkedActivity'] as num?)?.toInt() != aktuell) {
+    if (ortsziel(place['linkedActivity']) != aktuell) {
       throw MoodleFehler(
         'Die Verknüpfung von Ort „$ort" ist seit dem Lesen anders. '
         'Lernlandkarte neu lesen und die Entscheidung erneut prüfen.',

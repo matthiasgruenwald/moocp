@@ -34,6 +34,15 @@ String _placestoreStruktur(Object? daten) {
   return daten?.runtimeType.toString() ?? 'null';
 }
 
+/// Das Ziel eines Kartenorts als cmid. Moodle speichert `linkedActivity` je
+/// nach Weg als Zahl oder als Zeichenkette („123"); ohne Ziel steht `null`
+/// oder eine leere Zeichenkette. Alles andere gilt als ohne lesbares Ziel.
+int? ortsziel(Object? linkedActivity) => switch (linkedActivity) {
+  final num n => n.toInt(),
+  final String s => int.tryParse(s.trim()),
+  _ => null,
+};
+
 /// Die gespeicherten Kartendaten aus dem Lernlandkarten-Formular.
 ///
 /// SVG und Ortsdaten bleiben unverändert erhalten; die abgeleiteten Angaben

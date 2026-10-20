@@ -876,7 +876,8 @@ class McpDienst {
           'Sichert eine Aktivität als Datei (.mbz) in den Sicherungsordner der App, außerhalb des '
           'Arbeitsordners, ohne Nutzerdaten. Nummer und Name müssen zusammenpassen. Vor dem Start fragt die App '
           'nach einer Freigabe, die Kurs, Namen und Datei zeigt. Dauert die Sicherung länger als eine Minute, '
-          'läuft sie weiter: dann sicherung_status mit der Nummer aufrufen.',
+          'ist nur die normale Antwortfrist erreicht, kein Fehler und kein Abbruch. Sie läuft im Hintergrund weiter: '
+          'sicherung_status mit derselben Nummer in Abständen bis zu 30 Minuten weiterfragen, den Auftrag nicht erneut senden.',
       parameter: {
         'kurs': _kurs,
         'cmid': _cmid,
@@ -916,7 +917,9 @@ class McpDienst {
           'fragt laufende bei Moodle nach. Ohne Nummer: die letzten Sicherungen. Nur lesen, außer wenn eine '
           'Sicherung noch bei Moodle läuft. Nur Vorgänge dieses Profils; ungebundene Altvorgänge '
           'werden nicht bei Moodle fortgesetzt. Die tatsächliche Moodle-Adresse einschließlich Installationspfad '
-          'muss mit der gespeicherten Instanzbindung übereinstimmen.',
+          'muss mit der gespeicherten Instanzbindung übereinstimmen. Nach der normalen Antwortfrist von einer Minute '
+          'mit derselben Nummer in Abständen bis zu 30 Minuten weiterfragen; läuft weiter ist kein Fehler und kein Abbruch. '
+          'Echte Fehler und Stillstandshinweise weitergeben, den Sicherungsauftrag nicht erneut senden.',
       parameter: {
         'id': JsonSchema.string(
           description: 'Nummer der Sicherung, wie sichern_aktivitaet sie nennt',
@@ -947,15 +950,23 @@ class McpDienst {
           'geprüft (gepacktes Tar, keine Nutzerdaten, keine Pfade nach außen, höchstens 200 MB). Der Kursname muss '
           'zu der Nummer passen. Vor dem Start fragt die App nach einer Freigabe, die Kurs, Datei, Modus und die '
           'neuen Aktivitäten zeigt; bei löschenden Wegen steht dort, dass vorhandene Inhalte gelöscht werden. '
-          'Neue Aktivitäten werden danach verborgen (kurzzeitig können sie sichtbar sein). Verborgen ist kein Schutz. '
+          'Sichtbarkeit und Voraussetzungen bleiben wie in der Quelle (Vorgabe wie_quelle); sie werden nicht gegengeprüft, '
+          'verified umfasst die übrigen Prüfungen. Mit sichtbarkeit: verborgen verbirgt die App die neuen Aktivitäten danach '
+          '(kurzzeitig können sie sichtbar sein). Verborgen ist kein Schutz. Die Freigabe nennt die Wahl. '
           'Ein nach dem Start ausgetauschtes Quellarchiv oder fehlender Inhalts-Hash bleibt bei der Anhangprüfung eine Prüflücke. '
-          'Dauert es länger als eine Minute, läuft es weiter: dann wiederherstellung_status mit der Nummer aufrufen. '
+          'Nach einer Minute ist nur die normale Antwortfrist erreicht, kein Fehler und kein Abbruch. Die Arbeit läuft '
+          'im Hintergrund weiter: wiederherstellung_status mit derselben Nummer in Abständen bis zu 30 Minuten weiterfragen. '
           'Nach dem Start wird nie neu gesendet. Dieselbe Datei für denselben Zielweg wird nicht ein zweites Mal '
           'gestartet, solange dafür ein Vorgang offen oder fertig ist (ein zweiter Lauf legt Dubletten an; auch nach dem Zeitlimit oder einem Neustart); ein vor dem Start abgebrochener oder belegt fehlgeschlagener Vorgang sperrt nicht. Meldet Moodle einen Fehler, entscheidet die App nicht aus dem Fehlerfeld, sondern liest den Zielkurs zurück: Ist alles Prüfbare vollständig und gleich, gilt der Vorgang als verifiziert (Prüflücken bleiben genannt); weicht der Zielkurs ab, nennt die Antwort das Fehlende und die Optionen (bewusste Wiederholung mit wiederholung_von oder das Fehlende einzeln anlegen), der Vorgang bleibt gesperrt; ist das Prozessende nicht belegt, bleibt er gesperrt und die Antwort enthält einen Nachfragetext an die Verwaltung. Fehlgeschlagen gilt nur, wenn der Prozess beendet ist und im Zielkurs nachweislich nichts Neues steht. Die App wiederholt nie selbst. Bei einer Sperre nennt die Antwort '
           'die Nummer des Vorgangs, auch wenn das Profil umbenannt wurde. Eine bewusste Wiederholung nur mit wiederholung_von '
           'und dieser Nummer: Der aktuelle Hintergrundstand wird vor der Freigabe gelesen und mit Unsicherheiten '
           'und Dublettenrisiko angezeigt.',
       parameter: {
+        'sichtbarkeit': JsonSchema.string(
+          enumValues: [for (final s in WiederherstellungsSichtbarkeit.values) s.wert],
+          description: 'Vorgabe wie_quelle: Sichtbarkeit und Voraussetzungen der Sicherung erhalten; '
+              'verborgen: neue Aktivitäten danach verbergen. Sichtbarkeit und Voraussetzungen der Quelle werden nicht gegengeprüft.',
+        ),
         'datei': JsonSchema.string(
           description: 'Dateiname der .mbz relativ zum Sicherungsordner, wie sichern_aktivitaet ihn nennt.',
         ),
@@ -1009,6 +1020,7 @@ class McpDienst {
             kategorieId: _zahlOder(a, 'kategorie_id'),
             sammlung: _zahlOder(a, 'sammlung'),
             wiederholungVon: a['wiederholung_von'] as String?,
+            sichtbarkeit: WiederherstellungsSichtbarkeit.aus(a['sichtbarkeit'] as String?),
             instanz: profil.name,
             profilKennung: profil.kennung,
             beiVorgang: (id) => vid = id,
@@ -1032,7 +1044,9 @@ class McpDienst {
           'fehlgeschlagen, unklar) und fragt eine laufende bei Moodle nach. Startet nie neu. Ein Vorgang, der nie bei '
           'Moodle begonnen hat, wird als fehlgeschlagen vermerkt. Nur Vorgänge dieses Profils; ungebundene Altvorgänge '
           'werden nicht bei Moodle fortgesetzt. Die tatsächliche Moodle-Adresse einschließlich Installationspfad '
-          'muss mit der gespeicherten Instanzbindung übereinstimmen.',
+          'muss mit der gespeicherten Instanzbindung übereinstimmen. Nach der normalen Antwortfrist von einer Minute '
+          'mit derselben Nummer in Abständen bis zu 30 Minuten weiterfragen; läuft weiter ist kein Fehler und kein Abbruch. '
+          'Echte Fehler und Stillstandshinweise weitergeben, den Wiederherstellungsauftrag nicht erneut senden.',
       parameter: {
         'id': JsonSchema.string(
           description: 'Nummer der Wiederherstellung, wie wiederherstellen_datei sie nennt',
@@ -1059,8 +1073,9 @@ class McpDienst {
           'Sicherungsordner der App, ohne Nutzerdaten. Ohne aktivitaeten und abschnitte, mit ganzer_kurs=true: '
           'der ganze Kurs. Mit Angaben und ganzer_kurs=true: der Kurs, eingeschränkt auf die Angaben. Namen und '
           'Nummern müssen zusammenpassen. Vor dem Start fragt die App nach einer Freigabe, die alles Gewählte, '
-          'die Nutzerdaten, die fehlen, und die Datei zeigt. Dauert die Sicherung länger als eine Minute, läuft '
-          'sie weiter: dann sicherung_status mit der Nummer aufrufen.',
+          'die Nutzerdaten, die fehlen, und die Datei zeigt. Nach einer Minute ist nur die normale Antwortfrist erreicht, '
+          'kein Fehler und kein Abbruch. Die Arbeit läuft im Hintergrund weiter: sicherung_status mit derselben Nummer '
+          'in Abständen bis zu 30 Minuten weiterfragen, den Auftrag nicht erneut senden.',
       parameter: {
         'kurs': _kurs,
         'name_des_kurses': JsonSchema.string(
@@ -1149,9 +1164,20 @@ class McpDienst {
           'erneuten Imports; eine bewusste Wiederholung geht über wiederherstellen_datei mit wiederholung_von. Eine Einfüge-Wiederherstellung kann Dubletten '
           'erzeugen. Ohne datei werden Lernlandkarten vorab erfasst und nach dem Kopieren je Zielkurs auf die belegten Kopien '
           'neu verknüpft; offene Zuordnungen werden einzeln gemeldet, nichts zusätzlich kopiert. Mit datei keine automatische '
-          'Neuverknüpfung. Kartenstände bleiben je Ziel getrennt im Übertragungsprotokoll (uebertragungen.json).',
+          'Neuverknüpfung. Sichtbarkeit und Voraussetzungen bleiben wie in der Quelle (Vorgabe wie_quelle); '
+          'mit sichtbarkeit: verborgen werden die neuen Aktivitäten danach verborgen. Die Wahl gilt für alle Ziele '
+          'und steht in der Freigabe. Sichtbarkeit und Voraussetzungen der Quelle werden nicht gegengeprüft. '
+          'Kartenstände bleiben je Ziel getrennt im Übertragungsprotokoll (uebertragungen.json). '
+          'Die normale Antwortfrist beträgt hier vier Minuten, bei den Einzelschritten eine Minute; das ist kein '
+          'Fehler und kein Abbruch. Im Hintergrund läuft die Arbeit weiter. Mit dem genannten Statuswerkzeug und '
+          'derselben Nummer in Abständen bis zu 30 Minuten weiterfragen; den Auftrag nicht erneut senden.',
       zerstoerend: true,
       parameter: {
+        'sichtbarkeit': JsonSchema.string(
+          enumValues: [for (final s in WiederherstellungsSichtbarkeit.values) s.wert],
+          description: 'Für alle Ziele, Vorgabe wie_quelle: Sichtbarkeit und Voraussetzungen erhalten; '
+              'verborgen: neue Aktivitäten danach verbergen. Quellsichtbarkeit und Voraussetzungen werden nicht gegengeprüft.',
+        ),
         'ziele': JsonSchema.array(
           items: JsonSchema.object(
             properties: {
