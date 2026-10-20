@@ -592,6 +592,8 @@ flutter test
 flutter run -d macos
 ```
 
+**Ohne KI-Chat starten:** `moocp-starten.command` im Hauptordner des Projekts doppelt anklicken (beim ersten Mal im Finder Rechtsklick > Öffnen) oder im Terminal `bash moocp-starten.command` aufrufen. Das Skript baut die App, wenn es noch keinen Bau gibt oder der Quelltext neuer ist, und startet sie; sonst startet es sofort den vorhandenen Bau. Läuft die App schon, holt es sie nur nach vorn.
+
 Die Einstellungen liegen unter `~/Library/Application Support/moocp`, dort auch der Socket für die Einzelstart-Sperre (`moocp.sock`). Die Zugangsdaten stehen im Schlüsselbund des Benutzers, im alten Schlüsselbund statt der Datenschutz-Schlüsselbundgruppe, weil ein Entwicklerbau ohne Team-ID dort nicht schreiben darf.
 
 Das KI-Werkzeug LM Studio mit Bionic wird auf dem Mac nicht angeboten: Seine Brücke ist ein Windows-Programm. Claude Code und Codex CLI findet die App im `PATH` sowie unter `~/.local/bin`, `/opt/homebrew/bin` und `/usr/local/bin`.
