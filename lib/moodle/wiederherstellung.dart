@@ -467,12 +467,29 @@ Future<String> _ausfuehren(
     await _uebergang(vorgaenge, vg, WiederherstellungStand.laufend,
         laufzeit: laufzeit, backupid: restoreid, kontext: kontext);
     try {
-      final start = await moodle.senden(s16.aktion, s16.felder);
+      var start = await moodle.senden(s16.aktion, s16.felder);
       if (start.status >= 400) {
         throw MoodleFehler('Der Wiederherstellungsstart wurde mit HTTP ${start.status} beantwortet. '
             'Der Ausgang ist unklar; mit wiederherstellung_status prüfen, nicht neu senden.');
       }
       moodle.protokoll.eintrag(Art.info, 'Wiederherstellungsstart: ${startDiagnose(start)}');
+      // Rollenzuordnung (gemessen auf einer Produktivinstanz): Passt eine Rolle der
+      // Sicherung nicht unmittelbar zu einer des Ziels, hält Moodle nach dem Prüfen
+      // an und wartet auf „Weiter". Die Vorgabe von Moodle gilt; Nutzerdaten sind
+      // ohnehin ausgeschlossen (ohneNutzerdaten). Genau eine solche Seite, nie mehr.
+      final rollen = rollenzuordnung(start);
+      if (rollen != null) {
+        start = await moodle.senden(rollen.aktion, rollen.felder);
+        if (start.status >= 400) {
+          throw MoodleFehler('Die Rollenzuordnung wurde mit HTTP ${start.status} beantwortet. '
+              'Der Ausgang ist unklar; mit wiederherstellung_status prüfen, nicht neu senden.');
+        }
+        moodle.protokoll.eintrag(Art.info, 'Wiederherstellung, Rollenzuordnung bestätigt: ${startDiagnose(start)}');
+        if (rollenzuordnung(start) != null) {
+          throw MoodleFehler('Moodle fragt die Rollenzuordnung erneut ab. Nichts weiter gesendet; '
+              'mit wiederherstellung_status prüfen, nicht neu senden.');
+        }
+      }
     } catch (_) {
       await _uebergang(vorgaenge, vg, WiederherstellungStand.unklar,
           text: 'Der Start ist nicht bestätigt. wiederherstellung_status prüft erneut; nicht neu senden.');
@@ -501,6 +518,20 @@ Future<String> _ausfuehren(
     }
     rethrow;
   }
+}
+
+/// Das Formular „Wiederherstellen Rollenzuordnungen" des Assistenten: eines mit
+/// `substage` und mindestens einem Feld `mapping<Rollen-ID>`, dessen Werte alle
+/// belegt sind (die Vorgabe von Moodle). Sonst null.
+({String aktion, Felder felder})? rollenzuordnung(Antwort r) {
+  for (final form in html_parser.parse(r.text).querySelectorAll('form')) {
+    final felder = formularFelder(form);
+    final zuordnungen = felder.where((e) => e.key.startsWith('mapping')).toList();
+    if (wertIn(felder, 'substage') == null || zuordnungen.isEmpty || zuordnungen.any((e) => e.value.isEmpty)) continue;
+    final ziel = r.adresse.resolve(form.attributes['action'] ?? r.adresse.path);
+    return (aktion: ziel.hasQuery ? '${ziel.path}?${ziel.query}' : ziel.path, felder: felder);
+  }
+  return null;
 }
 
 /// Bau der Antwort auf den Wiederherstellungsstart, nur als Aufbau: Status,

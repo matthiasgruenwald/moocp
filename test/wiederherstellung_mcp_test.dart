@@ -35,6 +35,8 @@ class _Moodle {
   Completer<void>? hold;
   bool completed = false;
   bool completeOnStart = false;
+  bool rollenSeite = false;
+  int rollenBestaetigt = 0;
   List<String> weitereQuizze = [];
   static const restore = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
   Uri get basis => Uri.parse('http://127.0.0.1:${server.port}');
@@ -157,7 +159,14 @@ class _Moodle {
         } else {
           writes++;
           final f = Uri.splitQueryString(body);
-          if (f.containsKey('_qf__restore_review_form')) {
+          if (f.containsKey('_qf__restore_review_form') && rollenSeite) {
+            answer = form({'restore': restore, 'stage': '32', 'substage': 'rolemapping', 'mapping5': '5'});
+          } else if (f.containsKey('substage')) {
+            rollenBestaetigt++;
+            starts++;
+            if (completeOnStart) completed = true;
+            answer = page('Gestartet');
+          } else if (f.containsKey('_qf__restore_review_form')) {
             starts++;
             if (completeOnStart) completed = true;
             answer = page('Gestartet');
@@ -617,6 +626,20 @@ void main() {
     expect(result, contains('1 fertig'));
     expect(result, contains('Fragenherkunft nicht bestätigt'));
     expect(result, isNot(contains('verborgen: verified')));
+  });
+
+  test('Moodle hält mit der Rollenzuordnung an: die Vorgabe wird einmal bestätigt, dann läuft die Wiederherstellung', () async {
+    writeArchive(quiz: true, geteilt: true);
+    external.progress = {'progress': 1, 'status': 1000};
+    external.completeOnStart = true;
+    external.rollenSeite = true;
+    final result = await client.tool('uebertragen', {
+      'datei': 'test.mbz',
+      'ziele': [{'kurs': 12, 'name': 'ZZ Kurs', 'weg': 'aktueller_kurs_verschmelzen'}],
+    });
+    expect(external.rollenBestaetigt, 1);
+    expect(external.starts, 1);
+    expect(result, contains('1 fertig'));
   });
 
   test('Übertragungszeitlimit beim Sichern nennt Sicherungsnummer und Statuswerkzeug', () async {

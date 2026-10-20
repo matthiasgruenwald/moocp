@@ -1150,6 +1150,33 @@ class MoodleZugang {
             _gesetzt(wertIn(f, 'sesskey')) &&
             ohneNutzerdaten(f),
       ),
+    // Rollenzuordnung nach dem Prüfen (gemessen auf einer Produktivinstanz): Moodle hält
+    // an und wartet auf „Weiter". Nur die Felder dieser Seite, nur Zahlen als
+    // Rollennummern; es werden keine Nutzerdaten gelesen oder gesendet.
+    Erlaubt(
+      'POST',
+      r'^/backup/restore\.php$',
+      'Wiederherstellen: Rollenzuordnung bestätigen',
+      parameter: (q) => _nurSchluessel(q, {'contextid', 'filename'}),
+      formular: (f) =>
+          _zahl(wertIn(f, 'stage')) &&
+          RegExp(r'^[A-Za-z_]{1,30}$').hasMatch(wertIn(f, 'substage') ?? '') &&
+          RegExp(r'^[0-9a-f]{32}$').hasMatch(wertIn(f, 'restore') ?? '') &&
+          _gesetzt(wertIn(f, 'sesskey')) &&
+          f.any((e) => e.key.startsWith('mapping')) &&
+          f.every(
+            (e) => switch (e.key) {
+              'stage' || 'contextid' => _zahl(e.value),
+              'substage' || 'restore' || 'sesskey' => true,
+              'context' || 'q' || 'pageurl' => true,
+              final k when RegExp(r'^mapping\d+$').hasMatch(k) => _zahl(
+                e.value,
+              ),
+              _ => false,
+            },
+          ) &&
+          ohneNutzerdaten(f),
+    ),
     Erlaubt(
       'POST',
       r'^/repository/draftfiles_ajax\.php$',
