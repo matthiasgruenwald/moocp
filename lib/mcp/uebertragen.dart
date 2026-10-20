@@ -53,6 +53,7 @@ extension _Uebertragung on McpDienst {
     Map<String, dynamic> a, {
     required void Function(String werkzeug, String? id) beiVorgang,
   }) async {
+    final sichtbarkeit = WiederherstellungsSichtbarkeit.aus(a['sichtbarkeit'] as String?);
     final auftragsProfil = profil.kennung;
     final auftragsInstanz = moodle.basis;
     bool bindungPasst() =>
@@ -133,7 +134,8 @@ extension _Uebertragung on McpDienst {
       for (final k in karten) ...[
         'Lernlandkarte „${k.name}" (cmid ${k.cmid}): ${k.orte.length} verknüpfte '
             '${k.orte.length == 1 ? 'Ort' : 'Orte'}. Nach dem Kopieren verknüpft die App sie in jedem Zielkurs '
-            'neu auf die dort kopierten Aktivitäten (je Karte eine weitere Freigabe); sie bleibt verborgen.',
+            'neu auf die dort kopierten Aktivitäten (je Karte eine weitere Freigabe); '
+            'ihre Sichtbarkeit folgt der gewählten Wiederherstellung.',
         for (final o in k.orte)
           if (!o.mitkopiert)
             '  Ort ${o.ort} zeigt auf „${o.zielName ?? 'cmid ${o.quellZiel}'}", das nicht mitkopiert wird: bleibt ungelöst, '
@@ -180,6 +182,7 @@ extension _Uebertragung on McpDienst {
             'Übertragung in ${geprueft.length} ${geprueft.length == 1 ? 'Kurs' : 'Kurse'} starten?',
         punkte: [
           ...punkte,
+          sichtbarkeit.freigabe,
           ...kartenZeilen,
           'Je Ziel ein eigener Vorgang, nacheinander. Ein Fehler stoppt die anderen Ziele nicht; eine Ablehnung schon.',
           'Eine Einfüge-Wiederherstellung kann Inhalte doppelt anlegen. Ein Aktualisieren ist nicht zugesagt.',
@@ -279,6 +282,7 @@ extension _Uebertragung on McpDienst {
           kurs: z.kurs,
           name: z.name,
           loeschend: z.weg.loescht,
+          sichtbarkeit: sichtbarkeit,
           beiVorgang: (id) {
             vid = id;
             beiVorgang('wiederherstellung_status', id);
@@ -406,6 +410,7 @@ extension _Uebertragung on McpDienst {
           arbeitsordner: arbeitsordner,
           kurs: z.kurs,
           zuordnung: zu,
+          sichtbarkeit: sichtbarkeit,
           pruefeBindung: pruefeKartenBindung,
         );
         ergebnisse.add(ergebnis);

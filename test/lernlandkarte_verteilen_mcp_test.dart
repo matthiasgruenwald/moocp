@@ -604,7 +604,7 @@ class _Moodle {
     });
   }
 
-  /// Moodle legt die gesicherten Aktivitäten im Zielkurs neu an: neue Nummern, sichtbar,
+  /// Moodle legt die gesicherten Aktivitäten im Zielkurs neu an: neue Nummern, Quellsichtbarkeit,
   /// die Karte mit unveränderten (veralteten) Verweisen. Jedes zweite Ziel in umgekehrter Reihenfolge.
   void _kopieren(int ziel) {
     var quelle = [
@@ -619,6 +619,7 @@ class _Moodle {
         300 + ziel,
         x.modul,
         x.name,
+        sichtbar: x.sichtbar,
         placestore: x.placestore,
       );
       kopie.svgcode = x.svgcode;
@@ -744,6 +745,7 @@ void main() {
   Map<String, Object?> auftrag({
     List<int> ziele = const [31, 32, 33, 34, 35],
   }) => {
+    'sichtbarkeit': 'verborgen',
     'kurs': 12,
     'name_des_kurses': 'ZZ Quelle',
     'abschnitte': [
@@ -998,6 +1000,20 @@ void main() {
     expect(ergebnis, contains('seit der Freigabe geändert'));
     expect(moodle.kartenSpeicherungen, 0);
     expect(links(moodle.karte)['p1'], moodle.seiteA.cmid);
+  });
+
+  test('Übertragung erhält standardmäßig sichtbare Karten und verborgene Blätter beim Neuverknüpfen', () async {
+    moodle.seiteB.sichtbar = false;
+    final args = auftrag(ziele: [31])..remove('sichtbarkeit');
+    final ergebnis = await client.tool('uebertragen', args);
+    final karte = inZiel(31, 'learningmap', 'ZZ Karte');
+    expect(ergebnis, contains('1 verknüpft, 0 offen, 0 unklar'), reason: ergebnis);
+    expect(karte.sichtbar, isTrue);
+    expect(inZiel(31, 'page', 'ZZ Seite A').sichtbar, isTrue);
+    expect(inZiel(31, 'page', 'ZZ Seite B').sichtbar, isFalse);
+    expect(links(karte)['p1'], inZiel(31, 'page', 'ZZ Seite A').cmid);
+    expect(links(karte)['p2'], inZiel(31, 'page', 'ZZ Seite B').cmid);
+    expect(ergebnis, contains('Sichtbarkeit und Voraussetzungen nicht gegengeprüft'));
   });
 
   test('Thema samt Karte in fünf Zielkurse: jede Karte zeigt nur auf die Kopien ihres Zielkurses', () async {

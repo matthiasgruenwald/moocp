@@ -8,7 +8,7 @@
 //   Kategorie für neuer_kurs -> Freigabe in der App -> Vorgang anlegen, bei löschenden
 //   Wegen Übersicht des Zielkurses festhalten -> Datei in den Entwurfsbereich ->
 //   Formular „Wiederherstellen" -> Schritte 2, Ziel, 4, 8 und 16 -> Hintergrundauftrag
-//   abfragen (Kennung: restoreid) -> neue Aktivitäten verbergen -> Kurs zurücklesen.
+//   abfragen (Kennung: restoreid) -> auf Wunsch neue Aktivitäten verbergen -> Kurs zurücklesen.
 //
 // Nach dem Schritt 16 gilt: Bricht die Verbindung ab oder läuft die Sitzung ab, steht
 // der Vorgang auf „unklar". Er wird nie neu gestartet; wiederherstellung_status fragt
@@ -100,6 +100,7 @@ Future<String> wiederherstellen(
   int? sammlung,
   void Function(String vorgangId)? beiVorgang,
   String? wiederholungVon,
+  WiederherstellungsSichtbarkeit sichtbarkeit = WiederherstellungsSichtbarkeit.wieQuelle,
 }) async {
   // 1. Datei: nur ein .mbz innerhalb des Sicherungsordners, nicht zu groß.
   final fehler = pfadFehler(datei);
@@ -231,8 +232,7 @@ Future<String> wiederherstellen(
         if (aktivitaeten.isNotEmpty) 'Angelegt werden: ${aktivitaeten.join(', ')}',
         // Die Herkunftsrisiken müssen vor dem Start sichtbar sein.
         ...herkunft.zeilen,
-        'Moodle stellt die neuen Aktivitäten sichtbar wieder her; die App verbirgt sie danach. Sie können '
-            'kurzzeitig für Lernende sichtbar sein. Verborgen ist kein Schutz: Wer im Kurs Rechte hat, sieht sie und kann sie sichtbar machen.',
+        sichtbarkeit.freigabe,
         'Nutzerdaten sind im Archiv nicht enthalten (geprüft). Rechte und Einschreibungen bleiben unverändert.',
         if (wiederholungVon != null)
           'Wiederholung des Vorgangs $wiederholungVon: $wiederholungsBefund '
@@ -260,6 +260,7 @@ Future<String> wiederherstellen(
         kurs: kurs ?? 0, datei: datei, fingerabdruck: fp, wiederholungVon: wiederholungVon,
         profilKennung: profilKennung,
         quizQuellen: quellen,
+        sichtbarkeit: sichtbarkeit,
         herkunftEigen: herkunft.eigen);
     _laufendeWiederherstellungen.add(vg.id);
     // Die Nummer geht nur an den Aufrufer, damit er das Ergebnis je Ziel
@@ -789,12 +790,8 @@ Future<({List<String> zeilen, bool eigen})> _herkunftZeilen(
   return (zeilen: zeilen, eigen: herkunftVerifiziert(befunde));
 }
 
-/// Verbirgt die neuen Aktivitäten und liest den Kurs zurück. Moodle stellt die
-/// wiederhergestellten Seiten sichtbar wieder her (gemessen), darum verbirgt die
-/// App sie danach über dieselbe Kursaktion wie sichtbarkeit_setzen. Die Freigabe
-/// für den ganzen Lauf gilt dafür; eine weitere gibt es nicht. Verborgen ist
-/// kein Schutz: Kurzzeitig können Lernende die Aktivitäten gesehen haben.
-/// verified nur, wenn es neue Aktivitäten gibt und alle verborgen sind.
+/// Liest neue Aktivitäten zurück und verbirgt sie nur bei entsprechender Wahl (E20).
+/// Bei „wie Quelle“ bestätigt verified keinen Sichtbarkeits- oder Voraussetzungsvergleich.
 Future<String> _gegenlesen(
   MoodleZugang moodle,
   Vorgaenge vorgaenge,
@@ -808,6 +805,7 @@ Future<String> _gegenlesen(
 }) async {
   // Erneut aufrufbar (nach „unklar"): Verborgenes wird nicht noch einmal angefasst.
   vorgaenge.pruefeBindung(vg);
+  final verbergen = vg.sichtbarkeit == WiederherstellungsSichtbarkeit.verborgen;
   final vorVerbergen = await kursLesen(moodle, kurs);
   final zugeordnet = importierteCmidsEindeutig(
     erwartet: erwartet,
@@ -816,7 +814,7 @@ Future<String> _gegenlesen(
   );
   final sichtbareNeue = zugeordnet == null ? const <int>[] :
       [for (final cmid in zugeordnet) if (vorVerbergen.nachCmid[cmid]!.sichtbar) cmid];
-  if (sichtbareNeue.isNotEmpty) {
+  if (verbergen && sichtbareNeue.isNotEmpty) {
     vorgaenge.pruefeBindung(vg);
     await kursAktion(moodle, kurs, 'cm_hide', sichtbareNeue);
   }
@@ -849,6 +847,7 @@ Future<String> _gegenlesen(
       zugeordnet.toSet().containsAll(abschliessendZugeordnet) && abschliessendZugeordnet.toSet().containsAll(zugeordnet);
   final alleVerborgen = zuordnungUnveraendert && zugeordnet.isNotEmpty &&
       zugeordnet.every((cmid) => jetzt.nachCmid[cmid]?.sichtbar == false);
+  final sichtbarkeitOk = !verbergen || alleVerborgen;
   final liste = neue.map((a) => '„${a.name}" (${a.modul}${a.sichtbar ? ', sichtbar' : ', verborgen'})').join(', ');
   // Anhänge und Bilder der eindeutig zugeordneten Aktivitäten zurücklesen.
   // Nur bei eindeutiger Zuordnung; sonst bleibt die Prüfung aus (keine Raterei).
@@ -869,10 +868,11 @@ Future<String> _gegenlesen(
   final basis = zugeordnet == null
       ? 'Importierte Aktivitäten konnten nicht eindeutig von anderen neuen Aktivitäten unterschieden werden. Keine Aktivität wurde verborgen; bitte prüfen.'
       : !zuordnungUnveraendert
-          ? 'Nach dem Verbergen kamen weitere oder mehrdeutige neue Aktivitäten hinzu. Nur zuvor eindeutig zugeordnete Importaktivitäten wurden verborgen; bitte prüfen.'
+          ? 'Beim Gegenlesen kamen weitere oder mehrdeutige neue Aktivitäten hinzu. '
+              '${verbergen ? 'Nur zuvor eindeutig zugeordnete Importaktivitäten wurden verborgen; ' : ''}bitte prüfen.'
       : neue.isEmpty
       ? 'Keine neuen Aktivitäten im Kurs gefunden.'
-      : alleVerborgen
+      : sichtbarkeitOk
           ? 'Neu im Kurs: $liste.'
           : 'Neu im Kurs: $liste. Nicht alle sind verborgen; bitte prüfen.';
   // Verglichen wird hier nie Text mit Adressen: Aktivitäten nach Typ und Titel, Anhänge nach
@@ -903,14 +903,16 @@ Future<String> _gegenlesen(
       vergleiche.add(FragenVergleich(v.art, 'Quiz „${z.titel}": ${v.text}', fehlend: v.fehlend, zusaetzlich: v.zusaetzlich));
     }
   }
-  // verified nur, wenn alle Prüfungen es erlauben: Verbergen, Anhänge und Fragenvergleich.
+  // Der Sichtbarkeitsvergleich mit der Quelle ist bei „wie Quelle“ ausdrücklich ausgenommen.
   final anhangOk = anhang == null || anhang.vollstaendig;
   final vergleichOk = vergleiche.every(quizVerifiziert);
   // Nur eigene Fragen und lesbare Aktivitätstypen erlauben eine vollständige Verifikation.
   final herkunftOk = erwartet.every((a) => a.modul != 'quiz') || herkunftEigen;
   final schreibPruefluecke = nichtSchreibbarePruefluecke(erwartet.map((a) => a.modul));
-  final verifiziert = alleVerborgen && anhangOk && vergleichOk && herkunftOk && schreibPruefluecke == null;
+  final verifiziert = zuordnungUnveraendert && zugeordnet.isNotEmpty && sichtbarkeitOk &&
+      anhangOk && vergleichOk && herkunftOk && schreibPruefluecke == null;
   final zusatz = [
+    if (!verbergen) 'Sichtbarkeit und Voraussetzungen nicht gegengeprüft; verified gilt für die übrigen Prüfungen.',
     if (anhang != null) anhang.text,
     for (final v in vergleiche) v.text,
     if (!herkunftOk) 'Fragenherkunft nicht bestätigt: Die Fragen sind nicht eindeutig als quizlokal nachgewiesen. '
@@ -922,7 +924,7 @@ Future<String> _gegenlesen(
     // Moodle meldete einen Fehler: Ob er den Inhalt betrifft, zeigt nur der Vergleich mit der Quelle.
     final abweichungen = [
       if (zugeordnet == null || !zuordnungUnveraendert) _zahlAbweichung(erwartet, neue),
-      if (zuordnungUnveraendert && !alleVerborgen) 'Nicht alle neuen Aktivitäten sind verborgen.',
+      if (verbergen && zuordnungUnveraendert && !alleVerborgen) 'Nicht alle neuen Aktivitäten sind verborgen.',
       if (anhang != null && anhang.abweichend) anhang.text,
       for (final v in vergleiche) if (v.art == VergleichArt.abweichung) v.text,
     ];
@@ -943,13 +945,15 @@ Future<String> _gegenlesen(
     final fertigText = '$kopf $text';
     await _uebergang(vorgaenge, vg, WiederherstellungStand.fertig, text: fertigText, verified: verifiziert);
     final befundZeile = verifiziert
-        ? 'verborgen: verified'
+        ? (verbergen ? 'verborgen: verified; verified: true' : 'verified: true (ohne Sichtbarkeit und Voraussetzungen)')
         : 'nicht verifiziert: Prüflücken oder Ungeprüftes bleiben offen, siehe unten';
     return '$kopf Wiederhergestellt (Nummer ${vg.id}): ${neue.isEmpty ? 'keine neuen Aktivitäten' : liste}. $befundZeile.'
         '${zusatz.isEmpty ? '' : ' $zusatz'}';
   }
   await _uebergang(vorgaenge, vg, WiederherstellungStand.fertig, text: text, verified: verifiziert);
-  final befund = verifiziert ? 'verborgen: verified' : 'verborgen oder Anhänge/Vergleich nicht bestätigt, siehe Zustand oben';
+  final befund = verifiziert
+      ? (verbergen ? 'verborgen: verified; verified: true' : 'verified: true (ohne Sichtbarkeit und Voraussetzungen)')
+      : 'verified: false; Zuordnung, Sichtbarkeitswahl oder Anhänge/Vergleich nicht bestätigt, siehe Zustand oben';
   return 'Wiederhergestellt (Nummer ${vg.id}): ${neue.isEmpty ? 'keine neuen Aktivitäten' : liste}. $befund.'
       '${zusatz.isEmpty ? '' : ' $zusatz'}';
 }

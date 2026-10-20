@@ -75,7 +75,9 @@ Aktivitätsart in der Auswahl stoppen den Auftrag, bevor ein Ziel kopiert wird.
 
 Je Durchführungskurs läuft zuerst die Wiederherstellung des Themas. Moodle kann
 die Karte dabei nur zusammen mit den übrigen Aktivitäten anlegen. Die App
-verbirgt eindeutig belegte Kopien, ordnet die neuen Aktivitäten anhand des
+erhält standardmäßig Sichtbarkeit und Voraussetzungen der Quelle; nur bei
+ausdrücklich gewähltem Verbergen verbirgt sie eindeutig belegte Kopien.
+Sie ordnet die neuen Aktivitäten anhand des
 Kopiervorgangs zu und verknüpft die Karte erst danach abschließend. Nummern aus
 der Quelle, anderen Durchführungskursen oder vorhandene gleichnamige Aktivitäten
 sind kein Nachweis. Je Kartenänderung kommt abhängig von der Freigabestufe eine
@@ -90,7 +92,10 @@ ist auch ihre Sichtbarkeit ungeklärt: frisch lesen und der Lehrkraft sagen.
 Fehlende, kursfremde oder nicht mitkopierte Verweisziele bleiben mit Ortskennung
 und Grund ungelöst. Es wird kein zusätzlicher Inhalt kopiert. Lies mögliche
 Zielaktivitäten nach „Vorhandene Ziele fachlich auswählen“ und kläre die
-betroffene Karte gezielt. Sichtbar machen ist ein eigener Auftrag.
+betroffene Karte gezielt. Die Neuverknüpfung ändert die Sichtbarkeit der Karte
+nicht. Sichtbarkeit und Voraussetzungen der Quelle sind im Wiederherstellungsbericht
+nicht gegengeprüft; gib diese Grenze auch bei verifizierten Ortszuordnungen weiter.
+Eine spätere Änderung der Sichtbarkeit ist ein eigener Auftrag.
 
 Nach Teilfehler, Zeitlimit oder Neustart den Vorgang mit der ausgegebenen Nummer
 prüfen. Den Verteilungsauftrag nicht blind erneut senden: Erfolgreiche und unklare

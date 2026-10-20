@@ -13,7 +13,7 @@ import 'dart:typed_data';
 import 'package:crypto/crypto.dart';
 import 'package:xml/xml.dart';
 
-import 'moodle_zugang.dart' show MoodleZugang;
+import 'moodle_zugang.dart' show MoodleZugang, MoodleFehler;
 import 'sicherung_regeln.dart' show nutzerdatenOptionen;
 import 'wiederherstellung_fragen.dart' show QuizFrage, quizFragenAusXml;
 
@@ -29,6 +29,28 @@ const int eintragGrenzeStandard = 20000;
 
 /// Das Verhältnis entpackt zu gepackt, ab dem das Archiv als verdächtig gilt.
 const int verhaeltnisGrenze = 200;
+
+/// E20: Wiederherstellungen behalten die Quelle, ausdrücklich wählbar ist Verbergen.
+enum WiederherstellungsSichtbarkeit {
+  wieQuelle('wie_quelle'),
+  verborgen('verborgen');
+
+  const WiederherstellungsSichtbarkeit(this.wert);
+  final String wert;
+
+  String get freigabe => this == wieQuelle
+      ? 'Sichtbarkeit: wie Quelle. Sichtbarkeit und Voraussetzungen der Sicherung bleiben unverändert; '
+          'Inhalte können sofort für Lernende sichtbar sein. Sichtbarkeit und Voraussetzungen werden nicht gegengeprüft.'
+      : 'Sichtbarkeit: verborgen. Die App verbirgt die eindeutig zugeordneten neuen Aktivitäten nach der '
+          'Wiederherstellung. Sie können kurzzeitig sichtbar sein. Voraussetzungen bleiben unverändert. '
+          'Verborgen ist kein Schutz vor Personen mit Bearbeitungsrechten.';
+
+  static WiederherstellungsSichtbarkeit aus(String? wert) => switch (wert) {
+    null || 'wie_quelle' => wieQuelle,
+    'verborgen' => verborgen,
+    _ => throw MoodleFehler('sichtbarkeit muss wie_quelle oder verborgen sein. Nichts geändert.'),
+  };
+}
 
 /// Der Stand einer Wiederherstellung, in vorgaenge.json als wiederherstellung_status.
 enum WiederherstellungStand {

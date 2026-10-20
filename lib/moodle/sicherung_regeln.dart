@@ -491,5 +491,10 @@ String? zielOrdnerPruefen(String? ordner) {
 /// nicht, sagt er das, und es gibt keinen Folgeaufruf mit einer Nummer, die es
 /// noch nicht gibt. In beiden Fällen ist nichts neu gestartet.
 String laufText(String was, String? nummer, String werkzeug) => nummer == null
-    ? '$was läuft noch. Die Nummer steht noch nicht fest; es ist noch nichts gestartet.'
-    : '$was läuft weiter (Nummer $nummer). Mit $werkzeug und der Nummer $nummer später prüfen.';
+    ? '$was läuft noch. Die normale Antwortfrist des Werkzeugaufrufs ist erreicht; das ist kein Fehler '
+        'und kein Abbruch. Die Nummer steht noch nicht fest; es ist noch nichts gestartet. '
+        'Gegebenenfalls die Freigabe in der App beantworten. Den Auftrag nicht erneut senden.'
+    : '$was läuft weiter (Nummer $nummer). Die normale Antwortfrist des Werkzeugaufrufs ist erreicht; '
+        'das ist kein Fehler und kein Abbruch. Die Arbeit läuft im Hintergrund weiter. '
+        'Mit $werkzeug und der Nummer $nummer in Abständen bis zu 30 Minuten weiterfragen. '
+        'Den Auftrag nicht erneut senden; echte Fehler oder Stillstandshinweise des Statuswerkzeugs weitergeben.';

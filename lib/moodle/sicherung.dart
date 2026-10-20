@@ -72,6 +72,7 @@ class Vorgang {
     this.instanzAdresse,
     this.quizQuellen,
     this.herkunftEigen = false,
+    this.sichtbarkeit = WiederherstellungsSichtbarkeit.verborgen,
   }) : aktualisiert = aktualisiert ?? begonnen;
 
   final String id;
@@ -129,6 +130,9 @@ class Vorgang {
   /// Die Fragenherkunft war vor dem Start als eigen belegt; bleibt für spätere Statusabfragen erhalten.
   bool herkunftEigen;
 
+  /// Altvorgänge behalten das bisherige Verbergen, auch nach einem Neustart.
+  WiederherstellungsSichtbarkeit sichtbarkeit;
+
   Map<String, Object?> zuJson() => {
         'id': id,
         'kurs': kurs,
@@ -155,6 +159,7 @@ class Vorgang {
         'profil_kennung': profilKennung,
         'instanz_adresse': instanzAdresse,
         'herkunft_eigen': herkunftEigen,
+        'sichtbarkeit': sichtbarkeit.wert,
         'quiz_quellen': quizQuellen?.map((titel, fragen) => MapEntry(titel, [
               for (final f in fragen) {'name': f.name, 'sachnummer': f.sachnummer, 'zufall': f.zufall, 'lokal': f.lokal},
             ])),
@@ -195,6 +200,7 @@ class Vorgang {
       profilKennung: o['profil_kennung'] as String?,
       instanzAdresse: o['instanz_adresse'] as String?,
       herkunftEigen: o['herkunft_eigen'] == true,
+      sichtbarkeit: WiederherstellungsSichtbarkeit.aus(o['sichtbarkeit'] as String? ?? 'verborgen'),
       quizQuellen: _quizQuellenAus(o['quiz_quellen']),
     );
   }
@@ -325,6 +331,7 @@ class Vorgaenge {
     String? profilKennung,
     Map<String, List<QuizFrage>>? quizQuellen,
     bool herkunftEigen = false,
+    WiederherstellungsSichtbarkeit sichtbarkeit = WiederherstellungsSichtbarkeit.wieQuelle,
   }) async {
     final v = await neu(kurs: kurs, cmid: 0, datei: datei);
     v.wiederherstellung = WiederherstellungStand.anstehend;
@@ -333,6 +340,7 @@ class Vorgaenge {
     v.profilKennung = profilKennung ?? this.profilKennung;
     v.quizQuellen = quizQuellen;
     v.herkunftEigen = herkunftEigen;
+    v.sichtbarkeit = sichtbarkeit;
     await _speichern(v);
     return v;
   }

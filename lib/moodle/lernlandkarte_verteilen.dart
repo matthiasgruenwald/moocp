@@ -4,7 +4,7 @@
 //   1. Vor dem Kopieren: die Karten der Auswahl und ihre Verweisziele im
 //      Quellkurs erfassen ([kartenErfassen]).
 //   2. Das Thema wird in den Zielkurs kopiert (wiederherstellung.dart); die App
-//      verbirgt die eindeutig belegten Kopien.
+//      verbirgt die eindeutig belegten Kopien nur bei entsprechender Wahl.
 //   3. Je Zielkurs: aus dem tatsächlichen Kopiervorgang die Quell-/Ziel-
 //      Zuordnung ableiten ([kartenZuordnen]) und die Karte dort abschließend
 //      neu verknüpfen ([kartenVerknuepfen]).
@@ -437,6 +437,7 @@ Future<KartenErgebnis> kartenVerknuepfen(
   required String arbeitsordner,
   required int kurs,
   required KartenZuordnung zuordnung,
+  required WiederherstellungsSichtbarkeit sichtbarkeit,
   required void Function() pruefeBindung,
 }) async {
   pruefeBindung();
@@ -540,10 +541,12 @@ Future<KartenErgebnis> kartenVerknuepfen(
       if ((aktuell[o.ort] ?? 0) != o.neuesZiel) o,
   ];
   final alsKarte = 'Lernlandkarte „$name" (cmid $karte)';
-  if (!await _verborgen(moodle, kurs, karte)) {
+  final vorherSichtbar = await _sichtbarkeit(moodle, kurs, karte);
+  if (vorherSichtbar == null ||
+      (sichtbarkeit == WiederherstellungsSichtbarkeit.verborgen && vorherSichtbar)) {
     return KartenErgebnis(
       KartenStand.offen,
-      '$alsKarte: Die Karte ist nicht nachweislich verborgen. '
+      '$alsKarte: Die Karte fehlt im Zielkurs oder ist entgegen der Wahl nicht verborgen. '
       'Nichts verknüpft; Sichtbarkeit in Moodle prüfen.',
     );
   }
@@ -655,8 +658,9 @@ Future<KartenErgebnis> kartenVerknuepfen(
     );
   }
   pruefeBindung();
-  final weiterhinVerborgen = await _verborgen(moodle, kurs, karte);
-  final stand = offen.isEmpty && weiterhinVerborgen
+  final nachherSichtbar = await _sichtbarkeit(moodle, kurs, karte);
+  final sichtbarkeitUnveraendert = nachherSichtbar == vorherSichtbar;
+  final stand = offen.isEmpty && sichtbarkeitUnveraendert
       ? KartenStand.verknuepft
       : KartenStand.offen;
   final gesetzt = setzen.isEmpty
@@ -666,13 +670,16 @@ Future<KartenErgebnis> kartenVerknuepfen(
     stand,
     '$alsKarte: $gesetzt. '
     '${offen.isEmpty ? '' : 'Ungelöst, die Karte bleibt unverifiziert: ${ungeloest(offen)}. '}'
-    '${weiterhinVerborgen ? 'Die Karte bleibt verborgen; sichtbar machen ist eine eigene Entscheidung.' : 'ACHTUNG: Die Karte ist sichtbar. Prüfen und gegebenenfalls verbergen.'}',
+    '${!sichtbarkeitUnveraendert ? 'Die Sichtbarkeit hat sich geändert; in Moodle prüfen.' :
+        sichtbarkeit == WiederherstellungsSichtbarkeit.verborgen
+            ? 'Die Karte bleibt verborgen; sichtbar machen ist eine eigene Entscheidung.'
+            : 'Sichtbarkeit beim Verknüpfen unverändert (${nachherSichtbar == true ? 'sichtbar' : 'verborgen'}); nicht mit der Quelle gegengeprüft.'}',
   );
 }
 
-Future<bool> _verborgen(MoodleZugang moodle, int kurs, int karte) async {
+Future<bool?> _sichtbarkeit(MoodleZugang moodle, int kurs, int karte) async {
   final k = (await kursLesen(moodle, kurs)).nachCmid[karte];
-  return k != null && !k.sichtbar;
+  return k?.sichtbar;
 }
 
 /// Nach einem Fehler beim Schreiben: frisch lesen und sagen, was in der Karte steht.

@@ -1,6 +1,8 @@
 # Changelog
 
 ## 0.9.23
+- Wiederherstellung und Unterrichtsverteilung: Sichtbarkeit und Voraussetzungen bleiben standardmäßig wie in der Quelle; Verbergen ist ausdrücklich wählbar, die Freigabe nennt die Wahl.
+- Sicherung und Wiederherstellung: Die normale Antwortfrist wird als laufende Hintergrundarbeit erklärt, mit Statusabfragen bis zu 30 Minuten.
 - Wiederherstellung: Hält Moodle nach dem Prüfen mit der Seite „Rollenzuordnungen“ an, bestätigt die App die Vorgabe einmal; vorher blieb der Vorgang ohne Fehlermeldung auf „wartet“ stehen.
 - Wiederherstellung: Das Protokoll zeigt den Aufbau der Antwort auf den Start und die Rohwerte des Fortschritts (nur Zahlen und Feldnamen), damit eine nicht startende Wiederherstellung erkennbar wird.
 - Lernlandkarten: Eine Karte, deren Ortsziele Moodle als Text speichert, lässt sich wieder lesen (vorher Fehler beim Lesen, auch beim Verschieben in eine andere Instanz).
