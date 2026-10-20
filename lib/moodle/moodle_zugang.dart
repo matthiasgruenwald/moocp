@@ -155,6 +155,21 @@ class MoodleZugang {
   final Protokoll protokoll;
 
   static bool _zahl(String? s) => istZahl(s);
+
+  /// Nur die Form eines Werts für die Fehlersuche (nie der Wert): Zahl, Hex32, Text
+  /// aus Buchstaben und Unterstrichen, sonst gemischt, jeweils mit Länge.
+  static String _wertform(String v) {
+    final art = v.isEmpty
+        ? 'leer'
+        : RegExp(r'^\d+$').hasMatch(v)
+        ? 'Zahl'
+        : RegExp(r'^[0-9a-f]{32}$').hasMatch(v)
+        ? 'Hex32'
+        : RegExp(r'^[A-Za-z_]+$').hasMatch(v)
+        ? 'Text'
+        : 'gemischt';
+    return '$art(${v.length})';
+  }
   static bool _gesetzt(String? s) => s != null && s.isNotEmpty;
 
   /// Das Formular trägt die Marke seiner Klasse (`_qf__<klasse>`). Die Klassen
@@ -1160,7 +1175,7 @@ class MoodleZugang {
       parameter: (q) => _nurSchluessel(q, {'contextid', 'filename'}),
       formular: (f) =>
           _zahl(wertIn(f, 'stage')) &&
-          RegExp(r'^[A-Za-z_]{1,30}$').hasMatch(wertIn(f, 'substage') ?? '') &&
+          RegExp(r'^[A-Za-z0-9_.-]{1,40}$').hasMatch(wertIn(f, 'substage') ?? '') &&
           RegExp(r'^[0-9a-f]{32}$').hasMatch(wertIn(f, 'restore') ?? '') &&
           _gesetzt(wertIn(f, 'sesskey')) &&
           f.any((e) => e.key.startsWith('mapping')) &&
@@ -1169,9 +1184,8 @@ class MoodleZugang {
               'stage' || 'contextid' => _zahl(e.value),
               'substage' || 'restore' || 'sesskey' => true,
               'context' || 'q' || 'pageurl' => true,
-              final k when RegExp(r'^mapping\d+$').hasMatch(k) => _zahl(
-                e.value,
-              ),
+              final k when RegExp(r'^mapping\d+$').hasMatch(k) =>
+                RegExp(r'^[A-Za-z0-9_.-]{1,60}$').hasMatch(e.value),
               _ => false,
             },
           ) &&
@@ -1776,7 +1790,8 @@ class MoodleZugang {
     protokoll.eintrag(
       Art.gesperrt,
       'Gesperrt: $methode ${adresseOhneWerte(uri)}'
-      '${formular == null ? '' : ' (Felder: ${formular.map((e) => e.key).toSet().join(', ')})'}',
+      '${formular == null ? '' : ' (Felder: ${formular.map((e) => e.key).toSet().join(', ')})'}'
+      '${formular == null || uri.path != '/backup/restore.php' ? '' : ' (Wertformen: ${formular.map((e) => '${e.key}=${_wertform(e.value)}').join(', ')})'}',
     );
     throw MoodleFehler(
       'Gesperrt: $methode ${uri.path} steht nicht auf der Positivliste dieses Servers '
