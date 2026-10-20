@@ -1,6 +1,8 @@
 # Changelog
 
 ## 0.9.23
+- Mac: Die App startet per Doppelklick auf `moocp-starten.command` und baut sich bei Bedarf selbst.
+- Lernlandkarten: Eine Karte ohne Wege meldet beim Rücklesen kein falsches `verified: false` mehr.
 - Lernlandkarten: Vorhandene Zielaktivitäten lassen sich mit Inhaltsbelegen vorschlagen; fachliche Zuordnungen brauchen auch bei „keine“ eine Entscheidung und verfallen bei verändertem Inhalt.
 - Lernlandkarten: Ein Minutenwechsel bei ausgeschaltetem Abschlusstermin verhindert keine bestätigte Zielzuordnung mehr.
 - Debug-Testbetrieb: Vollständig geprüfte Kopien eigener ZZ-Proben lassen sich auch im gebundenen zweiten Profil automatisch nachbearbeiten und als Bild prüfen.
