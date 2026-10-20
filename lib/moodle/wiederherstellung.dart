@@ -26,6 +26,7 @@ import 'package:path/path.dart' as p;
 import 'package:html/parser.dart' as html_parser;
 
 import '../freigabe.dart';
+import '../protokoll.dart';
 import 'formular.dart';
 import 'formular_lesen.dart';
 import 'wiederherstellung_fragen.dart';
@@ -471,6 +472,7 @@ Future<String> _ausfuehren(
         throw MoodleFehler('Der Wiederherstellungsstart wurde mit HTTP ${start.status} beantwortet. '
             'Der Ausgang ist unklar; mit wiederherstellung_status prüfen, nicht neu senden.');
       }
+      moodle.protokoll.eintrag(Art.info, 'Wiederherstellungsstart: ${startDiagnose(start)}');
     } catch (_) {
       await _uebergang(vorgaenge, vg, WiederherstellungStand.unklar,
           text: 'Der Start ist nicht bestätigt. wiederherstellung_status prüft erneut; nicht neu senden.');
@@ -499,6 +501,45 @@ Future<String> _ausfuehren(
     }
     rethrow;
   }
+}
+
+/// Bau der Antwort auf den Wiederherstellungsstart, nur als Aufbau: Status,
+/// Ziel der Umleitung (Pfad ohne Query), Seitenkennung, Art der Meldungen und
+/// Feldnamen. Nie Texte oder Werte (E11). Zeigt, ob Moodle die Wiederherstellung
+/// asynchron geplant, im Aufruf selbst ausgeführt oder abgelehnt hat.
+String startDiagnose(Antwort r) {
+  final doc = html_parser.parse(r.text);
+  final koerper = doc.body;
+  final kennung = koerper?.attributes['id'] ?? 'ohne';
+  final meldungen = {
+    for (final e in doc.querySelectorAll('.alert, .notifyproblem, .notifysuccess'))
+      e.classes.where((c) => c.startsWith('alert-') || c.startsWith('notify')).join('+'),
+  }.where((c) => c.isNotEmpty).toList()
+    ..sort();
+  final felder = {
+    for (final f in doc.querySelectorAll('form'))
+      for (final e in formularFelder(f)) e.key,
+  }.where((k) => !k.startsWith('sesskey')).take(15).toList();
+  final umleitung = r.ort == null ? 'keine' : Uri.parse(r.ort!).path;
+  return 'HTTP ${r.status}, Umleitung $umleitung, Seite $kennung, '
+      'Meldungen ${meldungen.isEmpty ? 'keine' : meldungen.join(',')}, '
+      'Fortschrittsbalken ${doc.querySelectorAll('.progress, progress').length}, '
+      'Felder ${felder.isEmpty ? 'keine' : felder.join(',')}';
+}
+
+/// Rohwerte der Fortschrittsabfrage als Zahlen und Formangaben, ohne Texte (E11):
+/// zeigt, ob Moodle den Vorgang unter dieser Kennung führt und mit welchem Status.
+String fortschrittDiagnose(Object? antwort, String backupid) {
+  final form = antwort is List ? 'Liste(${antwort.length})' : antwort.runtimeType.toString();
+  Map? eintrag;
+  for (final x in antwort is List ? antwort : [antwort]) {
+    if (x is Map && '${x['backupid']}' == backupid) eintrag = x;
+  }
+  if (eintrag == null) return 'Antwort $form, kein Eintrag zu dieser Kennung';
+  String zahl(Object? v) => v is num ? '$v' : (v == null ? '-' : v.runtimeType.toString());
+  return 'Antwort $form, status ${zahl(eintrag['status'])}, '
+      'progress ${zahl(eintrag['progress'])}, '
+      'Felder ${(eintrag.keys.map((k) => '$k').toList()..sort()).join(',')}';
 }
 
 /// Setzt Kursname und Kurzname des neuen Kurses im Schema. Die Feldnamen sind
@@ -575,6 +616,7 @@ Future<String> _warten(
 }) async {
   final ende = jetzt().add(gesamt);
   var erster = true;
+  String? letzteDiagnose;
   try {
     while (true) {
       vorgaenge.pruefeBindung(vg);
@@ -584,6 +626,11 @@ Future<String> _warten(
         'contextid': kontext,
       });
       final stand = bewerteFortschritt(antwort, restoreid);
+      final diagnose = fortschrittDiagnose(antwort, restoreid);
+      if (diagnose != letzteDiagnose) {
+        moodle.protokoll.eintrag(Art.info, 'Wiederherstellung, Fortschritt: $diagnose');
+        letzteDiagnose = diagnose;
+      }
       if (stand == SicherungStand.fertig) break;
       if (stand == SicherungStand.fehlgeschlagen) {
         // Das Fehlerfeld entscheidet nicht: Der Zielkurs wird frisch gelesen und

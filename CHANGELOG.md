@@ -1,6 +1,7 @@
 # Changelog
 
 ## 0.9.23
+- Wiederherstellung: Das Protokoll zeigt den Aufbau der Antwort auf den Start und die Rohwerte des Fortschritts (nur Zahlen und Feldnamen), damit eine nicht startende Wiederherstellung erkennbar wird.
 - Lernlandkarten: Eine Karte, deren Ortsziele Moodle als Text speichert, lässt sich wieder lesen (vorher Fehler beim Lesen, auch beim Verschieben in eine andere Instanz).
 - Mac: Die App startet per Doppelklick auf `moocp-starten.command` und baut sich bei Bedarf selbst.
 - Lernlandkarten: Eine Karte ohne Wege meldet beim Rücklesen kein falsches `verified: false` mehr.
