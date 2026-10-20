@@ -190,6 +190,13 @@ String _vergleichHtml(String feld, String wert) =>
       )
     : wert;
 
+// Moodle setzt den ausgeschalteten Abschlusstermin bei jedem GET auf „jetzt“.
+bool _unwirksamerAbschlusswert(String key, bool aktiv) =>
+    !aktiv && const {
+      'completionexpected[year]', 'completionexpected[month]', 'completionexpected[day]',
+      'completionexpected[hour]', 'completionexpected[minute]',
+    }.contains(key);
+
 /// Moodle darf nur die Beschriftung eines geänderten Orts aus dessen neuem
 /// Aktivitätsnamen erzeugen. Alle anderen SVG-Texte bleiben Teil des Vergleichs.
 bool _gleicheSvgMitNeubeschriftungen(
@@ -246,6 +253,8 @@ bool _gleicheFormularFelder(
     for (final e in f.felder)
       if (e.key != 'sesskey' &&
           !istEntwurfsId(e.key) &&
+          !_unwirksamerAbschlusswert(e.key,
+              f.felder.any((e) => e.key == 'completionexpected[enabled]' && const {'1', 'on'}.contains(e.value))) &&
           !(nachSpeichern && e.key == 'svgcode'))
         [e.key, _vergleichHtml(e.key, e.value)],
   ];

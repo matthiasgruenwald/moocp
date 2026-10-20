@@ -11,6 +11,8 @@ Future<String> lernlandkarteVerknuepfungenSetzen(
   required List<Map<String, Object?>> zuordnungen,
   void Function()? pruefeBindung,
   Future<void> Function()? pruefeZielInhalte,
+  bool fachlicheEntscheidung = false,
+  String? begruendung,
 }) async {
   if (zuordnungen.isEmpty) {
     throw MoodleFehler('Mindestens eine Ortszuordnung angeben.');
@@ -113,6 +115,25 @@ Future<String> lernlandkarteVerknuepfungenSetzen(
     }
   }
   final details = <String>[];
+  final zielInhalte = <int, String>{};
+  if (fachlicheEntscheidung) {
+    for (final a in zuordnungen) {
+      final id = (a['ziel'] as num?)?.toInt();
+      if (id == null || id == 0 || zielInhalte.containsKey(id)) continue;
+      final gelesen = await formularLesen(
+        moodle,
+        Formularziel.aktivitaet(id),
+        arbeitsordner,
+      );
+      final stand = formularInhaltsstand(gelesen);
+      if (stand == null || gelesen.kurs != kurs) {
+        throw MoodleFehler(
+          'Zielinhalt nicht vollständig im Kartenkurs lesbar. Nichts geändert.',
+        );
+      }
+      zielInhalte[id] = stand;
+    }
+  }
   for (final a in zuordnungen) {
     final ort = '${a['ort']}';
     final erwartet = (a['aktuell'] as num?)?.toInt();
@@ -124,16 +145,20 @@ Future<String> lernlandkarteVerknuepfungenSetzen(
   final ja = await freigaben.anfragen(
     FreigabeAnfrage(
       titel: 'Lernlandkarte ändern?',
+      ab: fachlicheEntscheidung ? Bestaetigungen.keine : Bestaetigungen.mittel,
       punkte: [
         'Lernlandkarte „${vorher.name}" (cmid $cmid, $kursText)',
         ...details,
+        if (fachlicheEntscheidung)
+          'Fachliche Zuordnung: Sie entscheiden über diesen Vorschlag.',
+        if (begruendung != null) 'Begründung der KI (Vorschlag): $begruendung',
         'SVG, Wege, Ortsdarstellung und andere Kartendaten bleiben erhalten.',
       ],
       vergleich: const [],
     ),
   );
   if (!ja) {
-    return 'Nicht gespeichert: Die Ortszuordnung wurde nicht freigegeben.';
+    return 'Nicht gespeichert: Die Ortszuordnung wurde nicht freigegeben. Zuordnung offen; verified: false.';
   }
 
   final aktuell = await formularHolen(moodle, ziel.adresse);
@@ -168,6 +193,18 @@ Future<String> lernlandkarteVerknuepfungenSetzen(
     );
   }
   await pruefeZielInhalte?.call();
+  for (final e in zielInhalte.entries) {
+    final gelesen = await formularLesen(
+      moodle,
+      Formularziel.aktivitaet(e.key),
+      arbeitsordner,
+    );
+    if (gelesen.kurs != kurs || formularInhaltsstand(gelesen) != e.value) {
+      throw MoodleFehler(
+        'Der Zielinhalt hat sich seit der Entscheidungsvorlage geändert. Nichts zugeordnet; neu lesen und entscheiden.',
+      );
+    }
+  }
   final store = Map<String, dynamic>.from(daten);
   final places = (store['places'] as List).whereType<Map>().toList();
   for (final a in zuordnungen) {
@@ -218,6 +255,7 @@ Future<String> lernlandkarteVerknuepfungenSetzen(
       _gleicheFelder(lesestand, gelesen) &&
       _gleicheEinstellungen(lesestand, gelesen, beschriftungenNeu: true);
   final verified = karteOk && formularOk;
-  return 'Lernlandkarte „${gelesen.name}" zurückgelesen; Ortszuordnungen verified: $verified.';
+  return '${fachlicheEntscheidung ? 'Fachlicher Vorschlag bestätigt. ' : ''}'
+      'Lernlandkarte „${gelesen.name}" zurückgelesen; Ortszuordnungen verified: $verified. '
+      'Das gilt nur für die beauftragten Orte; ungelöste andere Ziele und der Übertragungsbericht bleiben offen.';
 }
-

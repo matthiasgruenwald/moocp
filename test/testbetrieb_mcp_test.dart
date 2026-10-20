@@ -322,6 +322,13 @@ void main() {
       stufe: Bestaetigungen.alle,
       frist: const Duration(milliseconds: 150),
     );
+    // Diese Rückleseszenarien legen Zustimmung ausdrücklich im Testtreiber fest.
+    freigaben.addListener(() {
+      if (freigaben.stufe == Bestaetigungen.keine &&
+          freigaben.aktuell?.titel == 'Lernlandkarte ändern?') {
+        scheduleMicrotask(() => freigaben.entscheiden(true));
+      }
+    });
     moodle = await MoodleZugang.fuerTest(
       Protokoll(),
       extern.basis,

@@ -39,6 +39,7 @@ import '../moodle/kursfilter.dart';
 import '../moodle/kurshinweise.dart';
 import '../moodle/links.dart';
 import '../moodle/lernlandkarte.dart';
+import '../moodle/lernlandkarte_zielkontext.dart';
 import '../moodle/lernlandkarte_verteilen.dart';
 import '../moodle/moodle_zugang.dart';
 import '../moodle/sicherung_regeln.dart';
@@ -56,7 +57,7 @@ part 'lernlandkarten.dart';
 /// Was die eingestellte Stufe für die Werkzeuge bedeutet, für `status`.
 const _stufenText = {
   Bestaetigungen.keine:
-      'Es kommt KEINE Freigabe; jede Änderung läuft sofort. Kündige keine an. '
+      'Schreibfreigaben entfallen. Fachliche Karten-Zuordnungen brauchen weiterhin eine menschliche Entscheidung in der App. '
       'Die Freigabe je Bildschirmfoto bleibt davon unberührt.',
   Bestaetigungen.mittel:
       'Freigabe vor Ändern, Verschieben, Sichtbarkeit, Löschen und sichtbarem '
@@ -117,6 +118,19 @@ class McpDienst {
 
   /// Pfad des Arbeitsordners (arbeitsordner.dart).
   final String arbeitsordner;
+
+  final _kartenKontexte =
+      <
+        String,
+        ({
+          String profil,
+          Uri? instanz,
+          DateTime ablauf,
+          KartenZielkontext inhalt,
+        })
+      >{};
+  int _kartenKontextNummer = 0;
+
 
   /// Speicherort und Antwortfrist des Servers; Hintergrundvorgänge laufen danach weiter.
   final String? sicherungsordner;
@@ -231,6 +245,7 @@ class McpDienst {
   }
 
   Future<void> stoppen() async {
+    _kartenKontexte.clear();
     _testbetrieb.beenden();
     await _server?.stop();
     _server = null;

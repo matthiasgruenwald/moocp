@@ -33,7 +33,7 @@ import 'protokoll.dart';
 /// Die Reihenfolge ist die Mechanik: Gefragt wird, wenn die eingestellte
 /// Stufe mindestens so hoch ist wie die der Anfrage ([FreigabeAnfrage.ab]).
 enum Bestaetigungen {
-  /// Keine Freigabe vor einer Änderung in Moodle; alles läuft sofort. Die
+  /// Schreibfreigaben entfallen; fachliche Karten-Zuordnungen fragen weiter. Die
   /// Freigabe je Bildschirmfoto bleibt davon unberührt: Sie entscheidet
   /// nicht über eine Änderung, sondern darüber, welches Bild aus dem Kurs an
   /// Claude geht (E18).
@@ -82,7 +82,7 @@ class FreigabeAnfrage {
   /// alles, was Bestehendes anfasst oder sofort sichtbar wird. Wer nur bei
   /// „alle" fragen will (Anlegen, Duplizieren, Importieren), gibt
   /// [Bestaetigungen.alle] an; [Bestaetigungen.keine] heißt „immer fragen, auch
-  /// bei keine" und gilt nur für das Bildschirmfoto, das keine Änderung ist.
+  /// bei keine" gilt für Bildschirmfotos und fachliche Karten-Zuordnungen.
   final Bestaetigungen ab;
 
   /// Wozu Claude das braucht, in Claudes eigenen Worten -- steht oben im

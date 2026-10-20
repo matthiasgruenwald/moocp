@@ -21,7 +21,39 @@ die bisherige Ziel-cmid, `ziel` die neue Ziel-cmid; jeweils bedeutet `0`
 Ortskennung und eine vorhandene Aktivität im selben Kurs. Die Freigabe nennt
 jede Änderung. Kündige sie im Chat an. Nach dem Speichern meldet das Werkzeug,
 ob der Stand zurückgelesen und verifiziert wurde; berichte diesen Wert
-wörtlich.
+wörtlich. Die fachliche Entscheidung in der App bleibt auch bei
+„Bestätigungen: keine“ erforderlich.
+
+## Vorhandene Ziele fachlich auswählen
+
+Suche nach vorhandenen Aktivitäten, wenn ein Ortsziel nicht mitkopiert wurde,
+fehlt oder mehrere Zuordnungen plausibel sind. Lies die Zielkursübersicht und
+mit `lernlandkarte_zielkontext` den betroffenen Ort samt Quellziel und
+Kandidaten. Bei einer kopierten Karte gib die ursprüngliche Quellkarte an,
+wenn sie auf derselben Instanz lesbar ist. Die App bindet den Kontext an
+Profil, Instanz, Kartenkurs und die tatsächlich gelesenen Aktivitätsnummern.
+Die Suche ist abgeschlossen, wenn für jeden vorgeschlagenen Kandidaten
+seine eindeutige Identität und der relevante Inhalt aus den Arbeitsdateien
+vorliegen. Ein unlesbarer Kandidat bleibt eine Prüflücke.
+
+Vergleiche Lerngegenstand, Arbeitsauftrag, Voraussetzungen und Funktion im
+Lernweg. Lege der Lehrkraft pro Vorschlag die Quellbelege, die passenden
+Zielinhalte und verbleibende Unterschiede vor. Titelgleichheit trägt keine
+Zuordnung. Bei mehreren plausiblen Kandidaten erkläre die Unterschiede und
+empfiehl mit Grund einen davon. Ohne passenden Kandidaten berichte das offene
+Ziel; einen zusätzlichen Kopierauftrag schlägst du getrennt mit Umfang und
+Grund vor und wartest auf die Entscheidung.
+
+Nach der Entscheidung übergib den gelesenen Kontext mit deiner Begründung an
+`lernlandkarte_verknuepfungen_setzen`. Die App zeigt den konkreten Vorschlag
+zur Entscheidung, auch bei „keine“, und prüft Quelle, Karte und gewählten
+Kandidaten vor dem Schreiben erneut. Ein veränderter Stand verlangt einen
+neuen Vorschlag und eine neue Entscheidung. Eine Ablehnung bleibt offen.
+Berichte getrennt, was du vorgeschlagen hast, was bestätigt wurde und welche
+Ortszuordnung tatsächlich geschrieben und zurückgelesen wurde. Der Aufruf
+verifiziert nur die beauftragten Orte; andere offene Ziele und Prüflücken des
+Übertragungsberichts bleiben bestehen. Nach App-Neustart oder abgelaufenem
+Kontext lies neu.
 
 Bei geänderten, doppelten oder fehlenden Ortskennungen, einem inzwischen
 veränderten Ziel oder einem unklaren Ziel stoppst du und liest neu. Wähle
@@ -57,9 +89,8 @@ ist auch ihre Sichtbarkeit ungeklärt: frisch lesen und der Lehrkraft sagen.
 
 Fehlende, kursfremde oder nicht mitkopierte Verweisziele bleiben mit Ortskennung
 und Grund ungelöst. Es wird kein zusätzlicher Inhalt kopiert. Lies mögliche
-Zielaktivitäten fachlich, schlage der Lehrkraft eine begründete Zuordnung vor
-und warte auf ihre Entscheidung. Danach ändere gezielt die betroffene Karte mit
-`lernlandkarte_verknuepfungen_setzen`. Sichtbar machen ist ein eigener Auftrag.
+Zielaktivitäten nach „Vorhandene Ziele fachlich auswählen“ und kläre die
+betroffene Karte gezielt. Sichtbar machen ist ein eigener Auftrag.
 
 Nach Teilfehler, Zeitlimit oder Neustart den Vorgang mit der ausgegebenen Nummer
 prüfen. Den Verteilungsauftrag nicht blind erneut senden: Erfolgreiche und unklare

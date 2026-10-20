@@ -267,8 +267,14 @@ class _Moodle {
         <input type="hidden" name="backgroundfile" value="${entwurf + 1000}">
         <textarea name="svgcode">${const HtmlEscape().convert(svgFuer(x))}</textarea>
         <input type="hidden" name="placestore" value='${const HtmlEscape().convert(x.placestore!)}'>
-        <div class="fitem row" id="fitem_id_completionexpected_minute"><div class="col-form-label">Erwarteter Abschluss</div><div class="felement"><input name="completionexpected[minute]" value="${x.completionMinute ?? erinnerungMinute}"></div></div>
-        ${erinnerungAktiv ? '<div class="fitem row" id="fitem_id_completionexpected_enabled"><div class="col-form-label">Abschluss aktiv</div><div class="felement"><input name="completionexpected[enabled]" value="1"></div></div>' : ''}
+        <div class="fitem row" id="fitem_id_completionexpected"><div class="col-form-label">Erwarteter Abschluss</div><div class="felement" data-fieldtype="date_time_selector">
+        <select name="completionexpected[year]"><option value="2026" selected>2026</option></select>
+        <select name="completionexpected[month]"><option value="10" selected>10</option></select>
+        <select name="completionexpected[day]"><option value="20" selected>20</option></select>
+        <select name="completionexpected[hour]"><option value="12" selected>12</option></select>
+        <select name="completionexpected[minute]"><option value="${x.completionMinute ?? erinnerungMinute}" selected>${x.completionMinute ?? erinnerungMinute}</option></select>
+        <input type="hidden" name="completionexpected[enabled]" value="0"><input type="checkbox" name="completionexpected[enabled]" value="1" ${erinnerungAktiv ? 'checked' : ''}>
+        </div></div>
         <input type="submit" name="submitbutton" value="Speichern"></form>''',
       ).replaceFirst(
         '</form>',
@@ -282,8 +288,14 @@ class _Moodle {
         <input name="cmidnumber" value="${x.idnummer ?? ''}">
         <select name="visible"><option value="0" ${x.sichtbar ? '' : 'selected'}>Verborgen</option><option value="1" ${x.sichtbar ? 'selected' : ''}>Sichtbar</option></select>
         <textarea name="page[text]">${const HtmlEscape().convert(x.html ?? '<p>${x.name}</p>')}</textarea><input name="page[format]" value="${x.format}"><input name="page[itemid]" value="9">
-        <div class="fitem row" id="fitem_id_completionexpected_minute"><div class="col-form-label">Erwarteter Abschluss</div><div class="felement"><input name="completionexpected[minute]" value="$erinnerungMinute"></div></div>
-        ${erinnerungAktiv ? '<div class="fitem row" id="fitem_id_completionexpected_enabled"><div class="col-form-label">Abschluss aktiv</div><div class="felement"><input name="completionexpected[enabled]" value="1"></div></div>' : ''}
+        <div class="fitem row" id="fitem_id_completionexpected"><div class="col-form-label">Erwarteter Abschluss</div><div class="felement" data-fieldtype="date_time_selector">
+        <select name="completionexpected[year]"><option value="2026" selected>2026</option></select>
+        <select name="completionexpected[month]"><option value="10" selected>10</option></select>
+        <select name="completionexpected[day]"><option value="20" selected>20</option></select>
+        <select name="completionexpected[hour]"><option value="12" selected>12</option></select>
+        <select name="completionexpected[minute]"><option value="$erinnerungMinute" selected>$erinnerungMinute</option></select>
+        <input type="hidden" name="completionexpected[enabled]" value="0"><input type="checkbox" name="completionexpected[enabled]" value="1" ${erinnerungAktiv ? 'checked' : ''}>
+        </div></div>
         <input type="submit" name="submitbutton" value="Speichern"></form>''',
     );
   }
@@ -759,6 +771,234 @@ void main() {
             a.name == name &&
             (neu ? a.cmid < 5000 : a.cmid >= 5000),
       );
+
+  test('Zielkontext liest fachliche Belege und bestätigt einen Kandidaten auch bei keine', () async {
+    freigaben.stufe = Bestaetigungen.keine;
+    final vorher = moodle.karte.placestore;
+    final text = await client.tool('lernlandkarte_zielkontext', {
+      'cmid': moodle.karte.cmid,
+      'ort': 'p1',
+      'kandidaten': [moodle.seiteB.cmid],
+    });
+    final kontext = jsonDecode(text) as Map;
+    expect(kontext['quelle']['cmid'], moodle.seiteA.cmid);
+    expect(kontext['kandidaten'].single['name'], 'ZZ Seite B');
+    expect(kontext['kandidaten'].single['inhalt'], contains('ZZ Seite B'));
+    expect(moodle.karte.placestore, vorher);
+    expect(kartenDialoge, 0);
+    final ergebnis = await client.tool('lernlandkarte_verknuepfungen_setzen', {
+      'cmid': moodle.karte.cmid,
+      'name': moodle.karte.name,
+      'kontext': kontext['kontext'],
+      'begruendung': 'Die Seite führt das Thema weiter.',
+      'zuordnungen': [
+        {
+          'ort': 'p1',
+          'aktuell': moodle.seiteA.cmid,
+          'ziel': moodle.seiteB.cmid,
+        },
+      ],
+    });
+    expect(ergebnis, contains('bestätigt'));
+    expect(ergebnis, contains('verified: true'));
+    expect(links(moodle.karte)['p1'], moodle.seiteB.cmid);
+    expect(kartenDialoge, 1);
+    expect(moodle.restoreStarts, 0);
+  });
+
+  test('auch eine direkte fachliche Zuordnung prüft den Zielinhalt nach der Entscheidung', () async {
+    beiKartenfreigabe = () =>
+        moodle.seiteB.html = '<p>Anderer Lerngegenstand</p>';
+    final ergebnis = await client.tool('lernlandkarte_verknuepfungen_setzen', {
+      'cmid': moodle.karte.cmid,
+      'name': moodle.karte.name,
+      'zuordnungen': [
+        {
+          'ort': 'p1',
+          'aktuell': moodle.seiteA.cmid,
+          'ziel': moodle.seiteB.cmid,
+        },
+      ],
+    });
+    expect(ergebnis, contains('Zielinhalt'));
+    expect(moodle.kartenSpeicherungen, 0);
+    expect(links(moodle.karte)['p1'], moodle.seiteA.cmid);
+  });
+
+  Future<Map> zielkontext({List<int>? kandidaten, int? quellkarte}) async =>
+      jsonDecode(
+        await client.tool('lernlandkarte_zielkontext', {
+          'cmid': moodle.karte.cmid,
+          'ort': 'p1',
+          'kandidaten': ?kandidaten,
+          'quellkarte': ?quellkarte,
+        }),
+      ) as Map;
+
+  Future<String> kandidatSetzen(Map kontext, int ziel) =>
+      client.tool('lernlandkarte_verknuepfungen_setzen', {
+        'cmid': moodle.karte.cmid,
+        'name': moodle.karte.name,
+        'kontext': kontext['kontext'],
+        'begruendung': 'Das gelesene Blatt behandelt denselben Lerngegenstand.',
+        'zuordnungen': [
+          {'ort': 'p1', 'aktuell': moodle.seiteA.cmid, 'ziel': ziel},
+        ],
+      });
+
+  test('mehrere gleichnamige Kandidaten ändern ohne Entscheidung nichts und die Lehrkraft kann den zweiten wählen', () async {
+    final zweiter = moodle.neu(12, 101, 'page', moodle.seiteB.name)
+      ..html = '<p>Vertiefung zum Lerngegenstand</p>';
+    final kontext = await zielkontext(
+      kandidaten: [moodle.seiteB.cmid, zweiter.cmid],
+    );
+    expect((kontext['kandidaten'] as List).map((k) => k['cmid']), [
+      moodle.seiteB.cmid,
+      zweiter.cmid,
+    ]);
+    expect(moodle.kartenSpeicherungen, 0);
+    expect(kartenDialoge, 0);
+    final ergebnis = await kandidatSetzen(kontext, zweiter.cmid);
+    expect(ergebnis, contains('verified: true'));
+    expect(links(moodle.karte)['p1'], zweiter.cmid);
+    expect(moodle.restoreStarts, 0);
+  });
+
+  test('Ablehnung bei keine lässt vorgeschlagenen Kandidaten offen und schreibt nichts', () async {
+    freigaben.stufe = Bestaetigungen.keine;
+    kartenFreigabe = false;
+    final kontext = await zielkontext(kandidaten: [moodle.seiteB.cmid]);
+    final ergebnis = await kandidatSetzen(kontext, moodle.seiteB.cmid);
+    expect(ergebnis, contains('Zuordnung offen; verified: false'));
+    expect(links(moodle.karte)['p1'], moodle.seiteA.cmid);
+    expect(moodle.kartenSpeicherungen, 0);
+    expect(kartenDialoge, 1);
+  });
+
+  test('kein passendes Ziel bleibt ohne Zusatzkopie offen und eine erfundene Nummer wird abgewiesen', () async {
+    final kontext = await zielkontext(kandidaten: []);
+    expect(kontext['kandidaten'], isEmpty);
+    expect(kontext['status'], contains('kein passendes Ziel bleibt offen'));
+    final ergebnis = await kandidatSetzen(kontext, 999999);
+    expect(ergebnis, contains('nicht zum gelesenen Zielkontext'));
+    expect(moodle.kartenSpeicherungen, 0);
+    expect(moodle.restoreStarts, 0);
+  });
+
+  for (final zeitpunkt in ['vor', 'während']) {
+    test(
+      'veränderter Kandidateninhalt $zeitpunkt der Entscheidung verhindert Zuordnung',
+      () async {
+        final kontext = await zielkontext(kandidaten: [moodle.seiteB.cmid]);
+        void aendern() => moodle.seiteB.html = '<p>Anderer Lerngegenstand</p>';
+        if (zeitpunkt == 'vor') {
+          aendern();
+        } else {
+          beiKartenfreigabe = aendern;
+        }
+        final ergebnis = await kandidatSetzen(kontext, moodle.seiteB.cmid);
+        expect(ergebnis, contains('seit dem Vorschlag geändert'));
+        expect(moodle.kartenSpeicherungen, 0);
+        expect(links(moodle.karte)['p1'], moodle.seiteA.cmid);
+      },
+    );
+  }
+
+  test(
+    'Quelländerung während der Entscheidung verhindert fachliche Zuordnung',
+    () async {
+      final kontext = await zielkontext(kandidaten: [moodle.seiteB.cmid]);
+      beiKartenfreigabe = () => moodle.seiteA.html = '<p>Neue Quelle</p>';
+      final ergebnis = await kandidatSetzen(kontext, moodle.seiteB.cmid);
+      expect(ergebnis, contains('seit dem Vorschlag geändert'));
+      expect(moodle.kartenSpeicherungen, 0);
+    },
+  );
+
+  test('kursfremder Kandidat wird bereits beim Lesen zurückgewiesen', () async {
+    final fremd = moodle.akt.firstWhere((a) => a.kurs == 31);
+    final ergebnis = await client.tool('lernlandkarte_zielkontext', {
+      'cmid': moodle.karte.cmid,
+      'ort': 'p1',
+      'kandidaten': [fremd.cmid],
+    });
+    expect(ergebnis, contains('keine Zielaktivität dieses Kurses'));
+    expect(moodle.kartenSpeicherungen, 0);
+  });
+
+  test(
+    'Profilwechsel während fachlicher Entscheidung schreibt nichts',
+    () async {
+      final kontext = await zielkontext(kandidaten: [moodle.seiteB.cmid]);
+      beiKartenfreigabe = () => dienst.profil = Profil(
+        kennung: 'fremd',
+        name: 'Fremd',
+        adresse: profil.adresse,
+        port: profil.port,
+        mcpName: 'fremd',
+      );
+      final ergebnis = await kandidatSetzen(kontext, moodle.seiteB.cmid);
+      expect(ergebnis, contains('Profil oder Instanz'));
+      expect(moodle.kartenSpeicherungen, 0);
+    },
+  );
+
+  test('Neustart verwirft alte Kandidatenbelege', () async {
+    final kontext = await zielkontext(kandidaten: [moodle.seiteB.cmid]);
+    await dienst.stoppen();
+    client.http.close(force: true);
+    await dienstStarten();
+    final ergebnis = await kandidatSetzen(kontext, moodle.seiteB.cmid);
+    expect(ergebnis, contains('Zielkontext fehlt'));
+    expect(moodle.kartenSpeicherungen, 0);
+  });
+
+  test('nicht mitkopiertes Quellziel wird über belegten Kontext auf vorhandenen Zielinhalt geklärt', () async {
+    final kopiert = await client.tool('uebertragen', {
+      'kurs': 12, 'name_des_kurses': 'ZZ Quelle',
+      'aktivitaeten': [{'cmid': moodle.karte.cmid, 'name': moodle.karte.name}],
+      'ziele': [{'kurs': 31, 'name': 'ZZ Ziel 1', 'weg': 'aktueller_kurs_verschmelzen'}],
+    });
+    expect(kopiert, contains('1 offen'));
+    final karte = inZiel(31, 'learningmap', 'ZZ Karte');
+    final kandidat = inZiel(31, 'page', 'ZZ Seite A', neu: false);
+    final kontext = jsonDecode(await client.tool('lernlandkarte_zielkontext', {
+      'cmid': karte.cmid, 'ort': 'p1', 'quellkarte': moodle.karte.cmid,
+      'kandidaten': [kandidat.cmid],
+    })) as Map;
+    expect(kontext['quelle']['cmid'], moodle.seiteA.cmid);
+    expect(kontext['karte']['kurs'], 31);
+    final ergebnis = await client.tool('lernlandkarte_verknuepfungen_setzen', {
+      'cmid': karte.cmid, 'name': karte.name, 'kontext': kontext['kontext'],
+      'begruendung': 'Das vorhandene Blatt behandelt denselben Lerngegenstand.',
+      'zuordnungen': [{'ort': 'p1', 'aktuell': moodle.seiteA.cmid, 'ziel': kandidat.cmid}],
+    });
+    expect(ergebnis, contains('bestätigt'));
+    expect(ergebnis, contains('verified: true'));
+    expect(ergebnis, contains('ungelöste andere Ziele'));
+    expect(links(karte)['p1'], kandidat.cmid);
+    expect(links(karte)['p2'], moodle.seiteB.cmid);
+    expect(moodle.restoreStarts, 1, reason: 'kein zusätzlicher Kopierauftrag');
+    expect(moodle.akt.where((a) => a.kurs == 31 && a.modul == 'page').length, 1);
+  });
+
+  test('inaktive Abschlusszeit mit neuem Minutenwert ändert keinen fachlichen Stand', () async {
+    final kontext = await zielkontext(kandidaten: [moodle.seiteB.cmid]);
+    beiKartenfreigabe = () => moodle.erinnerungMinute = 24;
+    final ergebnis = await kandidatSetzen(kontext, moodle.seiteB.cmid);
+    expect(ergebnis, contains('verified: true'), reason: ergebnis);
+    expect(links(moodle.karte)['p1'], moodle.seiteB.cmid);
+  });
+
+  test('ein veränderter aktiver Abschlusstermin verhindert weiterhin die Zuordnung', () async {
+    moodle.erinnerungAktiv = true;
+    final kontext = await zielkontext(kandidaten: [moodle.seiteB.cmid]);
+    beiKartenfreigabe = () => moodle.erinnerungMinute = 24;
+    final ergebnis = await kandidatSetzen(kontext, moodle.seiteB.cmid);
+    expect(ergebnis, contains('seit der Freigabe geändert'));
+    expect(moodle.kartenSpeicherungen, 0);
+    expect(links(moodle.karte)['p1'], moodle.seiteA.cmid);
+  });
 
   test('Thema samt Karte in fünf Zielkurse: jede Karte zeigt nur auf die Kopien ihres Zielkurses', () async {
     final ergebnis = await client.tool('uebertragen', auftrag());
@@ -1258,6 +1498,7 @@ void main() {
   test(
     'abweichende native Karteneinstellung bleibt vor dem Verknüpfen offen',
     () async {
+      moodle.erinnerungAktiv = true;
       moodle.kopieAendern = (a) {
         if (a.modul == 'learningmap') a.completionMinute = 99;
       };

@@ -19,6 +19,34 @@ Widget _fenster(Freigaben freigaben) => MaterialApp(
 );
 
 void main() {
+  for (final ja in [true, false]) {
+    testWidgets(
+      'fachliche Kandidatenentscheidung bei keine: ${ja ? 'bestätigen' : 'ablehnen'}',
+      (tester) async {
+        final freigaben = Freigaben(Protokoll(), stufe: Bestaetigungen.keine);
+        await tester.pumpWidget(_fenster(freigaben));
+        final antwort = freigaben.anfragen(
+          FreigabeAnfrage(
+            titel: 'Lernlandkarte ändern?',
+            punkte: const [
+              'Ort p1: ZZ Quelle → ZZ Vertiefung (cmid 72)',
+              'Begründung der KI (Vorschlag): Gleicher Lerngegenstand.',
+            ],
+            vergleich: const [],
+            ab: Bestaetigungen.keine,
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(find.textContaining('ZZ Vertiefung'), findsOneWidget);
+        expect(find.textContaining('Gleicher Lerngegenstand'), findsOneWidget);
+        await tester.tap(find.text(ja ? 'Speichern' : 'Abbrechen'));
+        await tester.pumpAndSettle();
+        expect(await antwort, ja);
+        expect(freigaben.ausgelassen, 0);
+      },
+    );
+  }
+
   testWidgets('Bild außerhalb des erneut geprüften Testumfangs braucht persönliche Freigabe', (tester) async {
     final freigaben = Freigaben(Protokoll(), stufe: Bestaetigungen.keine);
     await tester.pumpWidget(_fenster(freigaben));

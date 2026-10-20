@@ -1,6 +1,8 @@
 # Changelog
 
 ## 0.9.23
+- Lernlandkarten: Vorhandene Zielaktivitäten lassen sich mit Inhaltsbelegen vorschlagen; fachliche Zuordnungen brauchen auch bei „keine“ eine Entscheidung und verfallen bei verändertem Inhalt.
+- Lernlandkarten: Ein Minutenwechsel bei ausgeschaltetem Abschlusstermin verhindert keine bestätigte Zielzuordnung mehr.
 - Debug-Testbetrieb: Vollständig geprüfte Kopien eigener ZZ-Proben lassen sich auch im gebundenen zweiten Profil automatisch nachbearbeiten und als Bild prüfen.
 - Unterrichtsverteilung: Lernlandkarten werden je Durchführungskurs auf die belegten Kopien neu verknüpft; offene Zuordnungen und Wiederholungen bleiben je Ziel erkennbar.
 - Wiederherstellung: Ein HTTP-Fehler beim Start bleibt unklar und löst keinen erneuten Start aus.

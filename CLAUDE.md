@@ -59,7 +59,7 @@ Konsole. Die KI liest nie `shared_preferences.json` oder
 - neu Angelegtes ist verborgen; sichtbar Anlegen, Ändern, Verschieben,
   Sichtbarkeit und Löschen nur nach Freigabe in der App, die Kurs, Namen und
   alles Mitbetroffene zeigt;
-- **wie viele Freigaben, entscheidet die Lehrkraft** (E20): „mittel" ist die Vorgabe und die Liste darüber, „alle" fragt zusätzlich vor jedem Erzeugen in Moodle, „keine" vor nichts. Was dieser Absatz sonst verlangt, gilt unabhängig davon – Namensprüfung, Stand-Prüfung, Rückleseprobe, Protokoll. Entscheidet die Stufe, dass nicht gefragt wird, hält das Protokoll fest, dass ohne Freigabe geschrieben wurde, und das Werkzeug sagt es Claude;
+- **wie viele Freigaben, entscheidet die Lehrkraft** (E20): „mittel" ist die Vorgabe und die Liste darüber, „alle" fragt zusätzlich vor jedem Erzeugen in Moodle, „keine" ohne Schreibfreigaben; fachliche Karten-Zuordnungen erfordern weiterhin eine menschliche Entscheidung (E20). Was dieser Absatz sonst verlangt, gilt unabhängig davon – Namensprüfung, Stand-Prüfung, Rückleseprobe, Protokoll. Entscheidet die Stufe, dass nicht gefragt wird, hält das Protokoll fest, dass ohne Freigabe geschrieben wurde, und das Werkzeug sagt es Claude;
 - wer Bestehendes verschiebt, verbirgt oder löscht, nennt den Namen, wie er
   jetzt in Moodle steht; passt er nicht zur Nummer, bricht das Werkzeug ab,
   bevor etwas geschieht;

@@ -1529,7 +1529,7 @@ Future<void> bestaetigungenHilfe(
               stufe(
                 'keine',
                 farbe.error,
-                'Es wird nichts mehr gezeigt. Alles läuft sofort, auch Löschen.',
+                'Schreibfreigaben entfallen, auch beim Löschen. Fachliche Karten-Zuordnungen brauchen weiterhin Ihre Entscheidung.',
                 'Nur für den Fall, dass Sie sich sicher sind und zügig arbeiten wollen. Das Feld ist '
                     'dann rot. Was bleibt: Die KI kommt an keine Daten von Lernenden, nennt vor jedem '
                     'Verschieben, Verbergen und Löschen den Namen, wie er jetzt in Moodle steht, und '
