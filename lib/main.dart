@@ -693,7 +693,7 @@ class _HauptseiteState extends State<Hauptseite> with WindowListener {
         widget.protokoll.eintrag(
           Art.fehler,
           'MCP-Server (${i.dienst.profil.name}) startet nicht auf Port '
-          '${i.dienst.profil.port}: $e',
+          '${i.dienst.profil.port}: ${e.runtimeType}',
         );
       }
     }

@@ -4,8 +4,15 @@ import 'moodle_zugang.dart';
 
 /// Moodle-Formulare rücken SVG-Zeilen beim Speichern ein. Leerraum zwischen
 /// Tags ist in SVG bedeutungslos; Text innerhalb eines Elements bleibt exakt.
-String lernlandkarteSvgVergleichswert(String svg) =>
-    svg.replaceAll(RegExp(r'>\s+<'), '><').trim();
+/// Moodle liefert ein leeres Element als `<g/>` zurück, die App schreibt
+/// `<g></g>`; beide Schreibweisen sind gleich.
+String lernlandkarteSvgVergleichswert(String svg) => svg
+    .replaceAll(RegExp(r'>\s+<'), '><')
+    .replaceAllMapped(
+      RegExp(r'<([A-Za-z][\w:.-]*)((?:\s[^<>]*?)?)></\1>'),
+      (m) => '<${m[1]}${m[2]}/>',
+    )
+    .trim();
 
 /// Eine kleine, skriptfreie Lernlandkarte aus den nativen Feldern des
 /// Moodle-Formulars. Eingaben enthalten nur Punkte und Verbindungen; IDs,

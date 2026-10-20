@@ -278,6 +278,14 @@ void main() {
       ),
       '<svg><g><circle/></g></svg>',
     );
+    expect(
+      lernlandkarteSvgVergleichswert('<svg><g id="a"></g><g></g></svg>'),
+      lernlandkarteSvgVergleichswert('<svg><g id="a"/><g/></svg>'),
+    );
+    expect(
+      lernlandkarteSvgVergleichswert('<svg><text>a</text></svg>'),
+      '<svg><text>a</text></svg>',
+    );
   });
 
   test('Kartenvorlage lehnt fremde IDs und ungültige Wege vor dem Schreiben ab', () {

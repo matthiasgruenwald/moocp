@@ -1,6 +1,6 @@
 # Features
 
-- Lernlandkarten anlegen: Eine Vorlage mit einem Ort und ohne Wege meldet auf der Testinstanz eine abweichende Kartengrafik, weil Moodle das leere SVG-Element `<g></g>` als `<g/>` zurückliefert. Orte, Hintergrunddatei und übrige Prüfungen stimmen. Der SVG-Vergleich muss diese semantisch gleiche Schreibweise gezielt berücksichtigen; zwei Orte mit einem Weg sind vollständig zurückgelesen.
+- Lernlandkarten anlegen: Der SVG-Vergleich behandelt `<g></g>` und `<g/>` jetzt als gleich (`lernlandkarteSvgVergleichswert`, Einheitentest). Umgesetzt, auf der Instanz noch nicht erneut gemessen: eine Vorlage mit einem Ort und ohne Wege muss dort `verified: true` melden.
 - Bildschirmfotos: Bei einer schmalen Inhaltsbox werden links Textanfänge abgeschnitten. Im Live-Test auf der zweiten Testinstanz mit einer eigenen ZZ-Textseite mehrfach reproduziert; der rückgelesene Quelltext ist vollständig. Inhaltskoordinaten und Layoutänderungen zwischen Messen und Aufnahme prüfen, ohne den Ausschnitt auf Kopf oder Navigation auszuweiten.
 
 Größere Folgearbeiten zur sicheren Wiederherstellung sind in [Issue #26](https://github.com/matthiasgruenwald/moocp/issues/26) zur menschlichen Klärung gesammelt. Die dortige Reihenfolge gilt nach Abschluss des aktuellen PR.
