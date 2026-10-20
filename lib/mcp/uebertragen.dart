@@ -1,6 +1,44 @@
 part of 'mcp_dienst.dart';
 
 extension _Uebertragung on McpDienst {
+  Future<String> _nachTestkopie(
+    Future<String> lauf,
+    Vorgaenge vorgaenge,
+    String? Function() nummer,
+  ) async {
+    final text = await lauf;
+    final eigen = await _testbetrieb.kopienErfassen(
+      profil,
+      testzugang ?? Testzugang.fuer(profil),
+      vorgaenge,
+      nummer(),
+    );
+    return eigen
+        ? '$text\nDebug-Testbetrieb: Belegte eigene ZZ-Kopien für Folgeaktionen erfasst.'
+        : text;
+  }
+
+  Future<String> _nachTestsicherung(
+    Future<String> lauf,
+    Vorgaenge vorgaenge,
+    String? Function() nummer,
+    Map<String, dynamic> args,
+  ) async {
+    final text = await lauf;
+    final id = nummer();
+    final v = id == null ? null : await vorgaenge.finde(id);
+    if (v != null) {
+      await _testbetrieb.sicherungMerken(
+        profil,
+        testzugang ?? Testzugang.fuer(profil),
+        vorgaenge,
+        v,
+        args,
+      );
+    }
+    return text;
+  }
+
   /// Übertragung in einem Auftrag (Issue #10). Die Entscheidungen stehen in
   /// uebertragung_lauf.dart; hier nur die Verdrahtung mit Moodle und Freigabe.
   /// Reihenfolge: prüfen, Wiederholungsschutz, eine Freigabe mit der
@@ -10,6 +48,12 @@ extension _Uebertragung on McpDienst {
     Map<String, dynamic> a, {
     required void Function(String werkzeug, String? id) beiVorgang,
   }) async {
+    final auftragsProfil = profil.kennung;
+    final auftragsInstanz = moodle.basis;
+    bool bindungPasst() =>
+        profil.kennung == auftragsProfil &&
+        moodle.angemeldet &&
+        moodle.basis == auftragsInstanz;
     final ziele = <ZielAngabe>[];
     for (final x in (a['ziele'] as List?) ?? const []) {
       final m = McpDienst._karte(x);
@@ -50,6 +94,47 @@ extension _Uebertragung on McpDienst {
     }
     if (rueckfragen.isNotEmpty) return rueckfragen.join('\n\n');
 
+    // Lernlandkarten und Verweisziele erfassen, bevor etwas kopiert wird.
+    // Nur lesend; ohne Quellkurs (mit datei) gibt es nichts zu erfassen.
+    Future<List<KartenQuelle>> quelleErfassen() async => quellkurs == null
+        ? const <KartenQuelle>[]
+        : await kartenErfassen(
+            moodle,
+            kurs: quellkurs,
+            aktivitaeten: [
+              for (final x in (a['aktivitaeten'] as List?) ?? const [])
+                _zahl(McpDienst._karte(x), 'cmid'),
+            ],
+            abschnitte: [
+              for (final x in (a['abschnitte'] as List?) ?? const [])
+                _zahl(McpDienst._karte(x), 'id'),
+            ],
+            ganzerKurs: a['ganzer_kurs'] == true,
+          );
+    final karten = await quelleErfassen();
+    Future<bool> quelleUnveraendert() async {
+      if (!bindungPasst()) return false;
+      final frisch = await quelleErfassen();
+      return jsonEncode([
+            for (final k in karten) [k.cmid, k.name, k.stand],
+          ]) ==
+          jsonEncode([
+            for (final k in frisch) [k.cmid, k.name, k.stand],
+          ]);
+    }
+
+    final kartenZeilen = [
+      for (final k in karten) ...[
+        'Lernlandkarte „${k.name}" (cmid ${k.cmid}): ${k.orte.length} verknüpfte '
+            '${k.orte.length == 1 ? 'Ort' : 'Orte'}. Nach dem Kopieren verknüpft die App sie in jedem Zielkurs '
+            'neu auf die dort kopierten Aktivitäten (je Karte eine weitere Freigabe); sie bleibt verborgen.',
+        for (final o in k.orte)
+          if (!o.mitkopiert)
+            '  Ort ${o.ort} zeigt auf „${o.zielName ?? 'cmid ${o.quellZiel}'}", das nicht mitkopiert wird: bleibt ungelöst, '
+                'es wird nichts zusätzlich kopiert.',
+      ],
+    ];
+
     // Die Zusammenfassung vor dem ersten Schreibschritt (Issue #5, uebertragungsZusammenfassung).
     final zielZeilen = [
       for (final z in geprueft)
@@ -89,6 +174,7 @@ extension _Uebertragung on McpDienst {
             'Übertragung in ${geprueft.length} ${geprueft.length == 1 ? 'Kurs' : 'Kurse'} starten?',
         punkte: [
           ...punkte,
+          ...kartenZeilen,
           'Je Ziel ein eigener Vorgang, nacheinander. Ein Fehler stoppt die anderen Ziele nicht; eine Ablehnung schon.',
           'Eine Einfüge-Wiederherstellung kann Inhalte doppelt anlegen. Ein Aktualisieren ist nicht zugesagt.',
         ],
@@ -100,6 +186,10 @@ extension _Uebertragung on McpDienst {
     if (!ja) {
       return 'Nicht übertragen: in der App abgelehnt oder nicht innerhalb von '
           '${freigaben.frist.inMinutes} Minuten freigegeben. Nichts geändert.';
+    }
+
+    if (karten.isNotEmpty && !await quelleUnveraendert()) {
+      return 'Die Quellauswahl wurde seit dem Erfassen geändert. Nichts übertragen; neu lesen und planen.';
     }
 
     // Ohne datei zuerst auf dieser Instanz sichern. Die Datei gilt nur, wenn der Vorgang fertig ist.
@@ -118,11 +208,17 @@ extension _Uebertragung on McpDienst {
         name: _text(a, 'name_des_kurses'),
         aktivitaeten: [
           for (final x in (a['aktivitaeten'] as List?) ?? const [])
-            (cmid: _zahl(McpDienst._karte(x), 'cmid'), name: _text(McpDienst._karte(x), 'name')),
+            (
+              cmid: _zahl(McpDienst._karte(x), 'cmid'),
+              name: _text(McpDienst._karte(x), 'name'),
+            ),
         ],
         abschnitte: [
           for (final x in (a['abschnitte'] as List?) ?? const [])
-            (id: _zahl(McpDienst._karte(x), 'id'), name: _text(McpDienst._karte(x), 'name')),
+            (
+              id: _zahl(McpDienst._karte(x), 'id'),
+              name: _text(McpDienst._karte(x), 'name'),
+            ),
         ],
         ganzerKurs: a['ganzer_kurs'] == true,
         zielOrdner: a['ziel_ordner'] as String?,
@@ -139,11 +235,29 @@ extension _Uebertragung on McpDienst {
       }
       datei = sv.datei;
       sicherungNummer = id;
+      await _testbetrieb.sicherungMerken(
+        profil,
+        testzugang ?? Testzugang.fuer(profil),
+        vorgaenge,
+        sv,
+        a,
+      );
     }
+
+    if (karten.isNotEmpty && !await quelleUnveraendert()) {
+      return 'Die Quellauswahl wurde seit dem Erfassen geändert. Die Sicherung wurde erstellt, '
+          'aber nichts übertragen; neu lesen und planen.';
+    }
+    var archivHatKarten = false;
 
     // Ein Ziel: eigener Vorgang, Stand aus dem Vorgang. Ohne Vorgangsnummer hat die
     // App abgelehnt (wiederherstellen legt den Vorgang erst nach der Freigabe an).
     Future<ZielErgebnis> lauf(PlanZiel z) async {
+      if (!bindungPasst()) {
+        throw MoodleFehler(
+          'Profil oder Instanz der Übertragung wurde gewechselt. Nichts weiter gestartet.',
+        );
+      }
       beiVorgang('wiederherstellung_status', null);
       String? vid;
       String text = '';
@@ -173,11 +287,70 @@ extension _Uebertragung on McpDienst {
       final id = vid;
       if (id == null) return ZielErgebnis(ZielStand.abgelehnt, text: text);
       final v = await vorgaenge.finde(id);
+      archivHatKarten |=
+          v?.wiederherstellungAktivitaeten?.any(
+            (x) => x.modul == 'learningmap',
+          ) ??
+          false;
       return ZielErgebnis(
         zielStandAus(v?.wiederherstellung),
         vorgang: id,
         text: text,
       );
+    }
+
+    // Nach dem Kopieren eines Ziels: seine Karten auf die dort belegten Kopien verknüpfen.
+    Future<KartenErgebnis?> kartenLauf(PlanZiel z, ZielErgebnis restore) async {
+      final id = restore.vorgang;
+      final v = id == null ? null : await vorgaenge.finde(id);
+      if (v == null ||
+          v.kurs != z.kurs ||
+          v.wiederherstellungAktivitaeten == null ||
+          v.vorherCmids == null) {
+        return const KartenErgebnis(
+          KartenStand.offen,
+          'Der Kopiervorgang dieses Ziels ist nicht belegt (Nummer, Kurs oder Archivliste fehlen). Die Karten bleiben unverknüpft.',
+        );
+      }
+      void pruefeKartenBindung() {
+        if (!bindungPasst()) {
+          throw MoodleFehler(
+            'Profil oder Instanz der Übertragung wurde gewechselt. Nichts weiter verknüpft.',
+          );
+        }
+        vorgaenge.pruefeBindung(v);
+      }
+
+      pruefeKartenBindung();
+      final jetzt = await kursLesen(moodle, z.kurs);
+      final zuordnungen = kartenZuordnen(
+        karten,
+        archiv: v.wiederherstellungAktivitaeten!,
+        vorher: v.vorherCmids!.toSet(),
+        aktuell: [
+          for (final x in jetzt.nachCmid.values)
+            (cmid: x.cmid, modul: x.modul, titel: x.name),
+        ],
+      );
+      final ergebnisse = <KartenErgebnis>[];
+      for (final zu in zuordnungen) {
+        ergebnisse.add(
+          await kartenVerknuepfen(
+            moodle,
+            freigaben,
+            arbeitsordner: arbeitsordner,
+            kurs: z.kurs,
+            zuordnung: zu,
+            pruefeBindung: pruefeKartenBindung,
+          ),
+        );
+      }
+      final stand = ergebnisse.any((e) => e.stand == KartenStand.unklar)
+          ? KartenStand.unklar
+          : ergebnisse.any((e) => e.stand == KartenStand.offen)
+          ? KartenStand.offen
+          : KartenStand.verknuepft;
+      return KartenErgebnis(stand, ergebnisse.map((e) => e.text).join(' '));
     }
 
     final berichte = await uebertragungAusfuehren(
@@ -187,11 +360,25 @@ extension _Uebertragung on McpDienst {
       quellkurs: quellkurs,
       protokoll: protokoll,
       lauf: lauf,
+      kartenLauf: karten.isEmpty ? null : kartenLauf,
     );
-    final kopf = sicherungNummer == null
+    for (final bericht in berichte) {
+      await _testbetrieb.kopienErfassen(
+        profil,
+        testzugang ?? Testzugang.fuer(profil),
+        vorgaenge,
+        bericht.vorgang,
+      );
+    }
+    var kopf = sicherungNummer == null
         ? ''
         : 'Quelle gesichert: Nummer $sicherungNummer, Datei $datei.\n';
+    if (angegeben != null && archivHatKarten) {
+      kopf +=
+          'Hinweis: Das Archiv enthält Lernlandkarten. Mit datei werden sie nicht neu verknüpft '
+          '(der Quellkurs ist nicht erfasst). Sichtbarkeit und Verweise in jedem Ziel prüfen. '
+          'Für die Verteilung samt Karte ohne datei übertragen (kurs, aktivitaeten, abschnitte).\n';
+    }
     return '$kopf${uebertragungsBericht(berichte)}';
   }
-
 }

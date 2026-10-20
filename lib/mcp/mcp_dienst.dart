@@ -39,6 +39,7 @@ import '../moodle/kursfilter.dart';
 import '../moodle/kurshinweise.dart';
 import '../moodle/links.dart';
 import '../moodle/lernlandkarte.dart';
+import '../moodle/lernlandkarte_verteilen.dart';
 import '../moodle/moodle_zugang.dart';
 import '../moodle/sicherung_regeln.dart';
 import '../moodle/sicherung.dart';
@@ -123,7 +124,7 @@ class McpDienst {
   /// Abweichender Protokollpfad für isolierte MCP-Vertragstests.
   final String? uebertragungsprotokollPfad;
 
-  late final _testbetrieb = Testbetrieb(moodle, freigaben, arbeitsordner);
+  late final _testbetrieb = Testbetrieb(moodle, freigaben, arbeitsordner, sicherungsordner ?? sicherungenOrdner);
   late final _aufrufe = WerkzeugAufrufe(
     protokoll,
     freigaben,
@@ -141,6 +142,7 @@ class McpDienst {
 
   Future<void> starten() async {
     if (_server != null) return;
+    _testbetrieb.beginnen();
     final s = StreamableMcpServer(
       serverFactory: (sessionId) => _erzeugen(),
       host: '127.0.0.1',
@@ -228,6 +230,7 @@ class McpDienst {
   }
 
   Future<void> stoppen() async {
+    _testbetrieb.beenden();
     await _server?.stop();
     _server = null;
     protokoll.eintrag(Art.info, 'MCP-Server gestoppt');
@@ -1021,7 +1024,7 @@ class McpDienst {
       ausfuehren: (a) {
         String? vid;
         return _zeitlimit(
-          wiederherstellen(
+          _nachTestkopie(wiederherstellen(
             moodle,
             freigaben,
             vorgaenge,
@@ -1038,7 +1041,7 @@ class McpDienst {
             instanz: profil.name,
             profilKennung: profil.kennung,
             beiVorgang: (id) => vid = id,
-          ),
+          ), vorgaenge, () => vid),
           antwortfrist,
           () => laufText(
             'Die Wiederherstellung',
@@ -1066,7 +1069,7 @@ class McpDienst {
       },
       pflicht: ['id'],
       ausfuehren: (a) => _zeitlimit(
-        wiederherstellungStatus(moodle, vorgaenge, id: _text(a, 'id')),
+        _nachTestkopie(wiederherstellungStatus(moodle, vorgaenge, id: _text(a, 'id')), vorgaenge, () => _text(a, 'id')),
         antwortfrist,
         () => laufText(
           'Die Wiederherstellung',
@@ -1134,7 +1137,7 @@ class McpDienst {
         ];
         String? vid;
         return _zeitlimit(
-          auswahlSichern(
+          _nachTestsicherung(auswahlSichern(
             moodle,
             freigaben,
             vorgaenge,
@@ -1151,7 +1154,7 @@ class McpDienst {
             ganzerKurs: a['ganzer_kurs'] == true,
             zielOrdner: a['ziel_ordner'] as String?,
             beiVorgang: (id) => vid = id,
-          ),
+          ), vorgaenge, () => vid, a),
           antwortfrist,
           () => laufText('Die Sicherung', vid, 'sicherung_status'),
         );
@@ -1173,7 +1176,9 @@ class McpDienst {
           '(zwei Aufrufe). Vor dem ersten Schreiben zeigt die App eine Zusammenfassung; jeder Schritt fragt danach '
           'noch einmal. Ist dieselbe Datei für ein Ziel schon übertragen worden, kommt eine Rückfrage statt eines '
           'erneuten Imports; eine bewusste Wiederholung geht über wiederherstellen_datei mit wiederholung_von. Eine Einfüge-Wiederherstellung kann Dubletten '
-          'erzeugen. Das Protokoll je Ziel steht in uebertragungen.json im Einstellungsordner.',
+          'erzeugen. Ohne datei werden Lernlandkarten vorab erfasst und nach dem Kopieren je Zielkurs auf die belegten Kopien '
+          'neu verknüpft; offene Zuordnungen werden einzeln gemeldet, nichts zusätzlich kopiert. Mit datei keine automatische '
+          'Neuverknüpfung. Kartenstände bleiben je Ziel getrennt im Übertragungsprotokoll (uebertragungen.json).',
       zerstoerend: true,
       parameter: {
         'ziele': JsonSchema.array(
@@ -1878,7 +1883,7 @@ class McpDienst {
           'Zeigt, wie eine Seite im Browser aussieht, um Geschriebenes zu prüfen: gesetzte Formeln, '
           'Umbruch im Druck, eine Frage in der Vorschau (auch eine JSXGraph-Zeichnung, im Ausgangszustand), interaktive Elemente im Ausgangszustand samt ihren Skriptfehlern. Nie zum Lesen von Inhalten (dafür die Lesewerkzeuge) '
           'und Lernlandkarten im Kartenbereich; diese nur am Bildschirm, nicht für den Druck. Nicht routinemäßig -- im normalen Betrieb ist jedes Bild ein Klick der Lehrkraft. Nur im ausdrücklich gebundenen '
-          'Debug-Testbetrieb können Bilder eigener verborgener ZZ-Textseiten in freigegebenen Testkursen automatisch freigegeben werden. Bild nur vom Inhalt selbst, lange '
+          'Debug-Testbetrieb können Bilder eigener verborgener ZZ-Textseiten und ZZ-Lernlandkarten einschließlich vollständig geprüfter Kopien in freigegebenen Testkursen automatisch freigegeben werden. Bild nur vom Inhalt selbst, lange '
           'Seiten in Teilen. Die Lehrkraft sieht jedes Bild mit dem grund in der App und gibt es frei; ohne '
           'Freigabe wird es verworfen. Entweder cmid (Textseite, Buch mit optional kapitel, gemeinsames Wiki '
           'mit optional wikiseite), Lernlandkarte oder frage mit sammlung (Fragenvorschau). Bei Lernlandkarten ist cmid die Aktivitätsnummer. Nebenwirkungen wie beim Ansehen: '

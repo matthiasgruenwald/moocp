@@ -47,6 +47,29 @@ ZielStand zielStandAus(WiederherstellungStand? stand) => switch (stand) {
       _ => ZielStand.unklar,
     };
 
+/// Der Stand der Lernlandkarten eines Ziels, getrennt vom Stand des
+/// Kopierens. [ausstehend] steht im Protokoll, sobald das Kopieren fertig ist und
+/// die Karten noch verknüpft werden: Ein Abbruch dazwischen bleibt sichtbar und
+/// löst keinen neuen Lauf aus. Nur [verknuepft] heißt: zurückgelesen und
+/// vollständig verknüpft; alles andere bestätigt keine vollständige Verknüpfung.
+enum KartenStand {
+  ausstehend('ausstehend'),
+  verknuepft('verknüpft'),
+  offen('offen'),
+  unklar('unklar');
+
+  const KartenStand(this.text);
+
+  final String text;
+
+  static KartenStand? aus(Object? t) {
+    for (final s in values) {
+      if (s.text == t) return s;
+    }
+    return null;
+  }
+}
+
 /// Eine Zielangabe, wie die KI sie schickt. [weg] ist der Name des Zielwegs,
 /// nicht geprüft. [loeschend] muss bei löschenden Wegen true sein und sonst
 /// fehlen; sonst kommt eine Rückfrage, bevor etwas geschieht.
@@ -148,6 +171,7 @@ class UebertragungsEintrag {
     required this.zeit,
     this.quellkurs,
     this.vorgang,
+    this.karten,
   });
 
   final String datei;
@@ -158,6 +182,9 @@ class UebertragungsEintrag {
   final int? quellkurs;
   final String? vorgang;
 
+  /// Stand der Lernlandkarten dieses Ziels; null, wenn der Auftrag keine hatte.
+  final KartenStand? karten;
+
   Map<String, Object?> toJson() => {
         'datei': datei,
         'profil': profil,
@@ -166,6 +193,7 @@ class UebertragungsEintrag {
         'zeit': zeit.toIso8601String(),
         if (quellkurs != null) 'quellkurs': quellkurs,
         if (vorgang != null) 'vorgang': vorgang,
+        if (karten != null) 'karten': karten!.text,
       };
 
   static UebertragungsEintrag? ausJson(Object? j) {
@@ -177,6 +205,8 @@ class UebertragungsEintrag {
     final zeit = j['zeit'] is String ? DateTime.tryParse(j['zeit'] as String) : null;
     final quellkurs = j['quellkurs'];
     final vorgang = j['vorgang'];
+    final karten = KartenStand.aus(j['karten']);
+    if (j['karten'] != null && karten == null) return null;
     if (datei is! String || profil is! String || kurs is! int || stand == null || zeit == null) return null;
     if (quellkurs != null && quellkurs is! int) return null;
     if (vorgang != null && vorgang is! String) return null;
@@ -188,6 +218,7 @@ class UebertragungsEintrag {
       zeit: zeit,
       quellkurs: quellkurs as int?,
       vorgang: vorgang as String?,
+      karten: karten,
     );
   }
 }
@@ -216,8 +247,13 @@ String? wiederholungsRueckfrage(
   if (treffer.isEmpty) return null;
   final e = treffer.last;
   final nummer = e.vorgang == null ? '' : ' (Nummer ${e.vorgang})';
+  final karten = e.karten == null || e.karten == KartenStand.verknuepft
+      ? ''
+      : ' Die Lernlandkarten dieses Ziels sind „${e.karten!.text}": nicht verifiziert; Sichtbarkeit in Moodle prüfen. '
+          'Sie werden nicht durch eine Wiederholung, sondern mit aktivitaet_lesen und '
+          'lernlandkarte_verknuepfungen_setzen geklärt.';
   return 'Für Kurs $kurs ist schon einmal übertragen worden: Stand „${e.stand.text}", '
-      'am ${e.zeit.toIso8601String()}$nummer. Nichts wird erneut importiert. Erst den Stand klären '
+      'am ${e.zeit.toIso8601String()}$nummer.$karten Nichts wird erneut importiert. Erst den Stand klären '
       '(wiederherstellung_status mit der Nummer). Will die Lehrkraft die Wiederholung trotzdem, für diesen Kurs '
       'wiederherstellen_datei mit wiederholung_von=${e.vorgang ?? '<Nummer>'} und nach Freigabe.';
 }
@@ -289,13 +325,28 @@ class ZielErgebnis {
 /// in mcp_dienst.dart; in den Tests ein Fake.
 typedef ZielLauf = Future<ZielErgebnis> Function(PlanZiel ziel);
 
+/// Das Ergebnis der Lernlandkarten eines Ziels aus [KartenLauf].
+class KartenErgebnis {
+  const KartenErgebnis(this.stand, this.text);
+
+  final KartenStand stand;
+  final String text;
+}
+
+/// Verknüpft die Lernlandkarten eines Ziels, nachdem das Kopieren dort fertig
+/// ist ([restore] ist dessen Ergebnis). Null: der Auftrag hat keine Karten. Im
+/// Produkt die Verdrahtung in mcp_dienst.dart; in den Tests ein Fake.
+typedef KartenLauf = Future<KartenErgebnis?> Function(PlanZiel ziel, ZielErgebnis restore);
+
 class ZielBericht {
-  const ZielBericht(this.ziel, this.stand, this.vorgang, this.text);
+  const ZielBericht(this.ziel, this.stand, this.vorgang, this.text, {this.karten, this.kartenText = ''});
 
   final PlanZiel ziel;
   final ZielStand stand;
   final String? vorgang;
   final String text;
+  final KartenStand? karten;
+  final String kartenText;
 }
 
 /// Führt die Ziele nacheinander aus. Jedes Ziel bekommt seinen eigenen Lauf
@@ -309,6 +360,7 @@ Future<List<ZielBericht>> uebertragungAusfuehren(
   int? quellkurs,
   required Uebertragungsprotokoll protokoll,
   required ZielLauf lauf,
+  KartenLauf? kartenLauf,
 }) async {
   final berichte = <ZielBericht>[];
   var abgelehnt = false;
@@ -325,7 +377,9 @@ Future<List<ZielBericht>> uebertragungAusfuehren(
       e = const ZielErgebnis(ZielStand.unklar,
           text: 'Unerwarteter Fehler. Den Kurs in Moodle prüfen, bevor es erneut versucht wird.');
     }
-    berichte.add(ZielBericht(z, e.stand, e.vorgang, e.text));
+    // Mit Karten steht das Ziel schon als „ausstehend" im Protokoll, bevor sie
+    // verknüpft werden: Ein Abbruch oder Neustart dazwischen doppelt nichts.
+    final mitKarten = kartenLauf != null && e.stand == ZielStand.fertig;
     await protokoll.eintragen(UebertragungsEintrag(
       datei: datei,
       profil: profil,
@@ -334,7 +388,29 @@ Future<List<ZielBericht>> uebertragungAusfuehren(
       zeit: DateTime.now(),
       quellkurs: quellkurs,
       vorgang: e.vorgang,
+      karten: mitKarten ? KartenStand.ausstehend : null,
     ));
+    KartenErgebnis? k;
+    if (mitKarten) {
+      try {
+        k = await kartenLauf(z, e);
+      } catch (_) {
+        k = const KartenErgebnis(KartenStand.unklar,
+            'Unerwarteter Fehler bei den Lernlandkarten. Die Karte in Moodle prüfen, bevor etwas erneut versucht wird.');
+      }
+      // Ohne Karten im Auftrag (k ist null) bleibt „ausstehend" nicht stehen.
+      await protokoll.eintragen(UebertragungsEintrag(
+        datei: datei,
+        profil: profil,
+        kurs: z.kurs,
+        stand: e.stand,
+        zeit: DateTime.now(),
+        quellkurs: quellkurs,
+        vorgang: e.vorgang,
+        karten: k?.stand,
+      ));
+    }
+    berichte.add(ZielBericht(z, e.stand, e.vorgang, e.text, karten: k?.stand, kartenText: k?.text ?? ''));
     if (e.stand == ZielStand.abgelehnt) abgelehnt = true;
   }
   return berichte;
@@ -345,16 +421,27 @@ Future<List<ZielBericht>> uebertragungAusfuehren(
 String uebertragungsBericht(List<ZielBericht> berichte) {
   final zeilen = <String>[];
   final anzahl = {for (final s in ZielStand.values) s: 0};
+  final kartenAnzahl = {for (final s in KartenStand.values) s: 0};
   for (final b in berichte) {
     anzahl[b.stand] = anzahl[b.stand]! + 1;
     final nummer = b.vorgang == null ? '' : ', Nummer ${b.vorgang}';
     final text = b.text.isEmpty ? '' : ' ${b.text}';
-    zeilen.add('„${b.ziel.name}" (Kurs ${b.ziel.kurs}): ${b.stand.text}$nummer.$text');
+    final karten = b.karten == null ? '' : '\n  Lernlandkarten: ${b.karten!.text}. ${b.kartenText}'.trimRight();
+    zeilen.add('„${b.ziel.name}" (Kurs ${b.ziel.kurs}): ${b.stand.text}$nummer.$text$karten');
+    if (b.karten != null) kartenAnzahl[b.karten!] = kartenAnzahl[b.karten!]! + 1;
   }
   final kopf = 'Übertragung: ${anzahl[ZielStand.fertig]} fertig, '
       '${anzahl[ZielStand.fehlgeschlagen]! + anzahl[ZielStand.unklar]!} fehlgeschlagen oder unklar, '
       '${anzahl[ZielStand.abgelehnt]} abgelehnt, ${anzahl[ZielStand.nichtBegonnen]} nicht begonnen.';
+  final mitKarten = berichte.any((b) => b.karten != null);
+  final kartenKopf = !mitKarten
+      ? null
+      : 'Lernlandkarten je Ziel: ${kartenAnzahl[KartenStand.verknuepft]} verknüpft, '
+          '${kartenAnzahl[KartenStand.offen]} offen, ${kartenAnzahl[KartenStand.unklar]! + kartenAnzahl[KartenStand.ausstehend]!} unklar.';
   final hinweise = [
+    if (kartenAnzahl[KartenStand.offen]! + kartenAnzahl[KartenStand.unklar]! + kartenAnzahl[KartenStand.ausstehend]! > 0)
+      'Offene oder unklare Lernlandkarten bleiben unverifiziert; bei unbelegter Zuordnung die Sichtbarkeit in Moodle prüfen. Nichts wird automatisch wiederholt oder '
+          'zusätzlich kopiert; die ungelösten Zuordnungen entscheidet die Lehrkraft, danach lernlandkarte_verknuepfungen_setzen.',
     if (anzahl[ZielStand.fertig]! > 0)
       'Einfüge-Wiederherstellung: Ein erneuter Lauf legt Inhalte ein zweites Mal an (Dubletten). '
           'Ein Aktualisieren bestehender Inhalte ist nicht zugesagt.',
@@ -363,5 +450,5 @@ String uebertragungsBericht(List<ZielBericht> berichte) {
     if (anzahl[ZielStand.abgelehnt]! > 0)
       'Die Lehrkraft hat abgelehnt; die übrigen Ziele wurden nicht begonnen.',
   ];
-  return [kopf, ...zeilen, ...hinweise].join('\n');
+  return [kopf, ?kartenKopf, ...zeilen, ...hinweise].join('\n');
 }

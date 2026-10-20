@@ -33,6 +33,45 @@ Das Werkzeug ändert nur die genannten Zielzuordnungen. SVG, Wege, Farben,
 Ortspositionen und alle nicht genannten Kartendaten bleiben bestehen. Es legt
 keine Lernlandkarte an und bearbeitet keine übrigen Kartenbestandteile.
 
+## Ein Thema in mehrere Durchführungskurse verteilen
+
+Plane Quellauswahl, jeden Durchführungskurs und die Karten ausdrücklich mit der
+Lehrkraft. Für Ziele auf derselben Instanz nutze `uebertragen` ohne `datei`:
+Die App erfasst vor dem Kopieren die ausgewählten Aktivitäten und alle
+Verweisziele der Karten. Eine geänderte Quelle oder gleiche Namen derselben
+Aktivitätsart in der Auswahl stoppen den Auftrag, bevor ein Ziel kopiert wird.
+
+Je Durchführungskurs läuft zuerst die Wiederherstellung des Themas. Moodle kann
+die Karte dabei nur zusammen mit den übrigen Aktivitäten anlegen. Die App
+verbirgt eindeutig belegte Kopien, ordnet die neuen Aktivitäten anhand des
+Kopiervorgangs zu und verknüpft die Karte erst danach abschließend. Nummern aus
+der Quelle, anderen Durchführungskursen oder vorhandene gleichnamige Aktivitäten
+sind kein Nachweis. Je Kartenänderung kommt abhängig von der Freigabestufe eine
+weitere Freigabe; SVG, Geometrie und nicht beauftragte Kartendaten bleiben erhalten.
+
+Lies das Ergebnis für jeden Durchführungskurs getrennt: „fertig“ bezeichnet den
+Kopiervorgang; die Karten stehen zusätzlich auf „verknüpft“, „offen“ oder
+„unklar“. Nur „verknüpft“ bestätigt die zurückgelesenen Ortszuordnungen. Andere
+Prüflücken des Wiederherstellungsberichts bleiben bestehen. Bei unbelegten Kopien
+ist auch ihre Sichtbarkeit ungeklärt: frisch lesen und der Lehrkraft sagen.
+
+Fehlende, kursfremde oder nicht mitkopierte Verweisziele bleiben mit Ortskennung
+und Grund ungelöst. Es wird kein zusätzlicher Inhalt kopiert. Lies mögliche
+Zielaktivitäten fachlich, schlage der Lehrkraft eine begründete Zuordnung vor
+und warte auf ihre Entscheidung. Danach ändere gezielt die betroffene Karte mit
+`lernlandkarte_verknuepfungen_setzen`. Sichtbar machen ist ein eigener Auftrag.
+
+Nach Teilfehler, Zeitlimit oder Neustart den Vorgang mit der ausgegebenen Nummer
+prüfen. Den Verteilungsauftrag nicht blind erneut senden: Erfolgreiche und unklare
+Ziele sind gegen einen erneuten Import gesperrt; das repariert keine Karte. Eine offene Kartenphase wird im
+Übertragungsprotokoll festgehalten, bevor die Verknüpfung beginnt. Repariere die
+Karte statt den ganzen Zielkurs erneut zu importieren.
+
+Mit einer vorhandenen `datei` und beim Wechsel auf eine andere Instanz fehlt
+diese Quellerfassung; die App verknüpft Karten dann nicht automatisch. Plane dort
+das getrennte Sichern, Wiederherstellen und die ausdrücklich entschiedene
+Zielzuordnung. Behaupte keine vollständige Kartenprüfung aus dem Importergebnis.
+
 ## Darstellung prüfen
 
 Nur Orte mit einem sichtbaren Ziel erscheinen in der Kartenansicht; ihre

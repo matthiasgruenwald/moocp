@@ -118,10 +118,12 @@ Future<String> lernlandkarteVerknuepfungenSetzen(
   required int cmid,
   required String name,
   required List<Map<String, Object?>> zuordnungen,
+  void Function()? pruefeBindung,
 }) async {
   if (zuordnungen.isEmpty) {
     throw MoodleFehler('Mindestens eine Ortszuordnung angeben.');
   }
+  pruefeBindung?.call();
   final ziel = Formularziel.aktivitaet(cmid);
   final vorher = await formularHolen(moodle, ziel.adresse);
   if (vorher.modul != 'learningmap') {
@@ -286,7 +288,9 @@ Future<String> lernlandkarteVerknuepfungenSetzen(
     }
   }
   setze(aktuell.felder, 'placestore', jsonEncode(store));
+  pruefeBindung?.call();
   await absenden(moodle, aktuell);
+  pruefeBindung?.call();
   final rueckForm = await formularHolen(moodle, ziel.adresse);
   final gelesen = await formularLesen(moodle, ziel, arbeitsordner);
   final rueck = gelesen.lernlandkarte?['placestore'];

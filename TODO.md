@@ -65,16 +65,13 @@ Im Testkurs (Präfix `ZZ`, Quelle und Ziel, nie ein Produktivkurs) nachprüfen:
   das dann als abgelehnt ein. Prüfen: Kommt bei einer Ablehnung wirklich der Text
   „in der App abgelehnt" zurück, und stoppt der Lauf dann die übrigen Ziele?
 - **#10 Wiederholungsschutz:** Dieselbe Datei für dasselbe Ziel gibt eine Rückfrage.
-  Offen bleibt die Messung der Rückfrage bei einer frischen Sicherung (ohne `datei`) über den Quellkurs; `erneut` bleibt entfallen.
+  Der Wiederholungsschutz über den Quellkurs ist mit eigenen ZZ-Lernlandkarten live gemessen: kein weiterer Import. `erneut` bleibt entfallen.
   `wiederherstellen_datei` schützt denselben Datei-/Zielauftrag zusätzlich durch den gespeicherten Vorgang;
   dieser Schutz ist über MCP mit einem lokalen HTTP-Doppel geprüft.
 - **#10 Protokoll `uebertragungen.json`:** Ungemessen, ob ein Abbruch mitten im Lauf
   die bis dahin geschriebenen Einträge erhält, und ob eine beschädigte Datei wirklich
   unverändert stehen bleibt.
-- **#10 Rundlauf A → Datei → B:** Nicht geprüft. Die Logik ist mit Fakes getestet; ein
-  echter Rundlauf über `sichern_auswahl` und `wiederherstellen_datei` fehlt. Der Ablauf
-  zwischen zwei Instanzen setzt voraus, dass beide denselben Sicherungsordner nutzen.
-  Das ist ungemessen.
+- **#10 Rundlauf A → Datei → B:** Für eigene ZZ-Textseiten samt Lernlandkarte mit gemeinsamem Sicherungsordner gemessen. Der allgemeine wort- und einstellungsgenaue Vergleich aller Aktivitätstypen bleibt offen (siehe Wiederherstellung unten).
 - **#10 Freigaben:** Ein Auftrag fragt einmal für alle Ziele, und jeder Schreibschritt
   fragt danach erneut. Offen, ob das für die Stufe „mittel" zu viel ist. Bei der
   Datei-Variante fehlt der Quellkurs, darum zeigt die Freigabe dort die einfachen
@@ -289,7 +286,7 @@ Nicht Teil dieses Umbaus (eigene Aufgabe):
 - Auswahlfelder mit Zielen (etwa ein Ort) landen in `einstellungen.json` als Anzeigetext, nicht als Nummer. Zwei Aktivitäten mit gleichem Namen lassen sich dort nicht unterscheiden.
 - Verweise prüft die App nur in Textfeldern (`<feld>.html`), nicht in Auswahl- und Eingabefeldern.
 - Erhaltene, fehlende und „fremde" Ziele (in einem anderen Kurs) werden nicht unterschieden: `_zielTitel` liest nur den Titel. Titel werden für höchstens 10 Ziele außerhalb des Kurses abgerufen; darüber steht ein Hinweis.
-- Lehrkraft-Beobachtungen, nicht reproduziert und nicht gemessen: Verweise gehen beim Kopieren verloren; einmal die Warnung `Undefined array key "p1"`.
+- Die Lehrkraft-Beobachtung `Undefined array key "p1"` ist nicht reproduziert. Bei der gemessenen Themenverteilung blieben Ortsziele erhalten; die App prüft und setzt sie pro Zielkurs anhand der belegten Kopien. Das ersetzt keine allgemeine Verweisreparatur für beliebige Aktivitäten.
 - Quiz-Wiederherstellung (`get_questions_category()` mit `false`, MDL-89981): nicht geprüft, nicht Teil von #23.
 
 ## Aufräumen (Befunde aus dem Review, nicht behoben)

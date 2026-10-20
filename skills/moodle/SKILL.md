@@ -31,7 +31,8 @@ Moodle-Instanz hat einen eigenen Server mit eigenem Präfix (etwa
 
 Lernlandkarten sind eine begrenzte Ausnahme: `aktivitaet_lesen` liest SVG,
 Orte, Wege, Rollen und vorhandene Aktivitätsziele. Für eine ausdrücklich
-entschiedene Zieländerung gilt [Lernlandkarten](references/lernlandkarte.md).
+entschiedene Zieländerung und das Verteilen von Themen samt Karten in mehrere
+Durchführungskurse lies [Lernlandkarten](references/lernlandkarte.md).
 Die Karte selbst und ihre Wege werden dadurch nicht bearbeitet.
 
 Eine Sicherung (`sichern_aktivitaet`) ist eine einzelne Aktivität, ohne Nutzerdaten,

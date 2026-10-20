@@ -1,6 +1,9 @@
 # Changelog
 
 ## 0.9.23
+- Debug-Testbetrieb: Vollständig geprüfte Kopien eigener ZZ-Proben lassen sich auch im gebundenen zweiten Profil automatisch nachbearbeiten und als Bild prüfen.
+- Unterrichtsverteilung: Lernlandkarten werden je Durchführungskurs auf die belegten Kopien neu verknüpft; offene Zuordnungen und Wiederholungen bleiben je Ziel erkennbar.
+- Wiederherstellung: Ein HTTP-Fehler beim Start bleibt unklar und löst keinen erneuten Start aus.
 - Lernlandkarten: Eine verborgene Karte lässt sich aus dem nativen Moodle-Formular anlegen; eine skriptfreie `lernlandkarte.json`-Vorlage kann Orte und Wege vorgeben, Ortsziele bleiben gezielt freigabegeschützt änderbar.
 - Lernlandkarten: Zieländerungen verfallen, wenn sich Karte, Kurs oder Ziel während der Freigabe ändern; die Rückleseprobe vergleicht SVG, Kartendaten, Einstellungen und übrige Inhalte.
 - Lernlandkarten: Nach dem Speichern meldet das Rücklesen `verified: true`, auch wenn Moodle die Ortsbeschriftung und die Hintergrunddatei neu ablegt; vorher stand dort fälschlich `false`.
