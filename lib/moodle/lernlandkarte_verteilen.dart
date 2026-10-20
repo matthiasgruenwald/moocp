@@ -42,25 +42,44 @@ class KartenOrt {
     this.quellZiel,
     this.zielName,
     this.zielModul,
-    this.mitkopiert,
-  );
+    this.mitkopiert, {
+    this.idnummer,
+    this.formularstand,
+  });
 
   final String ort;
   final int quellZiel;
   final String? zielName;
   final String? zielModul;
   final bool mitkopiert;
+  final String? idnummer;
+  final String? formularstand;
 }
 
 /// Eine Karte der Auswahl im Quellkurs mit ihren verknüpften Orten.
 class KartenQuelle {
-  const KartenQuelle(this.cmid, this.name, this.orte, this.stand, this.daten);
+  const KartenQuelle(
+    this.cmid,
+    this.name,
+    this.orte,
+    this.stand,
+    this.daten,
+    this.formularstand,
+    this.idnummer,
+  );
 
   final int cmid;
   final String name;
   final List<KartenOrt> orte;
   final String stand;
   final Map<String, Object?> daten;
+  final String? formularstand;
+  final String? idnummer;
+}
+
+String? _idnummer(Formular form) {
+  final wert = wertIn(form.felder, 'cmidnumber')?.trim();
+  return wert == null || wert.isEmpty ? null : wert;
 }
 
 /// Liest die Lernlandkarten der Auswahl und ihre Verweisziele im Quellkurs.
@@ -69,6 +88,7 @@ class KartenQuelle {
 /// sich nicht lesen lassen, bricht den Auftrag ab, bevor etwas geschieht.
 Future<List<KartenQuelle>> kartenErfassen(
   MoodleZugang moodle, {
+  required String arbeitsordner,
   required int kurs,
   required List<int> aktivitaeten,
   required List<int> abschnitte,
@@ -104,11 +124,51 @@ Future<List<KartenQuelle>> kartenErfassen(
         'Die Lernlandkarte „${a.name}" (cmid $cmid) hat keine lesbaren Kartendaten. Nichts geändert.',
       );
     }
+    String? formularstand;
+    try {
+      formularstand = formularInhaltsstand(
+        await formularLesen(
+          moodle,
+          Formularziel.aktivitaet(cmid),
+          arbeitsordner,
+        ),
+      );
+    } on MoodleFehler {
+      // Nicht lesbar bleibt als Prüflücke gespeichert.
+    }
+    final idnummer = _idnummer(form);
+    final zielBelege = <int, ({String? idnummer, String? stand})>{};
     final orte = <KartenOrt>[];
     for (final o in (daten['orte'] as List).whereType<Map>()) {
       final ziel = (o['linkedActivity'] as num?)?.toInt();
       if (ziel == null || ziel == 0) continue;
       final z = struktur.nachCmid[ziel];
+      String? zielIdnummer;
+      String? zielFormularstand;
+      if (z != null && z.modul != 'learningmap' && gewaehlt.contains(ziel)) {
+        if (!zielBelege.containsKey(ziel)) {
+          try {
+            final zielForm = await formularHolen(
+              moodle,
+              Formularziel.aktivitaet(ziel).adresse,
+            );
+            final zielLesung = await formularLesen(
+              moodle,
+              Formularziel.aktivitaet(ziel),
+              arbeitsordner,
+            );
+            zielBelege[ziel] = (
+              idnummer: _idnummer(zielForm),
+              stand: formularInhaltsstand(zielLesung),
+            );
+          } on MoodleFehler {
+            zielBelege[ziel] = (idnummer: null, stand: null);
+          }
+        }
+        final beleg = zielBelege[ziel]!;
+        zielIdnummer = beleg.idnummer;
+        zielFormularstand = beleg.stand;
+      }
       orte.add(
         KartenOrt(
           '${o['id']}',
@@ -116,6 +176,8 @@ Future<List<KartenQuelle>> kartenErfassen(
           z?.name,
           z?.modul,
           z != null && z.modul != 'learningmap' && gewaehlt.contains(ziel),
+          idnummer: zielIdnummer,
+          formularstand: zielFormularstand,
         ),
       );
     }
@@ -124,7 +186,9 @@ Future<List<KartenQuelle>> kartenErfassen(
         [id, struktur.nachCmid[id]?.modul, struktur.nachCmid[id]?.name],
       daten,
     ]);
-    karten.add(KartenQuelle(cmid, a.name, orte, stand, daten));
+    karten.add(
+      KartenQuelle(cmid, a.name, orte, stand, daten, formularstand, idnummer),
+    );
   }
   final auswahl = [
     for (final id in gewaehlt)
@@ -177,50 +241,107 @@ class KartenZuordnung {
   ];
 }
 
-/// Leitet aus dem Kopiervorgang eines Zielkurses ab, welche neue Aktivität die
-/// Kopie welcher Quellaktivität ist. [archiv] sind die Aktivitäten der
-/// Sicherung, [vorher] die Nummern im Zielkurs vor dem Start und [aktuell] der
-/// Zielkurs jetzt. Ohne eindeutige 1:1-Zuordnung aller neuen Aktivitäten zum
-/// Archiv ist nichts belegt.
+/// Identitäts- und Inhaltsbeleg, frisch aus dem Zielkurs gelesen.
+class KartenBeleg {
+  const KartenBeleg({
+    required this.idnummer,
+    required this.formularstand,
+    this.kartendaten,
+  });
+
+  final String? idnummer;
+  final String? formularstand;
+  final Map<String, Object?>? kartendaten;
+}
+
+/// Ordnet nur neue Aktivitäten mit gleicher eindeutiger cmidnumber und gleichem
+/// vollständigen Formularinhalt zu. Titel und Sortierung reichen nicht.
 List<KartenZuordnung> kartenZuordnen(
   List<KartenQuelle> karten, {
-  required List<ArchivAktivitaet> archiv,
   required Set<int> vorher,
   required List<WiederhergestellteAktivitaet> aktuell,
+  required Map<int, KartenBeleg> belege,
 }) {
-  final neue = importierteCmidsEindeutig(
-    erwartet: archiv,
-    vorher: vorher,
-    aktuell: aktuell,
-  );
-  if (neue == null) {
-    const grund =
-        'Die neuen Aktivitäten im Zielkurs lassen sich nicht eindeutig 1:1 dem Archiv zuordnen.';
+  final quellen = <int, ({String modul, String titel, KartenBeleg beleg})>{};
+  for (final k in karten) {
+    quellen[k.cmid] = (
+      modul: 'learningmap',
+      titel: k.name,
+      beleg: KartenBeleg(
+        idnummer: k.idnummer,
+        formularstand: k.formularstand,
+        kartendaten: k.daten,
+      ),
+    );
+    for (final o in k.orte) {
+      if (!o.mitkopiert || o.zielModul == null || o.zielName == null) continue;
+      quellen[o.quellZiel] = (
+        modul: o.zielModul!,
+        titel: o.zielName!,
+        beleg: KartenBeleg(
+          idnummer: o.idnummer,
+          formularstand: o.formularstand,
+        ),
+      );
+    }
+  }
+  final idnummern = <String, Set<int>>{};
+  for (final e in quellen.entries) {
+    final nummer = e.value.beleg.idnummer;
+    if (nummer != null) idnummern.putIfAbsent(nummer, () => {}).add(e.key);
+  }
+  List<int> passendeZiele(int cmid) {
+    final quelle = quellen[cmid]!;
+    final nummer = quelle.beleg.idnummer;
+    final stand = quelle.beleg.formularstand;
+    if (nummer == null || stand == null || idnummern[nummer]?.length != 1) {
+      return const [];
+    }
     return [
-      for (final k in karten)
-        KartenZuordnung(k, null, [
-          for (final o in k.orte)
-            OrtZuordnung(o.ort, o.quellZiel, o.zielName, grund: grund),
-        ], grund: grund),
+      for (final a in aktuell)
+        if (!vorher.contains(a.cmid) &&
+            a.modul == quelle.modul &&
+            a.titel == quelle.titel &&
+            belege[a.cmid]?.idnummer == nummer &&
+            belege[a.cmid]?.formularstand == stand &&
+            (quelle.modul != 'learningmap' ||
+                (belege[a.cmid]?.kartendaten != null &&
+                    belege[a.cmid]!.kartendaten!['svgcode'] ==
+                        quelle.beleg.kartendaten!['svgcode'] &&
+                    _gleicherKartenInhalt(
+                      belege[a.cmid]!.kartendaten!,
+                      quelle.beleg.kartendaten!,
+                    ))))
+          a.cmid,
     ];
   }
-  final nachArt = {
-    for (final a in aktuell)
-      if (neue.contains(a.cmid)) '${a.modul}\u0000${a.titel}': a.cmid,
-  };
-  final imArchiv = {for (final a in archiv) '${a.modul}\u0000${a.titel}'};
+
+  bool identitaetImZiel(int cmid) {
+    final quelle = quellen[cmid]!;
+    final nummer = quelle.beleg.idnummer;
+    return nummer != null &&
+        idnummern[nummer]?.length == 1 &&
+        aktuell.any(
+          (a) =>
+              !vorher.contains(a.cmid) &&
+              a.modul == quelle.modul &&
+              a.titel == quelle.titel &&
+              belege[a.cmid]?.idnummer == nummer,
+        );
+  }
+
   return [
     for (final k in karten)
       () {
-        final karte = nachArt['learningmap\u0000${k.name}'];
-        final kopie = imArchiv.contains('learningmap\u0000${k.name}')
-            ? karte
-            : null;
-        String? grund;
-        if (kopie == null) {
-          grund =
-              'Die Kopie der Karte „${k.name}" ist unter den neuen Aktivitäten nicht belegt.';
-        }
+        final passendeKarten = passendeZiele(k.cmid);
+        final kopie = passendeKarten.length == 1 ? passendeKarten.single : null;
+        final grund = k.idnummer == null || k.formularstand == null
+            ? 'Die Quellkarte hat keine eindeutige cmidnumber oder keinen vollständigen Inhaltsbeleg.'
+            : passendeKarten.length > 1
+            ? 'Mehrere neue Lernlandkarten haben denselben Identitäts- und Inhaltsbeleg.'
+            : identitaetImZiel(k.cmid)
+            ? 'Die Aktivität hat dieselbe eindeutige cmidnumber, aber Formularinhalte oder Kartendaten weichen von der Quelle ab.'
+            : 'Die Kartenkopie ist nicht durch eine eindeutige cmidnumber und übereinstimmende Formularinhalte belegt.';
         return KartenZuordnung(k, kopie, [
           for (final o in k.orte)
             if (kopie == null)
@@ -231,22 +352,23 @@ List<KartenZuordnung> kartenZuordnen(
                 o.quellZiel,
                 o.zielName,
                 grund: o.zielName == null
-                    ? 'Das Ziel (cmid ${o.quellZiel}) gibt es im Quellkurs nicht mehr.'
-                    : 'Das Ziel „${o.zielName}" gehört nicht zur kopierten Auswahl.',
+                    ? 'Das Ziel gibt es im Quellkurs nicht mehr.'
+                    : 'Das Ziel gehört nicht zur kopierten Auswahl.',
               )
             else
               () {
-                final neu =
-                    imArchiv.contains('${o.zielModul}\u0000${o.zielName}')
-                    ? nachArt['${o.zielModul}\u0000${o.zielName}']
-                    : null;
+                final passende = passendeZiele(o.quellZiel);
+                final neu = passende.length == 1 ? passende.single : null;
                 return neu == null
                     ? OrtZuordnung(
                         o.ort,
                         o.quellZiel,
                         o.zielName,
-                        grund:
-                            'Das Ziel „${o.zielName}" ist unter den neu kopierten Aktivitäten nicht belegt.',
+                        grund: o.idnummer == null || o.formularstand == null
+                            ? 'Das Ziel hat keinen eindeutigen cmidnumber- und Inhaltsbeleg.'
+                            : passende.length > 1
+                            ? 'Mehrere neue Aktivitäten belegen das Ziel identisch.'
+                            : 'Das Ziel ist nicht mit übereinstimmendem Inhalt belegt.',
                       )
                     : OrtZuordnung(
                         o.ort,
@@ -255,7 +377,7 @@ List<KartenZuordnung> kartenZuordnen(
                         neuesZiel: neu,
                       );
               }(),
-        ], grund: grund);
+        ], grund: kopie == null ? grund : null);
       }(),
   ];
 }
@@ -277,8 +399,23 @@ String _kartenInhalt(Map<String, Object?> karte) {
     for (final ort in (store['places'] as List).cast<Map>())
       Map<String, dynamic>.from(ort)..remove('linkedActivity'),
   ];
-  return jsonEncode([ohneOrtsbeschriftung(karte['svgcode']), store]);
+  return jsonEncode([
+    ohneOrtsbeschriftung(karte['svgcode']),
+    _kanonischeMap(store),
+  ]);
 }
+
+Map<String, Object?> _kanonischeMap(Map<dynamic, dynamic> quelle) => {
+  for (final key in quelle.keys.toList()..sort((a, b) => '$a'.compareTo('$b')))
+    '$key': switch (quelle[key]) {
+      final Map m => _kanonischeMap(m),
+      final List l => [
+        for (final eintrag in l)
+          if (eintrag is Map) _kanonischeMap(eintrag) else eintrag,
+      ],
+      final wert => wert,
+    },
+};
 
 bool _gleicherKartenInhalt(Map<String, Object?> a, Map<String, Object?> b) {
   final av = (a['placestore'] as Map)['version'];
@@ -336,6 +473,23 @@ Future<KartenErgebnis> kartenVerknuepfen(
     return KartenErgebnis(
       KartenStand.offen,
       '„$name": Die kopierte Karte (cmid $karte) ist nicht lesbar: ${e.meldung} Nichts geändert.',
+    );
+  }
+
+  final quellFormularstand = zuordnung.quelle.formularstand;
+  if (quellFormularstand == null) {
+    return KartenErgebnis(
+      KartenStand.offen,
+      '„$name": Das Quellformular einschließlich Dateien ist nicht vollständig lesbar (Prüflücke). Nichts verknüpft.',
+    );
+  }
+  final zielFormularstand = formularInhaltsstand(
+    await formularLesen(moodle, ziel, arbeitsordner),
+  );
+  if (zielFormularstand == null || zielFormularstand != quellFormularstand) {
+    return KartenErgebnis(
+      KartenStand.offen,
+      '„$name": Kartendaten oder Formularfelder weichen von der Quellerfassung ab. Nichts verknüpft; Karte in Moodle prüfen.',
     );
   }
 
@@ -426,6 +580,7 @@ Future<KartenErgebnis> kartenVerknuepfen(
         '$alsKarte: ${abgelehnt ? 'nicht freigegeben, nichts geändert' : 'Rücklesen ohne verified: true'}. '
         '${abgelehnt ? '' : 'Die Karte in Moodle prüfen. '}'
         '${offen.isEmpty ? '' : 'Ungelöst: ${ungeloest(offen)}.'}',
+        freigabeAbgelehnt: abgelehnt,
       );
     }
   }
@@ -440,7 +595,11 @@ Future<KartenErgebnis> kartenVerknuepfen(
         (throw MoodleFehler('Kartendaten fehlen.'));
     if (form.kurs != kurs ||
         form.modul != 'learningmap' ||
-        !_gleicherKartenInhalt(rueck, zuordnung.quelle.daten)) {
+        !_gleicherKartenInhalt(rueck, zuordnung.quelle.daten) ||
+        formularInhaltsstand(
+              await formularLesen(moodle, ziel, arbeitsordner),
+            ) !=
+            quellFormularstand) {
       return KartenErgebnis(
         KartenStand.unklar,
         '$alsKarte: Kartendaten stimmen beim Zurücklesen nicht überein.',

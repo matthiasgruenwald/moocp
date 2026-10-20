@@ -42,10 +42,10 @@ enum ZielStand {
 /// Alles, was weder fertig noch fehlgeschlagen ist, gilt als unklar: dann
 /// wird nicht erneut gesendet, sondern zuerst geprüft.
 ZielStand zielStandAus(WiederherstellungStand? stand) => switch (stand) {
-      WiederherstellungStand.fertig => ZielStand.fertig,
-      WiederherstellungStand.fehlgeschlagen => ZielStand.fehlgeschlagen,
-      _ => ZielStand.unklar,
-    };
+  WiederherstellungStand.fertig => ZielStand.fertig,
+  WiederherstellungStand.fehlgeschlagen => ZielStand.fehlgeschlagen,
+  _ => ZielStand.unklar,
+};
 
 /// Der Stand der Lernlandkarten eines Ziels, getrennt vom Stand des
 /// Kopierens. [ausstehend] steht im Protokoll, sobald das Kopieren fertig ist und
@@ -74,7 +74,12 @@ enum KartenStand {
 /// nicht geprüft. [loeschend] muss bei löschenden Wegen true sein und sonst
 /// fehlen; sonst kommt eine Rückfrage, bevor etwas geschieht.
 class ZielAngabe {
-  const ZielAngabe({required this.kurs, required this.name, this.weg, this.loeschend = false});
+  const ZielAngabe({
+    required this.kurs,
+    required this.name,
+    this.weg,
+    this.loeschend = false,
+  });
 
   final int kurs;
   final String name;
@@ -115,44 +120,59 @@ class PlanungRueckfrage extends Planung {
 Planung pruefeZiele(List<ZielAngabe> ziele, {int? quellkurs}) {
   if (ziele.isEmpty) {
     return const PlanungRueckfrage(
-        'Welche Kurse sollen die Übertragung bekommen? Je Ziel braucht es kurs, name und weg.');
+      'Welche Kurse sollen die Übertragung bekommen? Je Ziel braucht es kurs, name und weg.',
+    );
   }
   final gesehen = <int>{};
   final geprueft = <PlanZiel>[];
   for (final z in ziele) {
     if (z.kurs <= 0) {
-      return const PlanungRueckfrage('Eine Kursnummer der Ziele ist keine gültige Kurs-ID.');
+      return const PlanungRueckfrage(
+        'Eine Kursnummer der Ziele ist keine gültige Kurs-ID.',
+      );
     }
     if (!gesehen.add(z.kurs)) {
-      return PlanungRueckfrage('Der Kurs ${z.kurs} steht zweimal unter den Zielen.');
+      return PlanungRueckfrage(
+        'Der Kurs ${z.kurs} steht zweimal unter den Zielen.',
+      );
     }
     if (quellkurs != null && z.kurs == quellkurs) {
-      return PlanungRueckfrage('Der Kurs ${z.kurs} ist Quelle und Ziel zugleich. Welcher Kurs ist das Ziel?');
+      return PlanungRueckfrage(
+        'Der Kurs ${z.kurs} ist Quelle und Ziel zugleich. Welcher Kurs ist das Ziel?',
+      );
     }
     final text = z.weg;
     if (text == null || text.trim().isEmpty) {
       return PlanungRueckfrage(
-          'Für Kurs ${z.kurs} fehlt der Zielweg. Welcher soll es sein? Möglich sind: ${Zielweg.optionen}. Nichts wird geraten.');
+        'Für Kurs ${z.kurs} fehlt der Zielweg. Welcher soll es sein? Möglich sind: ${Zielweg.optionen}. Nichts wird geraten.',
+      );
     }
     final weg = Zielweg.aus(text);
     if (weg == null) {
-      return PlanungRueckfrage('Der Weg „$text" ist unbekannt. Möglich sind: ${Zielweg.optionen}. Nichts wird geraten.');
+      return PlanungRueckfrage(
+        'Der Weg „$text" ist unbekannt. Möglich sind: ${Zielweg.optionen}. Nichts wird geraten.',
+      );
     }
     if (!weg.brauchtKurs) {
       return PlanungRueckfrage(
-          'Für Kurs ${z.kurs}: uebertragen legt keinen neuen Kurs an. Dafür wiederherstellen_datei mit neuer_kurs verwenden.');
+        'Für Kurs ${z.kurs}: uebertragen legt keinen neuen Kurs an. Dafür wiederherstellen_datei mit neuer_kurs verwenden.',
+      );
     }
     if (z.name.trim().isEmpty) {
-      return PlanungRueckfrage('Für Kurs ${z.kurs} fehlt der Kursname (name), wie er jetzt in Moodle steht.');
+      return PlanungRueckfrage(
+        'Für Kurs ${z.kurs} fehlt der Kursname (name), wie er jetzt in Moodle steht.',
+      );
     }
     if (weg.loescht && !z.loeschend) {
       return PlanungRueckfrage(
-          'Für Kurs ${z.kurs} löscht der Weg ${weg.nennung} vorhandene Inhalte. Dafür braucht es loeschend: true '
-          'in diesem Ziel. Nichts wird geraten.');
+        'Für Kurs ${z.kurs} löscht der Weg ${weg.nennung} vorhandene Inhalte. Dafür braucht es loeschend: true '
+        'in diesem Ziel. Nichts wird geraten.',
+      );
     }
     if (z.loeschend && !weg.loescht) {
       return PlanungRueckfrage(
-          'Für Kurs ${z.kurs} gilt loeschend nur für die löschenden Wege. Bitte loeschend weglassen. Nichts wird geraten.');
+        'Für Kurs ${z.kurs} gilt loeschend nur für die löschenden Wege. Bitte loeschend weglassen. Nichts wird geraten.',
+      );
     }
     geprueft.add(PlanZiel(kurs: z.kurs, name: z.name, weg: weg));
   }
@@ -160,8 +180,8 @@ Planung pruefeZiele(List<ZielAngabe> ziele, {int? quellkurs}) {
 }
 
 /// Ein Eintrag im Übertragungsprotokoll. [datei] ist der Name der Sicherungsdatei;
-/// [quellkurs] der Kurs, aus dem frisch gesichert wurde (nur ohne Datei), damit
-/// der Wiederholungsschutz auch bei einer neuen Sicherung greift.
+/// [quellkurs] der Kurs, aus dem frisch gesichert wurde, damit ein Lauf auch
+/// nach einer neuen Sicherung gegen einen schon reservierten Zielkurs gesperrt ist.
 class UebertragungsEintrag {
   const UebertragungsEintrag({
     required this.datei,
@@ -186,15 +206,15 @@ class UebertragungsEintrag {
   final KartenStand? karten;
 
   Map<String, Object?> toJson() => {
-        'datei': datei,
-        'profil': profil,
-        'kurs': kurs,
-        'stand': stand.text,
-        'zeit': zeit.toIso8601String(),
-        if (quellkurs != null) 'quellkurs': quellkurs,
-        if (vorgang != null) 'vorgang': vorgang,
-        if (karten != null) 'karten': karten!.text,
-      };
+    'datei': datei,
+    'profil': profil,
+    'kurs': kurs,
+    'stand': stand.text,
+    'zeit': zeit.toIso8601String(),
+    if (quellkurs != null) 'quellkurs': quellkurs,
+    if (vorgang != null) 'vorgang': vorgang,
+    if (karten != null) 'karten': karten!.text,
+  };
 
   static UebertragungsEintrag? ausJson(Object? j) {
     if (j is! Map) return null;
@@ -202,12 +222,20 @@ class UebertragungsEintrag {
     final profil = j['profil'];
     final kurs = j['kurs'];
     final stand = ZielStand.aus(j['stand']);
-    final zeit = j['zeit'] is String ? DateTime.tryParse(j['zeit'] as String) : null;
+    final zeit = j['zeit'] is String
+        ? DateTime.tryParse(j['zeit'] as String)
+        : null;
     final quellkurs = j['quellkurs'];
     final vorgang = j['vorgang'];
     final karten = KartenStand.aus(j['karten']);
     if (j['karten'] != null && karten == null) return null;
-    if (datei is! String || profil is! String || kurs is! int || stand == null || zeit == null) return null;
+    if (datei is! String ||
+        profil is! String ||
+        kurs is! int ||
+        stand == null ||
+        zeit == null) {
+      return null;
+    }
     if (quellkurs != null && quellkurs is! int) return null;
     if (vorgang != null && vorgang is! String) return null;
     return UebertragungsEintrag(
@@ -225,7 +253,7 @@ class UebertragungsEintrag {
 
 /// Der Wiederholungsschutz: Ist für dieses Ziel schon etwas übertragen oder
 /// versucht worden, gibt es eine Rückfrage statt eines erneuten Imports.
-/// Trifft die Datei den Eintrag, sonst der Quellkurs (bei frischer Sicherung).
+/// Die Datei oder derselbe Quellkurs trifft den Eintrag.
 /// Abgelehnte Versuche zählen nicht: nichts wurde geschrieben. Eine bewusste
 /// Wiederholung geht nicht über uebertragen, sondern über wiederherstellen_datei
 /// mit wiederholung_von.
@@ -241,7 +269,8 @@ String? wiederholungsRueckfrage(
       if (e.profil == profil &&
           e.kurs == kurs &&
           e.stand != ZielStand.abgelehnt &&
-          ((datei != null && e.datei == datei) || (datei == null && quellkurs != null && e.quellkurs == quellkurs)))
+          ((datei != null && e.datei == datei) ||
+              (quellkurs != null && e.quellkurs == quellkurs)))
         e,
   ];
   if (treffer.isEmpty) return null;
@@ -250,8 +279,8 @@ String? wiederholungsRueckfrage(
   final karten = e.karten == null || e.karten == KartenStand.verknuepft
       ? ''
       : ' Die Lernlandkarten dieses Ziels sind „${e.karten!.text}": nicht verifiziert; Sichtbarkeit in Moodle prüfen. '
-          'Sie werden nicht durch eine Wiederholung, sondern mit aktivitaet_lesen und '
-          'lernlandkarte_verknuepfungen_setzen geklärt.';
+            'Sie werden nicht durch eine Wiederholung, sondern mit aktivitaet_lesen und '
+            'lernlandkarte_verknuepfungen_setzen geklärt.';
   return 'Für Kurs $kurs ist schon einmal übertragen worden: Stand „${e.stand.text}", '
       'am ${e.zeit.toIso8601String()}$nummer.$karten Nichts wird erneut importiert. Erst den Stand klären '
       '(wiederherstellung_status mit der Nummer). Will die Lehrkraft die Wiederholung trotzdem, für diesen Kurs '
@@ -276,11 +305,17 @@ class Uebertragungsprotokoll {
     } on FormatException {
       throw StateError('uebertragungen.json ist beschädigt. Nichts geändert.');
     }
-    if (j is! List) throw StateError('uebertragungen.json ist beschädigt. Nichts geändert.');
+    if (j is! List) {
+      throw StateError('uebertragungen.json ist beschädigt. Nichts geändert.');
+    }
     final liste = <UebertragungsEintrag>[];
     for (final e in j) {
       final x = UebertragungsEintrag.ausJson(e);
-      if (x == null) throw StateError('uebertragungen.json ist beschädigt. Nichts geändert.');
+      if (x == null) {
+        throw StateError(
+          'uebertragungen.json ist beschädigt. Nichts geändert.',
+        );
+      }
       liste.add(x);
     }
     return Uebertragungsprotokoll._(datei, liste);
@@ -289,26 +324,61 @@ class Uebertragungsprotokoll {
   // Alle Sitzungen teilen diese Datei; ein alter Snapshot darf neuere Einträge nicht ersetzen.
   static final Map<String, Future<void>> _schreibend = {};
 
-  Future<void> eintragen(UebertragungsEintrag e) {
+  Future<void> reservieren(UebertragungsEintrag e) =>
+      _schreiben(e, reservieren: true);
+
+  Future<void> eintragen(UebertragungsEintrag e) => _schreiben(e);
+
+  Future<void> _schreiben(UebertragungsEintrag e, {bool reservieren = false}) {
     final schluessel = p.normalize(p.absolute(_datei.path));
     final vorher = _schreibend[schluessel] ?? Future<void>.value();
-    final schreiben = vorher.catchError((Object _) {
-      // Der frühere Aufruf meldet seinen Fehler selbst; frisch lesen prüft die Datei erneut.
-    }).then((_) async {
-      final aktuell = await laden(_datei.path);
-      final liste = [...aktuell.eintraege, e];
-      await _datei.parent.create(recursive: true);
-      final tmp = File('${_datei.path}.tmp');
-      await tmp.writeAsString(jsonEncode([for (final x in liste) x.toJson()]), flush: true);
-      await tmp.rename(_datei.path);
-      eintraege
-        ..clear()
-        ..addAll(liste);
-    });
+    final schreiben = vorher
+        .catchError((Object _) {
+          // Der frühere Aufruf meldet seinen Fehler selbst; frisch lesen prüft die Datei erneut.
+        })
+        .then((_) async {
+          final aktuell = await laden(_datei.path);
+          final liste = [...aktuell.eintraege];
+          if (reservieren) {
+            final rueckfrage = wiederholungsRueckfrage(
+              liste,
+              profil: e.profil,
+              kurs: e.kurs,
+              datei: e.datei,
+              quellkurs: e.quellkurs,
+            );
+            if (rueckfrage != null) throw StateError(rueckfrage);
+            liste.add(e);
+          } else {
+            final index = liste.lastIndexWhere(
+              (alt) =>
+                  alt.stand == ZielStand.unklar &&
+                  alt.vorgang == null &&
+                  alt.profil == e.profil &&
+                  alt.kurs == e.kurs &&
+                  alt.datei == e.datei &&
+                  alt.quellkurs == e.quellkurs,
+            );
+            if (index < 0) {
+              liste.add(e);
+            } else {
+              liste[index] = e;
+            }
+          }
+          await _datei.parent.create(recursive: true);
+          final tmp = File('${_datei.path}.tmp');
+          await tmp.writeAsString(
+            jsonEncode([for (final x in liste) x.toJson()]),
+            flush: true,
+          );
+          await tmp.rename(_datei.path);
+          eintraege
+            ..clear()
+            ..addAll(liste);
+        });
     _schreibend[schluessel] = schreiben;
     return schreiben;
   }
-
 }
 
 /// Das Ergebnis eines Ziels aus [ZielLauf]: Stand, Nummer des Vorgangs (wenn
@@ -327,19 +397,30 @@ typedef ZielLauf = Future<ZielErgebnis> Function(PlanZiel ziel);
 
 /// Das Ergebnis der Lernlandkarten eines Ziels aus [KartenLauf].
 class KartenErgebnis {
-  const KartenErgebnis(this.stand, this.text);
+  const KartenErgebnis(this.stand, this.text, {this.freigabeAbgelehnt = false});
 
   final KartenStand stand;
   final String text;
+  final bool freigabeAbgelehnt;
 }
 
 /// Verknüpft die Lernlandkarten eines Ziels, nachdem das Kopieren dort fertig
 /// ist ([restore] ist dessen Ergebnis). Null: der Auftrag hat keine Karten. Im
 /// Produkt die Verdrahtung in mcp_dienst.dart; in den Tests ein Fake.
-typedef KartenLauf = Future<KartenErgebnis?> Function(PlanZiel ziel, ZielErgebnis restore);
+typedef KartenLauf = Future<KartenErgebnis?> Function(
+  PlanZiel ziel,
+  ZielErgebnis restore,
+);
 
 class ZielBericht {
-  const ZielBericht(this.ziel, this.stand, this.vorgang, this.text, {this.karten, this.kartenText = ''});
+  const ZielBericht(
+    this.ziel,
+    this.stand,
+    this.vorgang,
+    this.text, {
+    this.karten,
+    this.kartenText = '',
+  });
 
   final PlanZiel ziel;
   final ZielStand stand;
@@ -369,37 +450,31 @@ Future<List<ZielBericht>> uebertragungAusfuehren(
       berichte.add(ZielBericht(z, ZielStand.nichtBegonnen, null, ''));
       continue;
     }
+    await protokoll.reservieren(
+      UebertragungsEintrag(
+        datei: datei,
+        profil: profil,
+        kurs: z.kurs,
+        stand: ZielStand.unklar,
+        zeit: DateTime.now(),
+        quellkurs: quellkurs,
+      ),
+    );
     ZielErgebnis e;
     try {
       e = await lauf(z);
     } catch (_) {
       // Die Meldung einer Ausnahme kann Namen enthalten (E11): nur der Stand zählt.
-      e = const ZielErgebnis(ZielStand.unklar,
-          text: 'Unerwarteter Fehler. Den Kurs in Moodle prüfen, bevor es erneut versucht wird.');
+      e = const ZielErgebnis(
+        ZielStand.unklar,
+        text: 'Unerwarteter Fehler. Den Kurs in Moodle prüfen, bevor es erneut versucht wird.',
+      );
     }
     // Mit Karten steht das Ziel schon als „ausstehend" im Protokoll, bevor sie
     // verknüpft werden: Ein Abbruch oder Neustart dazwischen doppelt nichts.
     final mitKarten = kartenLauf != null && e.stand == ZielStand.fertig;
-    await protokoll.eintragen(UebertragungsEintrag(
-      datei: datei,
-      profil: profil,
-      kurs: z.kurs,
-      stand: e.stand,
-      zeit: DateTime.now(),
-      quellkurs: quellkurs,
-      vorgang: e.vorgang,
-      karten: mitKarten ? KartenStand.ausstehend : null,
-    ));
-    KartenErgebnis? k;
-    if (mitKarten) {
-      try {
-        k = await kartenLauf(z, e);
-      } catch (_) {
-        k = const KartenErgebnis(KartenStand.unklar,
-            'Unerwarteter Fehler bei den Lernlandkarten. Die Karte in Moodle prüfen, bevor etwas erneut versucht wird.');
-      }
-      // Ohne Karten im Auftrag (k ist null) bleibt „ausstehend" nicht stehen.
-      await protokoll.eintragen(UebertragungsEintrag(
+    await protokoll.eintragen(
+      UebertragungsEintrag(
         datei: datei,
         profil: profil,
         kurs: z.kurs,
@@ -407,10 +482,44 @@ Future<List<ZielBericht>> uebertragungAusfuehren(
         zeit: DateTime.now(),
         quellkurs: quellkurs,
         vorgang: e.vorgang,
-        karten: k?.stand,
-      ));
+        karten: mitKarten ? KartenStand.ausstehend : null,
+      ),
+    );
+    KartenErgebnis? k;
+    if (mitKarten) {
+      try {
+        k = await kartenLauf(z, e);
+      } catch (_) {
+        k = const KartenErgebnis(
+          KartenStand.unklar,
+          'Unerwarteter Fehler bei den Lernlandkarten. Die Karte in Moodle prüfen, bevor etwas erneut versucht wird.',
+        );
+      }
+      // Ohne Karten im Auftrag (k ist null) bleibt „ausstehend" nicht stehen.
+      await protokoll.eintragen(
+        UebertragungsEintrag(
+          datei: datei,
+          profil: profil,
+          kurs: z.kurs,
+          stand: e.stand,
+          zeit: DateTime.now(),
+          quellkurs: quellkurs,
+          vorgang: e.vorgang,
+          karten: k?.stand,
+        ),
+      );
+      if (k?.freigabeAbgelehnt == true) abgelehnt = true;
     }
-    berichte.add(ZielBericht(z, e.stand, e.vorgang, e.text, karten: k?.stand, kartenText: k?.text ?? ''));
+    berichte.add(
+      ZielBericht(
+        z,
+        e.stand,
+        e.vorgang,
+        e.text,
+        karten: k?.stand,
+        kartenText: k?.text ?? '',
+      ),
+    );
     if (e.stand == ZielStand.abgelehnt) abgelehnt = true;
   }
   return berichte;
@@ -426,27 +535,36 @@ String uebertragungsBericht(List<ZielBericht> berichte) {
     anzahl[b.stand] = anzahl[b.stand]! + 1;
     final nummer = b.vorgang == null ? '' : ', Nummer ${b.vorgang}';
     final text = b.text.isEmpty ? '' : ' ${b.text}';
-    final karten = b.karten == null ? '' : '\n  Lernlandkarten: ${b.karten!.text}. ${b.kartenText}'.trimRight();
-    zeilen.add('„${b.ziel.name}" (Kurs ${b.ziel.kurs}): ${b.stand.text}$nummer.$text$karten');
-    if (b.karten != null) kartenAnzahl[b.karten!] = kartenAnzahl[b.karten!]! + 1;
+    final karten = b.karten == null
+        ? ''
+        : '\n  Lernlandkarten: ${b.karten!.text}. ${b.kartenText}'.trimRight();
+    zeilen.add(
+      '„${b.ziel.name}" (Kurs ${b.ziel.kurs}): ${b.stand.text}$nummer.$text$karten',
+    );
+    if (b.karten != null) {
+      kartenAnzahl[b.karten!] = kartenAnzahl[b.karten!]! + 1;
+    }
   }
-  final kopf = 'Übertragung: ${anzahl[ZielStand.fertig]} fertig, '
+  final kopf =
+      'Übertragung: ${anzahl[ZielStand.fertig]} fertig, '
       '${anzahl[ZielStand.fehlgeschlagen]! + anzahl[ZielStand.unklar]!} fehlgeschlagen oder unklar, '
       '${anzahl[ZielStand.abgelehnt]} abgelehnt, ${anzahl[ZielStand.nichtBegonnen]} nicht begonnen.';
   final mitKarten = berichte.any((b) => b.karten != null);
   final kartenKopf = !mitKarten
       ? null
       : 'Lernlandkarten je Ziel: ${kartenAnzahl[KartenStand.verknuepft]} verknüpft, '
-          '${kartenAnzahl[KartenStand.offen]} offen, ${kartenAnzahl[KartenStand.unklar]! + kartenAnzahl[KartenStand.ausstehend]!} unklar.';
+            '${kartenAnzahl[KartenStand.offen]} offen, ${kartenAnzahl[KartenStand.unklar]! + kartenAnzahl[KartenStand.ausstehend]!} unklar.';
   final hinweise = [
-    if (kartenAnzahl[KartenStand.offen]! + kartenAnzahl[KartenStand.unklar]! + kartenAnzahl[KartenStand.ausstehend]! > 0)
+    if (kartenAnzahl[KartenStand.offen]! +
+            kartenAnzahl[KartenStand.unklar]! +
+            kartenAnzahl[KartenStand.ausstehend]! >
+        0)
       'Offene oder unklare Lernlandkarten bleiben unverifiziert; bei unbelegter Zuordnung die Sichtbarkeit in Moodle prüfen. Nichts wird automatisch wiederholt oder '
           'zusätzlich kopiert; die ungelösten Zuordnungen entscheidet die Lehrkraft, danach lernlandkarte_verknuepfungen_setzen.',
     if (anzahl[ZielStand.fertig]! > 0)
       'Einfüge-Wiederherstellung: Ein erneuter Lauf legt Inhalte ein zweites Mal an (Dubletten). '
           'Ein Aktualisieren bestehender Inhalte ist nicht zugesagt.',
-    if (anzahl[ZielStand.fehlgeschlagen]! + anzahl[ZielStand.unklar]! > 0)
-      'Nicht erneut gesendet. Stand je Ziel mit wiederherstellung_status und der Nummer klären.',
+    if (anzahl[ZielStand.fehlgeschlagen]! + anzahl[ZielStand.unklar]! > 0) 'Nicht erneut gesendet. Stand je Ziel mit wiederherstellung_status und der Nummer klären.',
     if (anzahl[ZielStand.abgelehnt]! > 0)
       'Die Lehrkraft hat abgelehnt; die übrigen Ziele wurden nicht begonnen.',
   ];

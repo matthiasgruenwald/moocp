@@ -1,5 +1,10 @@
 part of 'mcp_dienst.dart';
 
+String? _cmidnummer(Formular form) {
+  final wert = wertIn(form.felder, 'cmidnumber')?.trim();
+  return wert == null || wert.isEmpty ? null : wert;
+}
+
 extension _Uebertragung on McpDienst {
   Future<String> _nachTestkopie(
     Future<String> lauf,
@@ -100,6 +105,7 @@ extension _Uebertragung on McpDienst {
         ? const <KartenQuelle>[]
         : await kartenErfassen(
             moodle,
+            arbeitsordner: arbeitsordner,
             kurs: quellkurs,
             aktivitaeten: [
               for (final x in (a['aktivitaeten'] as List?) ?? const [])
@@ -116,10 +122,10 @@ extension _Uebertragung on McpDienst {
       if (!bindungPasst()) return false;
       final frisch = await quelleErfassen();
       return jsonEncode([
-            for (final k in karten) [k.cmid, k.name, k.stand],
+            for (final k in karten) [k.cmid, k.name, k.stand, k.formularstand],
           ]) ==
           jsonEncode([
-            for (final k in frisch) [k.cmid, k.name, k.stand],
+            for (final k in frisch) [k.cmid, k.name, k.stand, k.formularstand],
           ]);
     }
 
@@ -323,14 +329,72 @@ extension _Uebertragung on McpDienst {
 
       pruefeKartenBindung();
       final jetzt = await kursLesen(moodle, z.kurs);
+      final vorher = v.vorherCmids!.toSet();
+      final quellenTitel = {
+        for (final k in karten) 'learningmap\u0000${k.name}',
+        for (final k in karten)
+          for (final o in k.orte)
+            if (o.mitkopiert && o.zielModul != null && o.zielName != null)
+              '${o.zielModul}\u0000${o.zielName}',
+      };
+      final kandidaten = [
+        for (final x in jetzt.nachCmid.values)
+          if (!vorher.contains(x.cmid) &&
+              quellenTitel.contains('${x.modul}\u0000${x.name}'))
+            x,
+      ];
+      final belege = <int, KartenBeleg>{};
+      Future<void> belegLesen(KursAktivitaet kandidat) async {
+        try {
+          final form = await formularHolen(
+            moodle,
+            Formularziel.aktivitaet(kandidat.cmid).adresse,
+          );
+          final stand = formularInhaltsstand(
+            await formularLesen(
+              moodle,
+              Formularziel.aktivitaet(kandidat.cmid),
+              arbeitsordner,
+            ),
+          );
+          belege[kandidat.cmid] = KartenBeleg(
+            idnummer: _cmidnummer(form),
+            formularstand: stand,
+            kartendaten: kandidat.modul == 'learningmap'
+                ? lernlandkarteLesen(form.form)
+                : null,
+          );
+        } on MoodleFehler {
+          belege[kandidat.cmid] = const KartenBeleg(
+            idnummer: null,
+            formularstand: null,
+          );
+        }
+      }
+      for (final kandidat in kandidaten) {
+        await belegLesen(kandidat);
+      }
+      // Ein Aktivität kann während der Formularlesungen parallel auftauchen.
+      // Neue passende Kandidaten gehören zur Mehrdeutigkeitsprüfung dazu.
+      pruefeKartenBindung();
+      final frisch = await kursLesen(moodle, z.kurs);
+      final frischeKandidaten = [
+        for (final x in frisch.nachCmid.values)
+          if (!vorher.contains(x.cmid) &&
+              quellenTitel.contains('${x.modul}\u0000${x.name}'))
+            x,
+      ];
+      for (final kandidat in frischeKandidaten) {
+        if (!belege.containsKey(kandidat.cmid)) await belegLesen(kandidat);
+      }
       final zuordnungen = kartenZuordnen(
         karten,
-        archiv: v.wiederherstellungAktivitaeten!,
-        vorher: v.vorherCmids!.toSet(),
+        vorher: vorher,
         aktuell: [
-          for (final x in jetzt.nachCmid.values)
+          for (final x in frisch.nachCmid.values)
             (cmid: x.cmid, modul: x.modul, titel: x.name),
         ],
+        belege: belege,
       );
       final ergebnisse = <KartenErgebnis>[];
       for (final zu in zuordnungen) {
@@ -350,7 +414,11 @@ extension _Uebertragung on McpDienst {
           : ergebnisse.any((e) => e.stand == KartenStand.offen)
           ? KartenStand.offen
           : KartenStand.verknuepft;
-      return KartenErgebnis(stand, ergebnisse.map((e) => e.text).join(' '));
+      return KartenErgebnis(
+        stand,
+        ergebnisse.map((e) => e.text).join(' '),
+        freigabeAbgelehnt: ergebnisse.any((e) => e.freigabeAbgelehnt),
+      );
     }
 
     final berichte = await uebertragungAusfuehren(

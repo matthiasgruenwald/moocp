@@ -338,6 +338,52 @@ String? ohneOrtsbeschriftung(Object? svg) => svg is String
       )
     : null;
 
+/// Fingerabdruck des lesbaren Formularinhalts einer Lernlandkarte, einschließlich
+/// Beschreibung, nativer Einstellungen und heruntergeladener Dateiinhalte.
+/// Null bedeutet eine ausdrückliche Prüflücke.
+String? formularInhaltsstand(FormularGelesen f) {
+  if (f.modul == null ||
+      f.kurs == null ||
+      f.name == null ||
+      f.fehlend.isNotEmpty ||
+      f.bereiche.any((b) => b.nichtGelesen.isNotEmpty)) {
+    return null;
+  }
+  final dateien = <String, String>{};
+  for (final wurzel in ['dateien', 'bereiche']) {
+    final ordner = Directory(p.join(f.ordner, wurzel));
+    if (!ordner.existsSync()) continue;
+    for (final datei in ordner.listSync(recursive: true).whereType<File>()) {
+      dateien['$wurzel/${p.relative(datei.path, from: ordner.path)}'] = sha256
+          .convert(datei.readAsBytesSync())
+          .toString();
+    }
+  }
+  return jsonEncode({
+    'name': f.name,
+    'modul': f.modul,
+    'felder': [
+      for (final feld in f.felder)
+        if (feld.feld != 'svgcode' && feld.feld != 'placestore')
+        [feld.feld, _vergleichHtml(feld.feld, feld.html)],
+    ],
+    'einstellungen': {
+      for (final e in f.einstellungen)
+        if (!{'visible', 'backgroundfile', 'svgcode'}.contains(e.schluessel))
+          e.schluessel: e.wert,
+    },
+    'dateien': dateien,
+    'bereiche': [
+      for (final b in f.bereiche)
+        [
+          b.feld,
+          b.label,
+          for (final e in b.dateien.entries) [e.key, e.value.bytes],
+        ],
+    ],
+  });
+}
+
 bool _gleicheFelder(FormularGelesen vorher, FormularGelesen nachher) {
   final a = {
     for (final f in vorher.felder)

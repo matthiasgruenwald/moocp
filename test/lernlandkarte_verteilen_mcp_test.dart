@@ -41,6 +41,9 @@ class _Akt {
   String? placestore;
   String intro = '';
   String? html;
+  bool backgroundImage = false;
+  int? completionMinute;
+  String? idnummer;
   String svgcode =
       '<svg><circle id="p1" cx="120"/><circle id="p2" cx="480"/><title id="titlep1">ZZ Karte</title><text id="textp1">ZZ Karte</text><title id="titlep2">ZZ Karte</title><text id="textp2">ZZ Karte</text></svg>';
 }
@@ -70,8 +73,15 @@ class _Moodle {
   bool erinnerungAktiv = false;
   String dateiInhalt = 'Eigene Dateiprobe';
   int backupStarts = 0;
+  int backupVariation = 0;
   int restoreStarts = 0;
+  bool duplikatNachRestore = false;
+  bool duplikatErstellt = false;
   int kartenSpeicherungen = 0;
+  bool restoreAntwortBlockieren = false;
+  bool restoreBlockAufgebraucht = false;
+  final restoreLaeuft = Completer<void>();
+  final restoreFortsetzen = Completer<void>();
   void Function(_Akt)? kopieAendern;
   final startsJeZiel = <int, int>{};
   Set<int> gesichert = {};
@@ -105,15 +115,18 @@ class _Moodle {
 
   /// Quellkurs 12: Thema (101) mit zwei Seiten und der Karte; Rest (102) mit einer Außenseite.
   /// Ziele 31–35 enthalten je eine gleich benannte Altseite, die kein Nachweis ist.
-  late _Akt seiteA, seiteB, karte, aussen;
+  late _Akt seiteA, seiteB, karte, karteB, aussen;
   void aufbauen({bool verweisAufAussen = false, bool doppelterTitel = false}) {
     akt.clear();
     naechste = 200;
     seiteA = neu(12, 101, 'page', 'ZZ Seite A');
+    seiteA.idnummer = 'zz-seite-a';
     seiteB = neu(12, 101, 'page', 'ZZ Seite B');
+    seiteB.idnummer = 'zz-seite-b';
     if (doppelterTitel) neu(12, 101, 'page', 'ZZ Seite A');
     aussen = neu(12, 102, 'page', 'ZZ Außen');
     karte = neu(12, 101, 'learningmap', 'ZZ Karte');
+    karte.idnummer = 'zz-karte';
     karte.placestore = jsonEncode({
       'mapid': 'm1',
       'editmode': false,
@@ -147,9 +160,18 @@ class _Moodle {
       'startingplaces': ['p1'],
       'targetplaces': ['p3'],
     });
+    karteB = neu(12, 101, 'learningmap', 'ZZ Karte B');
+    karteB.idnummer = 'zz-karte-b';
+    karteB.placestore = jsonEncode({
+      'mapid': 'm2',
+      'places': [
+        {'id': 'p1', 'linkedActivity': seiteA.cmid},
+      ],
+      'paths': [],
+    });
     naechste = 5000;
     for (final k in [31, 32, 33, 34, 35]) {
-      neu(k, 300 + k, 'page', 'ZZ Seite A');
+      neu(k, 300 + k, 'page', 'ZZ Seite A').idnummer = 'alt-seite-a-$k';
     }
     naechste = 1000;
   }
@@ -183,7 +205,7 @@ class _Moodle {
       ArchiveFile.bytes(
         'moodle_backup.xml',
         utf8.encode(
-          '<moodle_backup><information><format>moodle2</format><type>course</type></information>'
+          '<moodle_backup><information><format>moodle2</format><type>course</type><variation>$backupVariation</variation></information>'
           '<activities>$eintraege</activities></moodle_backup>',
         ),
       ),
@@ -231,29 +253,36 @@ class _Moodle {
   String formFuer(_Akt x) {
     entwurf++;
     if (x.modul == 'learningmap') {
+      final dateiliste = x.backgroundImage
+          ? '"list":[{"type":"file","filepath":"/","filename":"background.png","size":4,"datemodified":1,"url":"$basis/draftfile.php/55/user/draft/9/background.png"}]'
+          : '"list":[]';
       return seite(
         '''<form class="mform" action="/course/modedit.php" method="post">
         <input name="_qf__mod_learningmap_mod_form" value="1"><input name="sesskey" value="$_sk">
         <input name="course" value="${x.kurs}"><input name="update" value="${x.cmid}">
-        <input name="modulename" value="learningmap"><input name="name" value="${x.name}">
+        <input name="modulename" value="learningmap"><input name="name" value="${x.name}"><input name="cmidnumber" value="${x.idnummer ?? ''}">
         <select name="visible"><option value="0" ${x.sichtbar ? '' : 'selected'}>Verborgen</option><option value="1" ${x.sichtbar ? 'selected' : ''}>Sichtbar</option></select>
         <textarea name="introeditor[text]">${const HtmlEscape().convert(x.intro)}</textarea><input name="introeditor[itemid]" value="$entwurf">
         <input type="hidden" name="backgroundfile" value="${entwurf + 1000}">
         <textarea name="svgcode">${const HtmlEscape().convert(svgFuer(x))}</textarea>
         <input type="hidden" name="placestore" value='${const HtmlEscape().convert(x.placestore!)}'>
-        <input name="completionexpected[minute]" value="$erinnerungMinute">
-        ${erinnerungAktiv ? '<input name="completionexpected[enabled]" value="1">' : ''}
+        <div class="fitem row" id="fitem_id_completionexpected_minute"><div class="col-form-label">Erwarteter Abschluss</div><div class="felement"><input name="completionexpected[minute]" value="${x.completionMinute ?? erinnerungMinute}"></div></div>
+        ${erinnerungAktiv ? '<div class="fitem row" id="fitem_id_completionexpected_enabled"><div class="col-form-label">Abschluss aktiv</div><div class="felement"><input name="completionexpected[enabled]" value="1"></div></div>' : ''}
         <input type="submit" name="submitbutton" value="Speichern"></form>''',
+      ).replaceFirst(
+        '</form>',
+        '<script>M.form_filemanager.init(Y, {"target":"id_backgroundfile","itemid":$entwurf,"client_id":"c",$dateiliste});</script></form>',
       );
     }
     return seite(
       '''<form class="mform" action="/course/modedit.php" method="post">
         <input name="_qf__mod_page_mod_form" value="1"><input name="sesskey" value="$_sk"><input name="course" value="${x.kurs}">
         <input name="update" value="${x.cmid}"><input name="modulename" value="page"><input name="name" value="${x.name}">
+        <input name="cmidnumber" value="${x.idnummer ?? ''}">
         <select name="visible"><option value="0" ${x.sichtbar ? '' : 'selected'}>Verborgen</option><option value="1" ${x.sichtbar ? 'selected' : ''}>Sichtbar</option></select>
         <textarea name="page[text]">${const HtmlEscape().convert(x.html ?? '<p>${x.name}</p>')}</textarea><input name="page[format]" value="1"><input name="page[itemid]" value="9">
-        <input name="completionexpected[minute]" value="$erinnerungMinute">
-        ${erinnerungAktiv ? '<input name="completionexpected[enabled]" value="1">' : ''}
+        <div class="fitem row" id="fitem_id_completionexpected_minute"><div class="col-form-label">Erwarteter Abschluss</div><div class="felement"><input name="completionexpected[minute]" value="$erinnerungMinute"></div></div>
+        ${erinnerungAktiv ? '<div class="fitem row" id="fitem_id_completionexpected_enabled"><div class="col-form-label">Abschluss aktiv</div><div class="felement"><input name="completionexpected[enabled]" value="1"></div></div>' : ''}
         <input type="submit" name="submitbutton" value="Speichern"></form>''',
     );
   }
@@ -285,16 +314,17 @@ class _Moodle {
       } else if (path == '/lib/ajax/service.php') {
         final call = (jsonDecode(body) as List).single as Map;
         final args = (call['args'] as Map?) ?? const {};
-        final Object data = switch (call['methodname']) {
+        final dynamic data = switch (call['methodname']) {
           'core_course_get_enrolled_courses_by_timeline_classification' => {
             'courses': [
               for (final e in kurse.entries)
                 {'id': e.key, 'fullname': e.value, 'shortname': 'ZZ${e.key}'},
             ],
           },
-          'core_courseformat_get_state' => zustand(
-            (args['courseid'] as num).toInt(),
-          ),
+          'core_courseformat_get_state' => () {
+            final kurs = (args['courseid'] as num).toInt();
+            return zustand(kurs);
+          }(),
           'core_courseformat_update_course' => () {
             if (args['action'] == 'cm_delete') {
               akt.removeWhere((x) => (args['ids'] as List).contains(x.cmid));
@@ -306,13 +336,23 @@ class _Moodle {
             }
             return <String, Object?>{};
           }(),
-          'core_backup_get_async_backup_progress' => [
-            {'backupid': _id, 'progress': 1, 'status': 1000},
-          ],
+          'core_backup_get_async_backup_progress' => () async {
+            if (restoreAntwortBlockieren &&
+                !restoreBlockAufgebraucht &&
+                restoreStarts > 0) {
+              restoreBlockAufgebraucht = true;
+              if (!restoreLaeuft.isCompleted) restoreLaeuft.complete();
+              await restoreFortsetzen.future;
+            }
+            return [
+              {'backupid': _id, 'progress': 1, 'status': 1000},
+            ];
+          }(),
           _ => throw StateError('Unerwarteter Dienst: ${call['methodname']}'),
         };
+        final Object result = data is Future ? await data : data as Object;
         antwort = jsonEncode([
-          {'error': false, 'data': data},
+          {'error': false, 'data': result},
         ]);
       } else if (path == '/backup/backup.php') {
         if (r.method == 'GET') {
@@ -440,6 +480,11 @@ class _Moodle {
         r.response.write(dateiInhalt);
         await r.response.close();
         return;
+      } else if (path == '/draftfile.php/55/user/draft/9/background.png') {
+        r.response.headers.contentType = ContentType.binary;
+        r.response.add([1, 2, 3, 4]);
+        await r.response.close();
+        return;
       } else if (path == '/repository/draftfiles_ajax.php') {
         antwort = jsonEncode({'list': []});
       } else if (path == '/course/modedit.php') {
@@ -458,10 +503,21 @@ class _Moodle {
           if (x.modul == 'page') x.html = f['page[text]'];
           x.intro = f['introeditor[text]'] ?? x.intro;
           if (x.modul == 'learningmap') {
+            final vorherStore = x.placestore == null
+                ? {'places': <Map<String, Object?>>[]}
+                : jsonDecode(x.placestore!) as Map;
+            final vorherLinks = {
+              for (final ort in vorherStore['places'] as List)
+                (ort as Map)['id']: (ort['linkedActivity'] as num?)?.toInt(),
+            };
             x.placestore = f['placestore'];
             x.svgcode = f['svgcode']!;
             final karte = jsonDecode(x.placestore!) as Map;
             for (final ort in karte['places'] as List) {
+              if (vorherLinks[ort['id']] ==
+                  (ort['linkedActivity'] as num?)?.toInt()) {
+                continue;
+              }
               final cmid = (ort['linkedActivity'] as num?)?.toInt();
               if (cmid == null) continue;
               final ziel = akt.firstWhere((a) => a.cmid == cmid);
@@ -516,6 +572,12 @@ class _Moodle {
           await r.response.close();
           return;
         }
+        if (duplikatNachRestore && !duplikatErstellt && restoreStarts > 0) {
+          duplikatErstellt = true;
+          neu(31, 331, 'page', 'ZZ Seite A')
+            ..idnummer = seiteA.idnummer
+            ..html = seiteA.html;
+        }
         antwort = formFuer(x);
       } else {
         throw StateError('Unerwartete Adresse: $path');
@@ -545,6 +607,9 @@ class _Moodle {
       );
       kopie.svgcode = x.svgcode;
       kopie.intro = x.intro;
+      kopie.backgroundImage = x.backgroundImage;
+      kopie.completionMinute = x.completionMinute;
+      kopie.idnummer = x.idnummer;
       kopie.html = x.html;
       kopien[x.cmid] = kopie;
     }
@@ -727,9 +792,9 @@ void main() {
       'p2': moodle.seiteB.cmid,
       'p3': null,
     });
-    expect(moodle.kartenSpeicherungen, 5);
+    expect(moodle.kartenSpeicherungen, 10);
     // Jede Kartenänderung wurde in der App freigegeben (je Ziel eine), dazu die übrigen Freigaben.
-    expect(freigabeTitel.where((t) => t == 'Lernlandkarte ändern?').length, 5);
+    expect(freigabeTitel.where((t) => t == 'Lernlandkarte ändern?').length, 10);
     // Der Protokollstand ist je Ziel getrennt und endet bei „verknüpft".
     final protokoll = (jsonDecode(
       File(p.join(ordner.path, 'uebertragungen.json')).readAsStringSync(),
@@ -739,6 +804,48 @@ void main() {
       expect(eintraege.last['karten'], 'verknüpft');
       expect(eintraege.last['stand'], 'fertig');
     }
+  });
+
+  test(
+    'fremde gleichnamige Ersatzaktivität wird nicht als Kopie verknüpft',
+    () async {
+      moodle.kopieAendern = (a) {
+        if (a.kurs == 31 && a.modul == 'page' && a.name == 'ZZ Seite A') {
+          a.idnummer = 'fremde-identitaet';
+          a.html = '<p>Fremder Inhalt</p>';
+        }
+      };
+      final ergebnis = await client.tool('uebertragen', auftrag(ziele: [31]));
+
+      expect(
+        ergebnis,
+        contains('ist nicht mit übereinstimmendem Inhalt belegt'),
+      );
+      expect(ergebnis, contains('0 verknüpft, 1 offen'));
+      final karte = inZiel(31, 'learningmap', 'ZZ Karte');
+      expect(links(karte)['p1'], moodle.seiteA.cmid);
+      expect(links(karte)['p2'], isNot(moodle.seiteB.cmid));
+      expect(moodle.kartenSpeicherungen, 1);
+    },
+  );
+
+  test('doppelte identische Zielkopien bleiben mehrdeutig', () async {
+    // Das Ziel erhält nach der Wiederherstellungsprüfung eine zweite, in
+    // Titel, cmidnumber und Inhalt identische Seite. Die Kartenzuordnung muss
+    // diese echte Mehrdeutigkeit offenlassen.
+    moodle.duplikatNachRestore = true;
+    final ergebnis = await client.tool('uebertragen', auftrag(ziele: [31]));
+
+    expect(
+      moodle.akt.where((a) => a.kurs == 31 && a.modul == 'page' && a.name == 'ZZ Seite A'),
+      hasLength(3),
+    );
+    expect(ergebnis, contains('Mehrere neue Aktivitäten belegen das Ziel identisch'));
+    expect(ergebnis, contains('0 verknüpft, 1 offen'));
+    final karte = inZiel(31, 'learningmap', 'ZZ Karte');
+    expect(links(karte)['p1'], moodle.seiteA.cmid);
+    expect(links(karte)['p2'], isNot(moodle.seiteB.cmid));
+    expect(moodle.kartenSpeicherungen, 1);
   });
 
   test('Zusammenfassung vor dem Kopieren nennt die Karte und ihre ungelösten Verweise', () async {
@@ -771,7 +878,7 @@ void main() {
     expect(
       ergebnis,
       contains(
-        'Ort p3 (Quellziel „ZZ Außen"): Das Ziel „ZZ Außen" gehört nicht zur kopierten Auswahl.',
+        'Ort p3 (Quellziel „ZZ Außen"): Das Ziel gehört nicht zur kopierten Auswahl.',
       ),
     );
     expect(ergebnis, contains('unverifiziert'));
@@ -851,6 +958,34 @@ void main() {
     );
   });
 
+  test('Neustart während laufender Wiederherstellung sperrt neue Sicherung desselben Quellziels', () async {
+    moodle.restoreAntwortBlockieren = true;
+    final ersterAufruf = client.tool('uebertragen', auftrag(ziele: [31]));
+    await moodle.restoreLaeuft.future;
+    expect(moodle.restoreStarts, 1);
+
+    final ersterFehler = ersterAufruf.then<void>(
+      (_) {},
+      onError: (Object _) {},
+    );
+    await dienst.stoppen();
+    client.http.close(force: true);
+    await dienstStarten();
+    moodle.backupVariation++;
+
+    final nachNeustart = await client.tool('uebertragen', auftrag(ziele: [31]));
+    expect(nachNeustart, contains('schon einmal übertragen'));
+    expect(
+      moodle.backupStarts,
+      1,
+      reason: 'die neue Sicherung hätte einen anderen Hash',
+    );
+    expect(moodle.restoreStarts, 1);
+
+    moodle.restoreFortsetzen.complete();
+    await ersterFehler;
+  });
+
   test('abgelehnte Kartenänderung: Karte bleibt unverknüpft, offen, Wiederholung nur über die Karte selbst', () async {
     kartenFreigabe = false;
     final ergebnis = await client.tool('uebertragen', auftrag(ziele: [31]));
@@ -868,6 +1003,27 @@ void main() {
     expect(moodle.restoreStarts, 1);
   });
 
+  test(
+    'Ablehnung der ersten Karte stoppt alle folgenden Karten und Zielkurse',
+    () async {
+      kartenFreigabe = false;
+      final ergebnis = await client.tool(
+        'uebertragen',
+        auftrag(ziele: [31, 32]),
+      );
+
+      expect(ergebnis, contains('abgelehnt'));
+      expect(moodle.startsJeZiel, {31: 1});
+      expect(moodle.restoreStarts, 1);
+      expect(moodle.kartenSpeicherungen, 0);
+      expect(
+        moodle.akt.where((a) => a.kurs == 31 && a.modul == 'learningmap'),
+        hasLength(2),
+      );
+      expect(moodle.akt.where((a) => a.kurs == 32 && a.cmid < 5000), isEmpty);
+    },
+  );
+
   test('während der Kartenfreigabe ist das kopierte Ziel dauerhaft als ausstehend gespeichert', () async {
     final staende = <String>[];
     freigaben.addListener(() {
@@ -881,7 +1037,7 @@ void main() {
     });
     kartenFreigabe = false;
     final ergebnis = await client.tool('uebertragen', auftrag(ziele: [31]));
-    expect(staende, ['ausstehend']);
+    expect(staende, ['ausstehend', 'ausstehend']);
     expect(ergebnis, contains('1 offen'));
     expect(moodle.restoreStarts, 1);
   });
@@ -905,7 +1061,9 @@ void main() {
       moodle.kopieAendern = (a) {
         if (a.modul != 'learningmap') return;
         final daten = jsonDecode(a.placestore!) as Map;
-        daten['places'][2]['linkedActivity'] = 999999;
+        for (final place in (daten['places'] as List).cast<Map>()) {
+          if (place['id'] == 'p3') place['linkedActivity'] = 999999;
+        }
         a.placestore = jsonEncode(daten);
       };
       final ergebnis = await client.tool('uebertragen', auftrag(ziele: [31]));
@@ -916,7 +1074,7 @@ void main() {
           'Kartendaten oder Ortsziele weichen von der Quellerfassung ab',
         ),
       );
-      expect(moodle.kartenSpeicherungen, 0);
+      expect(moodle.kartenSpeicherungen, 1);
     },
   );
 
@@ -992,6 +1150,62 @@ void main() {
     expect(daten['version'], 2024072201);
     expect(daten['strokeopacity'], 1);
   });
+
+  test(
+    'abweichende Kartenbeschreibung bleibt vor dem Verknüpfen offen',
+    () async {
+      moodle.kopieAendern = (a) {
+        if (a.modul == 'learningmap') a.intro = 'Fremde Beschreibung';
+      };
+      final ergebnis = await client.tool('uebertragen', auftrag(ziele: [31]));
+
+      expect(
+        ergebnis,
+        contains('Formularinhalte oder Kartendaten weichen von der Quelle ab'),
+      );
+      expect(ergebnis, contains('0 verknüpft, 1 offen'));
+      expect(moodle.kartenSpeicherungen, 0);
+    },
+  );
+
+  test(
+    'fehlendes Quell-Hintergrundbild bleibt vor dem Verknüpfen offen',
+    () async {
+      moodle.karte.backgroundImage = true;
+      moodle.kopieAendern = (a) {
+        if (a.modul == 'learningmap') a.backgroundImage = false;
+      };
+      final ergebnis = await client.tool('uebertragen', auftrag(ziele: [31]));
+
+      expect(
+        ergebnis,
+        contains('Formularinhalte oder Kartendaten weichen von der Quelle ab'),
+      );
+      expect(ergebnis, contains('0 verknüpft, 1 offen'));
+      expect(moodle.kartenSpeicherungen, 1);
+      expect(
+        links(inZiel(31, 'learningmap', 'ZZ Karte'))['p1'],
+        moodle.seiteA.cmid,
+      );
+    },
+  );
+
+  test(
+    'abweichende native Karteneinstellung bleibt vor dem Verknüpfen offen',
+    () async {
+      moodle.kopieAendern = (a) {
+        if (a.modul == 'learningmap') a.completionMinute = 99;
+      };
+      final ergebnis = await client.tool('uebertragen', auftrag(ziele: [31]));
+
+      expect(
+        ergebnis,
+        contains('Formularinhalte oder Kartendaten weichen von der Quelle ab'),
+      );
+      expect(ergebnis, contains('0 verknüpft, 1 offen'));
+      expect(moodle.kartenSpeicherungen, 0);
+    },
+  );
 
   test('abweichende Deckkraft bleibt trotz zulässiger technischer Kartenmetadaten offen', () async {
     moodle.kopieAendern = (a) {
@@ -1090,6 +1304,7 @@ void main() {
     eigene.add(quellKarte);
     moodle.erinnerungMinute =
         24; // ausgeschaltetes Datum ist kein geänderter Inhalt
+    moodle.nativeZielverweise = true;
     final ergebnis = await client.tool('uebertragen', {
       'kurs': 12,
       'name_des_kurses': 'ZZ Quelle',
