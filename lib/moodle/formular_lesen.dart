@@ -259,7 +259,7 @@ class FormularGelesen {
       for (final ort in orte.whereType<Map>()) {
         final id = '${ort['id'] ?? '(ohne Kennung)'}';
         final rolle = lernlandkarteRolle(store, id);
-        final ziel = (ort['linkedActivity'] as num?)?.toInt();
+        final ziel = ortsziel(ort['linkedActivity']);
         final titel = ziel == null ? null : lernlandkarteTitel[ziel];
         final status = ziel == null ? null : lernlandkarteZielstatus[ziel];
         final anzahl = orte
@@ -734,7 +734,7 @@ Future<FormularGelesen> formularLesenOhneSperre(
     final orte = (karte['orte'] as List).whereType<Map>();
     verlinkt.addAll(
       orte
-          .map((ort) => (ort['linkedActivity'] as num?)?.toInt())
+          .map((ort) => ortsziel(ort['linkedActivity']))
           .whereType<int>(),
     );
   }

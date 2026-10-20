@@ -1,6 +1,7 @@
 # Changelog
 
 ## 0.9.23
+- Lernlandkarten: Eine Karte, deren Ortsziele Moodle als Text speichert, lässt sich wieder lesen (vorher Fehler beim Lesen, auch beim Verschieben in eine andere Instanz).
 - Mac: Die App startet per Doppelklick auf `moocp-starten.command` und baut sich bei Bedarf selbst.
 - Lernlandkarten: Eine Karte ohne Wege meldet beim Rücklesen kein falsches `verified: false` mehr.
 - Lernlandkarten: Vorhandene Zielaktivitäten lassen sich mit Inhaltsbelegen vorschlagen; fachliche Zuordnungen brauchen auch bei „keine“ eine Entscheidung und verfallen bei verändertem Inhalt.

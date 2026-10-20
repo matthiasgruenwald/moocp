@@ -140,7 +140,7 @@ Future<List<KartenQuelle>> kartenErfassen(
     final zielBelege = <int, ({String? idnummer, String? stand})>{};
     final orte = <KartenOrt>[];
     for (final o in (daten['orte'] as List).whereType<Map>()) {
-      final ziel = (o['linkedActivity'] as num?)?.toInt();
+      final ziel = ortsziel(o['linkedActivity']);
       if (ziel == null || ziel == 0) continue;
       final z = struktur.nachCmid[ziel];
       String? zielIdnummer;
@@ -387,7 +387,7 @@ List<KartenZuordnung> kartenZuordnen(
 
 Map<String, int?> _verknuepfungen(Map<String, Object?> karte) => {
   for (final o in (karte['orte'] as List).whereType<Map>())
-    '${o['id']}': (o['linkedActivity'] as num?)?.toInt(),
+    '${o['id']}': ortsziel(o['linkedActivity']),
 };
 
 // Ortsbeschriftungen setzt Moodle neu; Geometrie und übrige Kartendaten müssen gleich bleiben.
