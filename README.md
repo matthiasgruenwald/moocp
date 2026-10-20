@@ -421,6 +421,7 @@ Dazu entfernt die App beim Lesen von Formularen Felder wie Autor, Ersteller, Nam
   - die Zusammenstellung eines Tests, STACK-Fragetests und der CAS-Notizblock;
   - Einträge einer Fortschrittsliste, Seiten und Seitenliste gemeinsamer Wikis, Board, Kanban, die Definition von Bewertungsschemata, alle Kapitel eines Buchs;
   - Dateien im Kurs (nach der Sperrliste) und im eigenen Entwurfsbereich;
+  - Sicherungs- und Wiederherstellungsassistent sowie Fortschritt eigener Sicherungs- und Wiederherstellungsvorgänge;
   - einige Moodle-Dienste: Kursstruktur, eigene Kurse, die eigenen zuletzt besuchten Kurse (nur mit der eigenen Nutzer-ID), Inhalt des gemeinsamen Boards und des Kanban-Boards.
 - **Schreiben:**
   - Aktivitäten anlegen und speichern, nur die Typen aus der [Übersicht](#unterstützte-aktivitäten-und-fragetypen), und Abschnitte speichern;
@@ -432,6 +433,7 @@ Dazu entfernt die App beim Lesen von Formularen Felder wie Autor, Ersteller, Nam
   - Board: Spalten und eigene Notizen; Kanban: Spalten und Karten;
   - Bewertungsschemata speichern;
   - Buchkapitel speichern, löschen, verschieben;
+  - Sicherungen ohne Nutzerdaten starten und Dateien wiederherstellen; dabei einmal die von Moodle vorgeschlagene Rollenzuordnung bestätigen, ohne Nutzerdaten zu übernehmen;
   - Dateien in den eigenen Entwurfsbereich hochladen und ersetzen – die App nimmt sie nur aus dem Arbeitsordner.
 
 Für den Browser der **Bildschirmfotos** gilt eine eigene, noch engere Liste ([lib/moodle/browserliste.dart](lib/moodle/browserliste.dart)): Als Seite lädt er nur die eine, die aufgenommen wird, als Rahmen darin die interaktiven Elemente dieser Seite, dazu Stylesheets, Schriften, Bilder, die Skripte, die STACK seinen Zeichnungen mitgibt, und einige Dienste für Vorlagen und Sprachtexte, alles über die App und hinter der Sperrliste. Lernlandkartenbilder zeigen ausschließlich den Kartenbereich.
