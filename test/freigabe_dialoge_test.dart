@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moocp/freigabe.dart';
@@ -16,6 +19,83 @@ Widget _fenster(Freigaben freigaben) => MaterialApp(
 );
 
 void main() {
+  for (final ja in [true, false]) {
+    testWidgets(
+      'fachliche Kandidatenentscheidung bei keine: ${ja ? 'bestätigen' : 'ablehnen'}',
+      (tester) async {
+        final freigaben = Freigaben(Protokoll(), stufe: Bestaetigungen.keine);
+        await tester.pumpWidget(_fenster(freigaben));
+        final antwort = freigaben.anfragen(
+          FreigabeAnfrage(
+            titel: 'Lernlandkarte ändern?',
+            punkte: const [
+              'Ort p1: ZZ Quelle → ZZ Vertiefung (cmid 72)',
+              'Begründung der KI (Vorschlag): Gleicher Lerngegenstand.',
+            ],
+            vergleich: const [],
+            ab: Bestaetigungen.keine,
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(find.textContaining('ZZ Vertiefung'), findsOneWidget);
+        expect(find.textContaining('Gleicher Lerngegenstand'), findsOneWidget);
+        await tester.tap(find.text(ja ? 'Speichern' : 'Abbrechen'));
+        await tester.pumpAndSettle();
+        expect(await antwort, ja);
+        expect(freigaben.ausgelassen, 0);
+      },
+    );
+  }
+
+  testWidgets('Bild außerhalb des erneut geprüften Testumfangs braucht persönliche Freigabe', (tester) async {
+    final freigaben = Freigaben(Protokoll(), stufe: Bestaetigungen.keine);
+    await tester.pumpWidget(_fenster(freigaben));
+    final anfrage = FreigabeAnfrage(titel: 'ZZ Bild?', punkte: const [], vergleich: const [],
+      ab: Bestaetigungen.keine,
+      bilder: [base64Decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=')]);
+    final antwort = freigaben.imTest(() => freigaben.anfragen(anfrage), pruefen: () async => false);
+    await tester.pumpAndSettle();
+    expect(find.text('ZZ Bild?'), findsOneWidget);
+    await tester.tap(find.text('Abbrechen'));
+    await tester.pumpAndSettle();
+    expect(await antwort, isFalse);
+    expect(freigaben.testfreigaben, 0);
+  });
+
+  for (final fall in ['Zustimmung', 'Ablehnung', 'Fristablauf', 'Abbruch']) {
+    testWidgets('realer Dialog: $fall beendet die Anfrage korrekt', (
+      tester,
+    ) async {
+      final freigaben = Freigaben(
+        Protokoll(),
+        frist: const Duration(seconds: 3),
+      );
+      await tester.pumpWidget(_fenster(freigaben));
+      final abbruch = Completer<void>();
+      final antwort = Freigaben.mitAbbruch(
+        abbruch.future,
+        () => freigaben.anfragen(_anfrage('ZZ Änderung?')),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('ZZ Änderung?'), findsOneWidget);
+      switch (fall) {
+        case 'Zustimmung':
+          await tester.tap(find.text('Speichern'));
+        case 'Ablehnung':
+          await tester.tap(find.text('Abbrechen'));
+        case 'Fristablauf':
+          await tester.pump(const Duration(seconds: 3));
+        case 'Abbruch':
+          abbruch.complete();
+      }
+      await tester.pumpAndSettle();
+      expect(await antwort, fall == 'Zustimmung');
+      expect(find.text('ZZ Änderung?'), findsNothing);
+      expect(freigaben.aktuell, isNull);
+      expect(freigaben.testfreigaben, 0);
+    });
+  }
+
   testWidgets(
     'wechselt den Listener bei Profilwechsel auch mit offenem Dialog',
     (tester) async {

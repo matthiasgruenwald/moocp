@@ -1,5 +1,8 @@
 # Features
 
+- Lernlandkarten anlegen: Der SVG-Vergleich behandelt `<g></g>` und `<g/>` jetzt als gleich (`lernlandkarteSvgVergleichswert`, Einheitentest). Umgesetzt, auf der Instanz noch nicht erneut gemessen: eine Vorlage mit einem Ort und ohne Wege muss dort `verified: true` melden.
+- Bildschirmfotos: Bei einer schmalen Inhaltsbox werden links Textanfänge abgeschnitten. Im Live-Test auf der zweiten Testinstanz mit einer eigenen ZZ-Textseite mehrfach reproduziert; der rückgelesene Quelltext ist vollständig. Inhaltskoordinaten und Layoutänderungen zwischen Messen und Aufnahme prüfen, ohne den Ausschnitt auf Kopf oder Navigation auszuweiten.
+
 Größere Folgearbeiten zur sicheren Wiederherstellung sind in [Issue #26](https://github.com/matthiasgruenwald/moocp/issues/26) zur menschlichen Klärung gesammelt. Die dortige Reihenfolge gilt nach Abschluss des aktuellen PR.
 - Kompatiblität zu MacOS und Linux herstellen. Müssen einzelne Features wie auto update umgestaltet oder gar entfernt werden? Die Pfade für die Konfiguration und ablage der Skills - sind die gleich?
 - automatisches bauen und erstellen eines releases in github, mit Windows, linux und MacOS Executables (windows sogar installer) und changelog message als Release message
@@ -63,16 +66,13 @@ Im Testkurs (Präfix `ZZ`, Quelle und Ziel, nie ein Produktivkurs) nachprüfen:
   das dann als abgelehnt ein. Prüfen: Kommt bei einer Ablehnung wirklich der Text
   „in der App abgelehnt" zurück, und stoppt der Lauf dann die übrigen Ziele?
 - **#10 Wiederholungsschutz:** Dieselbe Datei für dasselbe Ziel gibt eine Rückfrage.
-  Offen bleibt die Messung der Rückfrage bei einer frischen Sicherung (ohne `datei`) über den Quellkurs; `erneut` bleibt entfallen.
+  Der Wiederholungsschutz über den Quellkurs ist mit eigenen ZZ-Lernlandkarten live gemessen: kein weiterer Import. `erneut` bleibt entfallen.
   `wiederherstellen_datei` schützt denselben Datei-/Zielauftrag zusätzlich durch den gespeicherten Vorgang;
   dieser Schutz ist über MCP mit einem lokalen HTTP-Doppel geprüft.
 - **#10 Protokoll `uebertragungen.json`:** Ungemessen, ob ein Abbruch mitten im Lauf
   die bis dahin geschriebenen Einträge erhält, und ob eine beschädigte Datei wirklich
   unverändert stehen bleibt.
-- **#10 Rundlauf A → Datei → B:** Nicht geprüft. Die Logik ist mit Fakes getestet; ein
-  echter Rundlauf über `sichern_auswahl` und `wiederherstellen_datei` fehlt. Der Ablauf
-  zwischen zwei Instanzen setzt voraus, dass beide denselben Sicherungsordner nutzen.
-  Das ist ungemessen.
+- **#10 Rundlauf A → Datei → B:** Für eigene ZZ-Textseiten samt Lernlandkarte mit gemeinsamem Sicherungsordner gemessen. Der allgemeine wort- und einstellungsgenaue Vergleich aller Aktivitätstypen bleibt offen (siehe Wiederherstellung unten).
 - **#10 Freigaben:** Ein Auftrag fragt einmal für alle Ziele, und jeder Schreibschritt
   fragt danach erneut. Offen, ob das für die Stufe „mittel" zu viel ist. Bei der
   Datei-Variante fehlt der Quellkurs, darum zeigt die Freigabe dort die einfachen
@@ -117,6 +117,18 @@ Wenn eine Aufgabe gelesen wird, müssen nicht nur Metadaten, sondern auch Daten 
 ## Kurskonventionen verwalten
 
 *Begriff:* Eine Kurskonvention ist alles, was im verborgenen Verzeichnis `CLAUDE` eines Kurses steht – `CLAUDE.md` mit Steckbrief und Regeln, dazu die Dateien daneben, für den ganzen Kurs (Abschnitt „Allgemeines") oder für einen Abschnitt. Sie gilt nur in diesem Kurs, und zwar so, wie sie dort steht (E17); woher sie kommt – selbst geschrieben, aus einer Vorlage, aus einem eigenen oder fremden Kurs, aus einer Datei –, ändert daran nichts, geändert wird sie im Kurs. Eine *Vorlage* ist eine Quelle für Kurskonventionen und gilt selbst nirgends. *Verwalten* heißt: Vorlagen anbieten – allgemeine je Schulform oder Fach mit den Skills (anonym, A11), schulspezifische bleiben in Moodle, etwa in einem Kurs der Fachgruppe –; übernehmen aus Vorlage, eigenem oder fremdem Kurs oder Datei, ganz oder in Teilen, mit Vergleich zur bestehenden Fassung und den Widersprüchen im Plan; weitergeben. Übernommenes bleibt Daten (A7): Verdachtsprüfung wie bei jeder Fassung, Zusatzdateien werden nie ausgeführt, und bei einem fremden Kurs zeigt der Plan alles, was übernommen wird. *Offen:* Kopie oder Verweis – sollen Kurse nachziehen, wenn sich die Vorlage der Fachgruppe ändert, und wird dafür die Herkunft vermerkt? Was ist übertragbar, was hängt am Kurs (im Steckbrief Jahrgang, Bildungsgang, Lehrbücher; die Regeln eines Abschnitts)? Welche Werkzeuge fehlen: `kurs_hinweise` liest und `claude_schreiben` schreibt `CLAUDE.md`; ob die Zusatzdateien mit `aktivitaet_lesen` und `aendern` von Kurs zu Kurs kommen, ist zu prüfen. Begriff und Bedienung dann in die README (Benutzerhandbuch) und nach `gemeinsam/kurshinweise.md`. *Prüfstein:* drei parallele Kurse je Jahrgang mit gemeinsamen Regeln und je eigenem Anforderungsniveau.
+
+## Lückenbefund: Gestaltungsstandard Informatik (Skill moodle)
+
+LÜCKENBEFUND
+Zum Nachrüsten: diesen Block unverändert im Projekt moocp einfügen.
+
+Skill:      moodle
+Art:        Typ nicht unterstützt
+Typ:        choicegroup (Gruppenwahl), lightboxgallery (Bildergalerie)
+Gefordert:  Beschreibung (intro) im Gestaltungsstandard ändern
+Anlass:     „Partnerzuordnung und Bildanleitung nach dem Gestaltungsstandard für Informatik umsetzen“
+Meldung:    Unbekannte Aktivitätsart "choicegroup" / "lightboxgallery". Coursepilot führt: label, page, url, folder, resource, choice, forum, assign, quiz.
 
 
 # Bugs
@@ -268,12 +280,14 @@ Nicht Teil dieses Umbaus (eigene Aufgabe):
 - Installer, Signierung, Notarisierung und Release-Bau für den Mac. Der Mac bleibt bei E24 ein Entwicklungsbau.
 
 ## Lernlandkarte (Ticket #23): offene Punkte
-- Ändern (Verknüpfungen der Orte setzen) geht nicht: Der Typ der Lernlandkarte steht nicht in `schreibbareModule`, `aendern` lehnt vor jeder Freigabe ab. Ungemessen ist, unter welchem Modulnamen sie in Moodle läuft; der Ticket-Test nutzt einen erfundenen Typ.
-- Entscheidung der Lehrkraft offen: Werkzeug für die Lernlandkarte nachrüsten (mit Messung im Testkurs) oder Verknüpfungen in der Moodle-Oberfläche setzen (A6). Ein Plugin scheidet nach E23 aus.
+- Ändern der Ortsziele ist mit #31 umgesetzt (`lernlandkarte_verknuepfungen_setzen`). Modulname `learningmap` und der native Formularvertrag sind auf der Spike-Instanz mit eigenen ZZ-Proben gemessen. Auf der zweiten Testinstanz geprüft (Debug-Testbindung mit Kursliste, eigene verborgene ZZ-Proben): Karte und zwei Zielseiten angelegt (`verified: true`), Ortsziele gesetzt und eines wieder gelöst (zweimal `verified: true`, frisch zurückgelesen), alles gelöscht, Restbestand gleich dem Ausgangsbestand. Der Lauf war vorher nicht „abgelehnt" wegen der Bindung: Bindung, Profilkennung und Kursliste waren richtig; fehlte nur die Pflichtdatei `backgroundfile` in der Vorlage (Moodle meldet „Sie müssen hier einen Wert eingeben"), und eine Karte braucht ein Hintergrundbild unter `bereiche/backgroundfile/`.
+- Unerklärt: Im ersten Lauf auf der zweiten Instanz meldete das Rücklesen einmal `verified: false`, obwohl ein frisches Lesen den gewünschten Stand zeigte; in zwei Wiederholungen mit einzelnen Teilprüfungen waren alle wahr. Die Ursache ist nicht gefunden; bei erneutem Auftreten die Teilprüfungen in `lernlandkarte_verknuepfungen_setzen` einzeln ausgeben.
+- Bildschirmfoto auf der zweiten Instanz: angesehen, aber nicht bestanden. Das Bild ist links abgeschnitten, vom Weg ist nur ein Stück zu sehen, kein Ort und keine Beschriftung; dieselbe Darstellungsstörung wie bei Textseiten auf dieser Instanz (siehe oben). Die Darstellung der Karte dort ist damit nicht geprüft.
+- Darstellung: Ein Ort erscheint in der Kartenansicht nur mit einem sichtbaren Ziel, seine Beschriftung ist dann der Name des Ziels (gemessen auf der Spike-Instanz; Orte ohne Ziel oder mit verborgenem Ziel fehlen im Bildschirmfoto, Wege bleiben sichtbar). Das Hintergrundbild einer App-Vorlage wird nicht gezeigt, weil die Vorlage nur ein Rechteck in der SVG zeichnet; ob die Vorlage das Bild einbinden soll, ist offen.
 - Auswahlfelder mit Zielen (etwa ein Ort) landen in `einstellungen.json` als Anzeigetext, nicht als Nummer. Zwei Aktivitäten mit gleichem Namen lassen sich dort nicht unterscheiden.
 - Verweise prüft die App nur in Textfeldern (`<feld>.html`), nicht in Auswahl- und Eingabefeldern.
 - Erhaltene, fehlende und „fremde" Ziele (in einem anderen Kurs) werden nicht unterschieden: `_zielTitel` liest nur den Titel. Titel werden für höchstens 10 Ziele außerhalb des Kurses abgerufen; darüber steht ein Hinweis.
-- Lehrkraft-Beobachtungen, nicht reproduziert und nicht gemessen: Verweise gehen beim Kopieren verloren; einmal die Warnung `Undefined array key "p1"`.
+- Die Lehrkraft-Beobachtung `Undefined array key "p1"` ist nicht reproduziert. Bei der gemessenen Themenverteilung blieben Ortsziele erhalten; die App prüft und setzt sie pro Zielkurs anhand der belegten Kopien. Das ersetzt keine allgemeine Verweisreparatur für beliebige Aktivitäten.
 - Quiz-Wiederherstellung (`get_questions_category()` mit `false`, MDL-89981): nicht geprüft, nicht Teil von #23.
 
 ## Aufräumen (Befunde aus dem Review, nicht behoben)

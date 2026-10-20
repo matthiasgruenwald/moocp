@@ -1,6 +1,19 @@
 # Changelog
 
 ## 0.9.23
+- Lernlandkarten: Vorhandene Zielaktivitäten lassen sich mit Inhaltsbelegen vorschlagen; fachliche Zuordnungen brauchen auch bei „keine“ eine Entscheidung und verfallen bei verändertem Inhalt.
+- Lernlandkarten: Ein Minutenwechsel bei ausgeschaltetem Abschlusstermin verhindert keine bestätigte Zielzuordnung mehr.
+- Debug-Testbetrieb: Vollständig geprüfte Kopien eigener ZZ-Proben lassen sich auch im gebundenen zweiten Profil automatisch nachbearbeiten und als Bild prüfen.
+- Unterrichtsverteilung: Lernlandkarten werden je Durchführungskurs auf die belegten Kopien neu verknüpft; offene Zuordnungen und Wiederholungen bleiben je Ziel erkennbar.
+- Wiederherstellung: Ein HTTP-Fehler beim Start bleibt unklar und löst keinen erneuten Start aus.
+- Lernlandkarten: Eine verborgene Karte lässt sich aus dem nativen Moodle-Formular anlegen; eine skriptfreie `lernlandkarte.json`-Vorlage kann Orte und Wege vorgeben, Ortsziele bleiben gezielt freigabegeschützt änderbar.
+- Lernlandkarten: Zieländerungen verfallen, wenn sich Karte, Kurs oder Ziel während der Freigabe ändern; die Rückleseprobe vergleicht SVG, Kartendaten, Einstellungen und übrige Inhalte.
+- Lernlandkarten: Nach dem Speichern meldet das Rücklesen `verified: true`, auch wenn Moodle die Ortsbeschriftung und die Hintergrunddatei neu ablegt; vorher stand dort fälschlich `false`.
+- Lernlandkarten: Das Rücklesen prüft Ortslabels gegen die Namen der neuen Ziele und freie SVG-Texte bleiben geschützt; eingebettete Bilder mit neuer Moodle-Entwurfs-ID verursachen keinen falschen Konflikt.
+- Debug-Testbetrieb: Eigene verborgene ZZ-Lernlandkarten lassen sich im gebundenen Testumfang ohne persönliche Freigabe ändern und als Bild prüfen.
+- Lernlandkarten: Anlegen, Ortsziele ändern, Rücklesen und Aufräumen sind auch auf der zweiten Testinstanz mit eigenen ZZ-Proben durchgespielt; das Bildschirmfoto zeigt dort die Karte nur abgeschnitten.
+- Debug-Testbetrieb: Gebundene Testprofile melden sich selbst an; automatische Freigaben einschließlich Inhaltsbildern bleiben auf erlaubte Testkurse und eigene verborgene ZZ-Textseiten begrenzt.
+- Änderungen speichern: Die Rückleseprobe wartet nicht mehr auf ihre eigene Ordnersperre.
 - Moodle-Profile: Ein nicht mehr benötigtes Profil lässt sich in den Einstellungen löschen; Anmeldung, gespeicherte Zugangsdaten und der Eintrag in Claude Code, Codex und LM Studio werden dabei entfernt, und bleibt einer stehen, sagt die App welcher.
 - Deinstallation: Die Einträge aller Moodle-Profile werden aus den KI-Werkzeugen entfernt, nicht nur der Eintrag „moodle“.
 - Übertragung: Prüfprobleme bleiben auch bei abgeschlossenen Zielen sichtbar; Zeitlimitantworten nennen den laufenden Vorgang und das passende Statuswerkzeug.

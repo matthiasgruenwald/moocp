@@ -21,6 +21,9 @@ while (($#)); do
   fi
 done
 printf 'MCP-Server läuft auf 127.0.0.1\n' >> "$MOOCP_TEST_LOG"
+if [[ -n "${MOOCP_TESTZUGANG_PROFILE:-}" ]]; then
+  python3 -c 'import json,os; print("\n".join("MCP-Server bereit ["+k+"]" for k in json.loads(os.environ["MOOCP_TESTZUGANG_PROFILE"]) if k != os.environ.get("MOOCP_FEHLEND")))' >> "$MOOCP_TEST_LOG"
+fi
 MOCK
 cat > "$MOCKS/pkill" <<'MOCK'
 #!/usr/bin/env bash
@@ -60,6 +63,15 @@ assert_no_test_args
 
 export MOOCP_TESTZUGANG_PROFILE='{"standard":{"file":"/tmp/testzugang.env","address":"https://moodle.schule.example"}}'
 assert_env_args 'MOOCP_TESTZUGANG_PROFILE={"standard":{"file":"/tmp/testzugang.env","address":"https://moodle.schule.example"}}'
+export MOOCP_TESTZUGANG_PROFILE='{"standard":{"file":"/tmp/testzugang.env","address":"https://moodle.schule.example"},"zweites":{"file":"/tmp/zweites.env","address":"https://zweite.schule.example"}}'
+assert_env_args 'MOOCP_TESTZUGANG_PROFILE='
+export MOOCP_FEHLEND=zweites
+if bash "$TEST_ROOT/mac_start.sh" > "$TEST_ROOT/start.log"; then
+  echo 'Ein fehlender zweiter Server wurde als bereit gemeldet' >&2
+  exit 1
+fi
+grep -q 'START-FEHLT' "$TEST_ROOT/start.log"
+unset MOOCP_FEHLEND
 unset MOOCP_TESTZUGANG_PROFILE
 
 export MOOCP_TESTZUGANG='/tmp/legacy-testzugang.env'

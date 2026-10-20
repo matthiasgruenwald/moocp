@@ -19,13 +19,12 @@
 // Benutzername und Passwort sofort entfernt.
 
 import 'dart:io';
-import 'dart:convert';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'profil.dart';
+import 'testzugang.dart';
 
 class Anmeldedaten {
   static const _merken = 'anmeldung.merken';
@@ -64,49 +63,10 @@ class Anmeldedaten {
 
   const Anmeldedaten(this.merken, this.benutzer, this.passwort);
 
-  /// Nur Debug-Bau: Testzugänge sind ausdrücklich Profilkennung und Moodle-Adresse zugeordnet.
-  static Map<String, ({String datei, String adresse})> get _testprofile {
-    if (!kDebugMode) return const {};
-    final result = <String, ({String datei, String adresse})>{};
-    final roh = Platform.environment['MOOCP_TESTZUGANG_PROFILE'];
-    if (roh != null && roh.isNotEmpty) {
-      final json = jsonDecode(roh);
-      if (json is! Map) throw const FormatException('MOOCP_TESTZUGANG_PROFILE muss ein JSON-Objekt sein.');
-      for (final entry in json.entries) {
-        final wert = entry.value;
-        if (entry.key is! String || (entry.key as String).isEmpty || wert is! Map ||
-            wert['file'] is! String || (wert['file'] as String).trim().isEmpty || wert['address'] is! String) {
-          throw const FormatException('MOOCP_TESTZUGANG_PROFILE enthält einen ungültigen Eintrag.');
-        }
-        final uri = Uri.tryParse(wert['address'] as String);
-        if (uri == null || _adresseSchluessel(uri) == null) {
-          throw const FormatException('MOOCP_TESTZUGANG_PROFILE enthält eine ungültige Moodle-Adresse.');
-        }
-        result[entry.key as String] = (datei: wert['file'] as String, adresse: uri.toString());
-      }
-    }
-    final datei = Platform.environment['MOOCP_TESTZUGANG'];
-    final adresse = Platform.environment['MOOCP_TESTZUGANG_ADRESSE'];
-    if (datei != null && datei.isNotEmpty && adresse != null && adresse.isNotEmpty) {
-      result.putIfAbsent(Profil.standardKennung, () => (datei: datei, adresse: adresse));
-    }
-    return result;
-  }
-
-  static String? _adresseSchluessel(Uri uri) {
-    if (!{'http', 'https'}.contains(uri.scheme.toLowerCase()) || uri.host.isEmpty ||
-        uri.userInfo.isNotEmpty || uri.query.isNotEmpty || uri.fragment.isNotEmpty ||
-        (uri.path.isNotEmpty && uri.path != '/')) {
-      return null;
-    }
-    return uri.replace(scheme: uri.scheme.toLowerCase(), host: uri.host.toLowerCase(),
-        path: uri.path.replaceFirst(RegExp(r'/+$'), '')).toString();
-  }
-
-  static String? _adresseSchluesselFuer(String adresse) {
-    final uri = Uri.tryParse(adresse.trim());
-    return uri == null ? null : _adresseSchluessel(uri);
-  }
+  static Map<String, ({String datei, String adresse})> get _testprofile => {
+    for (final t in Testzugang.ausUmgebung().values)
+      t.kennung: (datei: t.datei, adresse: t.adresse),
+  };
 
   static bool testzugangZuordnungPasst(Profil profil, Map<String, ({String datei, String adresse})> testprofile) =>
       _testprofilPasst(profil.kennung, profil.adresse, testprofile);
@@ -114,8 +74,8 @@ class Anmeldedaten {
   static bool _testprofilPasst(String kennung, String adresse, Map<String, ({String datei, String adresse})> testprofile) {
     final test = testprofile[kennung];
     if (test == null) return false;
-    final testAdresse = _adresseSchluesselFuer(test.adresse);
-    final profilAdresse = _adresseSchluesselFuer(adresse);
+    final testAdresse = Testzugang.adresseSchluessel(test.adresse);
+    final profilAdresse = Testzugang.adresseSchluessel(adresse);
     return testAdresse != null && profilAdresse != null && testAdresse == profilAdresse;
   }
 
@@ -124,7 +84,7 @@ class Anmeldedaten {
   static bool _testprofil(String kennung, String? adresse) =>
       adresse != null && _testprofilPasst(kennung, adresse, _testprofile);
 
-  /// Der Testzugang gehört zum ersten Profil ([Profil.standardKennung]).
+  /// Liest ausschließlich den ausdrücklich gebundenen Zugang dieses Profils.
   static Future<(String, String)?> _testzugang(String kennung, String? adresse) async {
     final test = _testprofile[kennung];
     if (test == null ||
@@ -152,11 +112,11 @@ class Anmeldedaten {
   }
 
   static Future<Anmeldedaten> laden({String kennung = Profil.standardKennung, String? adresse}) async {
+    final test = await _testzugang(kennung, adresse);
+    if (test != null) return Anmeldedaten(true, test.$1, test.$2);
     final prefs = await SharedPreferences.getInstance();
     final merken = prefs.getBool(_schluessel(_merken, kennung)) ?? false;
     if (!merken) return const Anmeldedaten(false, null, null);
-    final test = await _testzugang(kennung, adresse);
-    if (test != null) return Anmeldedaten(true, test.$1, test.$2);
     String? passwort;
     try {
       passwort = await _sicher.read(key: _schluessel(_passwort, kennung));
