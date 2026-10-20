@@ -41,6 +41,7 @@ class _Akt {
   String? placestore;
   String intro = '';
   String? html;
+  String format = '1';
   bool backgroundImage = false;
   int? completionMinute;
   String? idnummer;
@@ -280,7 +281,7 @@ class _Moodle {
         <input name="update" value="${x.cmid}"><input name="modulename" value="page"><input name="name" value="${x.name}">
         <input name="cmidnumber" value="${x.idnummer ?? ''}">
         <select name="visible"><option value="0" ${x.sichtbar ? '' : 'selected'}>Verborgen</option><option value="1" ${x.sichtbar ? 'selected' : ''}>Sichtbar</option></select>
-        <textarea name="page[text]">${const HtmlEscape().convert(x.html ?? '<p>${x.name}</p>')}</textarea><input name="page[format]" value="1"><input name="page[itemid]" value="9">
+        <textarea name="page[text]">${const HtmlEscape().convert(x.html ?? '<p>${x.name}</p>')}</textarea><input name="page[format]" value="${x.format}"><input name="page[itemid]" value="9">
         <div class="fitem row" id="fitem_id_completionexpected_minute"><div class="col-form-label">Erwarteter Abschluss</div><div class="felement"><input name="completionexpected[minute]" value="$erinnerungMinute"></div></div>
         ${erinnerungAktiv ? '<div class="fitem row" id="fitem_id_completionexpected_enabled"><div class="col-form-label">Abschluss aktiv</div><div class="felement"><input name="completionexpected[enabled]" value="1"></div></div>' : ''}
         <input type="submit" name="submitbutton" value="Speichern"></form>''',
@@ -500,7 +501,10 @@ class _Moodle {
                   sichtbar: f['visible'] != '0',
                 )
               : akt.firstWhere((a) => a.cmid == int.parse(f['update']!));
-          if (x.modul == 'page') x.html = f['page[text]'];
+          if (x.modul == 'page') {
+            x.html = f['page[text]'];
+            x.format = f['page[format]'] ?? x.format;
+          }
           x.intro = f['introeditor[text]'] ?? x.intro;
           if (x.modul == 'learningmap') {
             final vorherStore = x.placestore == null
@@ -636,6 +640,9 @@ void main() {
   late Profil profil;
   late MoodleZugang zugang;
   final freigabeTitel = <String>[];
+  final kartenAntworten = <bool>[];
+  var kartenDialoge = 0;
+  void Function()? beiKartenfreigabe;
   var kartenFreigabe = true;
   var normaleFreigabe = true;
   var testbindung = false;
@@ -683,6 +690,9 @@ void main() {
     // Mittlere Stufe: Übertragung, Sicherung, Wiederherstellung und jede Kartenänderung fragen.
     freigaben = Freigaben(Protokoll(), stufe: Bestaetigungen.mittel);
     freigabeTitel.clear();
+    kartenAntworten.clear();
+    kartenDialoge = 0;
+    beiKartenfreigabe = null;
     kartenFreigabe = true;
     normaleFreigabe = true;
     testbindung = false;
@@ -690,9 +700,17 @@ void main() {
       final a = freigaben.aktuell;
       if (a == null || !a.offen) return;
       freigabeTitel.add(a.titel);
+      final istKartenfreigabe = a.titel == 'Lernlandkarte ändern?';
       final ja =
           normaleFreigabe &&
-          (a.titel != 'Lernlandkarte ändern?' || kartenFreigabe);
+          (!istKartenfreigabe ||
+              (kartenDialoge < kartenAntworten.length
+                  ? kartenAntworten[kartenDialoge]
+                  : kartenFreigabe));
+      if (istKartenfreigabe) {
+        kartenDialoge++;
+        beiKartenfreigabe?.call();
+      }
       scheduleMicrotask(() => freigaben.entscheiden(ja));
     });
     zugang = await MoodleZugang.fuerTest(
@@ -837,10 +855,15 @@ void main() {
     final ergebnis = await client.tool('uebertragen', auftrag(ziele: [31]));
 
     expect(
-      moodle.akt.where((a) => a.kurs == 31 && a.modul == 'page' && a.name == 'ZZ Seite A'),
+      moodle.akt.where(
+        (a) => a.kurs == 31 && a.modul == 'page' && a.name == 'ZZ Seite A',
+      ),
       hasLength(3),
     );
-    expect(ergebnis, contains('Mehrere neue Aktivitäten belegen das Ziel identisch'));
+    expect(
+      ergebnis,
+      contains('Mehrere neue Aktivitäten belegen das Ziel identisch'),
+    );
     expect(ergebnis, contains('0 verknüpft, 1 offen'));
     final karte = inZiel(31, 'learningmap', 'ZZ Karte');
     expect(links(karte)['p1'], moodle.seiteA.cmid);
@@ -1006,7 +1029,7 @@ void main() {
   test(
     'Ablehnung der ersten Karte stoppt alle folgenden Karten und Zielkurse',
     () async {
-      kartenFreigabe = false;
+      kartenAntworten.addAll([false, true]);
       final ergebnis = await client.tool(
         'uebertragen',
         auftrag(ziele: [31, 32]),
@@ -1016,6 +1039,8 @@ void main() {
       expect(moodle.startsJeZiel, {31: 1});
       expect(moodle.restoreStarts, 1);
       expect(moodle.kartenSpeicherungen, 0);
+      expect(kartenDialoge, 1);
+      expect(ergebnis, contains('nicht begonnen'));
       expect(
         moodle.akt.where((a) => a.kurs == 31 && a.modul == 'learningmap'),
         hasLength(2),
@@ -1023,6 +1048,46 @@ void main() {
       expect(moodle.akt.where((a) => a.kurs == 32 && a.cmid < 5000), isEmpty);
     },
   );
+
+  test(
+    'ändert sich Zielinhalt während Kartenfreigabe, wird nicht verknüpft',
+    () async {
+      beiKartenfreigabe = () {
+        for (final a in moodle.akt.where(
+          (a) => a.kurs == 31 && a.modul == 'page' && a.cmid >= 1000,
+        )) {
+          a.html = '<p>Inhalt während der Freigabe geändert</p>';
+        }
+      };
+      final ergebnis = await client.tool('uebertragen', auftrag(ziele: [31]));
+
+      expect(ergebnis, contains('offen'));
+      expect(
+        ergebnis,
+        contains('Inhalt des Zieles hat sich seit der Kopierprüfung geändert'),
+      );
+      expect(moodle.kartenSpeicherungen, 0);
+      expect(kartenDialoge, 2);
+    },
+  );
+
+  test('anderes Editorformat verhindert Kartenverknüpfung', () async {
+    beiKartenfreigabe = () {
+      for (final a in moodle.akt.where(
+        (a) => a.kurs == 31 && a.modul == 'page' && a.cmid >= 1000,
+      )) {
+        a.format = '2';
+      }
+    };
+    final ergebnis = await client.tool('uebertragen', auftrag(ziele: [31]));
+
+    expect(ergebnis, contains('offen'));
+    expect(
+      ergebnis,
+      contains('Inhalt des Zieles hat sich seit der Kopierprüfung geändert'),
+    );
+    expect(moodle.kartenSpeicherungen, 0);
+  });
 
   test('während der Kartenfreigabe ist das kopierte Ziel dauerhaft als ausstehend gespeichert', () async {
     final staende = <String>[];
@@ -1037,7 +1102,7 @@ void main() {
     });
     kartenFreigabe = false;
     final ergebnis = await client.tool('uebertragen', auftrag(ziele: [31]));
-    expect(staende, ['ausstehend', 'ausstehend']);
+    expect(staende, ['ausstehend']);
     expect(ergebnis, contains('1 offen'));
     expect(moodle.restoreStarts, 1);
   });

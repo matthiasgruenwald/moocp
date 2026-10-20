@@ -214,6 +214,7 @@ class OrtZuordnung {
     this.zielName, {
     this.neuesZiel,
     this.grund,
+    this.quellFormularstand,
   });
 
   final String ort;
@@ -221,6 +222,7 @@ class OrtZuordnung {
   final String? zielName;
   final int? neuesZiel;
   final String? grund;
+  final String? quellFormularstand;
 }
 
 /// Die Zuordnung einer Karte in einem Zielkurs. [zielKarte] ist null, wenn die
@@ -375,6 +377,7 @@ List<KartenZuordnung> kartenZuordnen(
                         o.quellZiel,
                         o.zielName,
                         neuesZiel: neu,
+                        quellFormularstand: o.formularstand,
                       );
               }(),
         ], grund: kopie == null ? grund : null);
@@ -564,6 +567,32 @@ Future<KartenErgebnis> kartenVerknuepfen(
         cmid: karte,
         name: zielName,
         pruefeBindung: pruefeBindung,
+        pruefeZielInhalte: () async {
+          for (final ort in aendern) {
+            final zielCmid = ort.neuesZiel;
+            final erwartet = ort.quellFormularstand;
+            if (zielCmid == null || erwartet == null) {
+              throw MoodleFehler(
+                'Der Inhaltsbeleg eines Verknüpfungsziels fehlt. Nichts geändert.',
+              );
+            }
+            final zielFormular = Formularziel.aktivitaet(zielCmid);
+            final zielForm = await formularHolen(moodle, zielFormular.adresse);
+            final zielLesung = await formularLesen(
+              moodle,
+              zielFormular,
+              arbeitsordner,
+            );
+            if (zielForm.kurs != kurs ||
+                zielForm.modul == 'learningmap' ||
+                zielForm.name != ort.zielName ||
+                formularInhaltsstand(zielLesung) != erwartet) {
+              throw MoodleFehler(
+                'Der Inhalt des Zieles hat sich seit der Kopierprüfung geändert. Nichts verknüpft; neu prüfen.',
+              );
+            }
+          }
+        },
         zuordnungen: [
           for (final o in aendern)
             {'ort': o.ort, 'aktuell': aktuell[o.ort] ?? 0, 'ziel': o.neuesZiel},

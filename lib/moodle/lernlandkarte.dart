@@ -119,6 +119,7 @@ Future<String> lernlandkarteVerknuepfungenSetzen(
   required String name,
   required List<Map<String, Object?>> zuordnungen,
   void Function()? pruefeBindung,
+  Future<void> Function()? pruefeZielInhalte,
 }) async {
   if (zuordnungen.isEmpty) {
     throw MoodleFehler('Mindestens eine Ortszuordnung angeben.');
@@ -275,6 +276,7 @@ Future<String> lernlandkarteVerknuepfungenSetzen(
       'neu lesen und die Entscheidung erneut prüfen.',
     );
   }
+  await pruefeZielInhalte?.call();
   final store = Map<String, dynamic>.from(daten);
   final places = (store['places'] as List).whereType<Map>().toList();
   for (final a in zuordnungen) {
@@ -365,8 +367,9 @@ String? formularInhaltsstand(FormularGelesen f) {
     'felder': [
       for (final feld in f.felder)
         if (feld.feld != 'svgcode' && feld.feld != 'placestore')
-        [feld.feld, _vergleichHtml(feld.feld, feld.html)],
+          [feld.feld, _vergleichHtml(feld.feld, feld.html)],
     ],
+    'editorFormate': f.editorFormate,
     'einstellungen': {
       for (final e in f.einstellungen)
         if (!{'visible', 'backgroundfile', 'svgcode'}.contains(e.schluessel))

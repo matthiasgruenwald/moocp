@@ -203,6 +203,7 @@ class FormularGelesen {
     this.lernlandkarte,
     this.lernlandkarteTitel = const {},
     this.lernlandkarteZielstatus = const {},
+    this.editorFormate = const {},
   });
   final Formularziel ziel;
   final List<Einstellung> einstellungen;
@@ -225,6 +226,7 @@ class FormularGelesen {
   final Map<String, Object?>? lernlandkarte;
   final Map<int, (String, String)> lernlandkarteTitel;
   final Map<int, String> lernlandkarteZielstatus;
+  final Map<String, String> editorFormate;
 
   String zusammenfassung() {
     final b = StringBuffer()
@@ -625,6 +627,19 @@ Future<FormularGelesen> formularLesenOhneSperre(
     encoding: utf8,
   );
   final einstellungen = einstellungenLesen(form);
+  final editorFormate = <String, String>{};
+  for (final text in form.querySelectorAll('textarea[name\$="[text]"]')) {
+    final textName = text.attributes['name'];
+    if (textName == null) continue;
+    final formatName = textName.replaceFirst(RegExp(r'\[text\]$'), '[format]');
+    final format = form.querySelector('[name="$formatName"]');
+    final wert =
+        format?.querySelector('option[selected]')?.attributes['value'] ??
+        format?.attributes['value'] ??
+        format?.querySelector('option')?.attributes['value'] ??
+        format?.text;
+    if (wert != null) editorFormate[textName] = wert;
+  }
   final einstellungenJson = const JsonEncoder.withIndent('  ')
       .convert([for (final e in einstellungen) e.toJson()]);
   // Oben zum Lesen; in .stand für den Vergleich beim Ändern (hat jemand anderes
@@ -771,6 +786,7 @@ Future<FormularGelesen> formularLesenOhneSperre(
     lernlandkarte: karte,
     lernlandkarteTitel: titel,
     lernlandkarteZielstatus: lernlandkarteZielstatus,
+    editorFormate: editorFormate,
   );
   await File(p.join(ziel0.path, 'uebersicht.json')).writeAsString(
     const JsonEncoder.withIndent('  ').convert({

@@ -371,6 +371,7 @@ extension _Uebertragung on McpDienst {
           );
         }
       }
+
       for (final kandidat in kandidaten) {
         await belegLesen(kandidat);
       }
@@ -397,17 +398,29 @@ extension _Uebertragung on McpDienst {
         belege: belege,
       );
       final ergebnisse = <KartenErgebnis>[];
-      for (final zu in zuordnungen) {
-        ergebnisse.add(
-          await kartenVerknuepfen(
-            moodle,
-            freigaben,
-            arbeitsordner: arbeitsordner,
-            kurs: z.kurs,
-            zuordnung: zu,
-            pruefeBindung: pruefeKartenBindung,
-          ),
+      for (var i = 0; i < zuordnungen.length; i++) {
+        final zu = zuordnungen[i];
+        final ergebnis = await kartenVerknuepfen(
+          moodle,
+          freigaben,
+          arbeitsordner: arbeitsordner,
+          kurs: z.kurs,
+          zuordnung: zu,
+          pruefeBindung: pruefeKartenBindung,
         );
+        ergebnisse.add(ergebnis);
+        if (ergebnis.freigabeAbgelehnt) {
+          for (final nichtBegonnen in zuordnungen.skip(i + 1)) {
+            ergebnisse.add(
+              KartenErgebnis(
+                KartenStand.offen,
+                'Lernlandkarte „${nichtBegonnen.quelle.name}“ nicht begonnen: '
+                'Die Freigabe der vorherigen Karte wurde abgelehnt.',
+              ),
+            );
+          }
+          break;
+        }
       }
       final stand = ergebnisse.any((e) => e.stand == KartenStand.unklar)
           ? KartenStand.unklar
