@@ -1,6 +1,7 @@
 # Changelog
 
 ## 0.9.23
+- Wiederherstellung: Hält Moodle nach dem Prüfen mit der Seite „Rollenzuordnungen“ an, bestätigt die App die Vorgabe einmal; vorher blieb der Vorgang ohne Fehlermeldung auf „wartet“ stehen.
 - Wiederherstellung: Das Protokoll zeigt den Aufbau der Antwort auf den Start und die Rohwerte des Fortschritts (nur Zahlen und Feldnamen), damit eine nicht startende Wiederherstellung erkennbar wird.
 - Lernlandkarten: Eine Karte, deren Ortsziele Moodle als Text speichert, lässt sich wieder lesen (vorher Fehler beim Lesen, auch beim Verschieben in eine andere Instanz).
 - Mac: Die App startet per Doppelklick auf `moocp-starten.command` und baut sich bei Bedarf selbst.
