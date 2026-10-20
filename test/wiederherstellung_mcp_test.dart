@@ -38,6 +38,8 @@ class _Moodle {
   bool sichtbar = false;
   int verbergen = 0;
   bool rollenSeite = false;
+  String? rollenSonderfall;
+  bool uploadFormularFehlt = false;
   int rollenBestaetigt = 0;
   List<String> weitereQuizze = [];
   static const restore = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
@@ -156,11 +158,12 @@ class _Moodle {
           await r.response.close();
           return;
         }
-        final upload = form({'_qf__course_restore_form': '1', 'backupfile': '9'}, path: path);
+        final upload = uploadFormularFehlt ? '' : form({'_qf__course_restore_form': '1', 'backupfile': '9'}, path: path);
+        final anderesFormular = form({'anderes_feld': 'technisch'}, path: path);
         final link = linkAvailable
             ? '<a href="/pluginfile.php/55/user/backup/1/download.mbz?forcedownload=1">download.mbz</a>'
             : '';
-        answer = '$upload<script>var repo = {"id":4,"type":"upload"};</script>$link';
+        answer = '$anderesFormular$upload<script>var repo = {"id":4,"type":"upload"};</script>$link';
       } else if (path == '/backup/restore.php') {
         if (r.method == 'GET') {
           answer = form({'contextid': '55', 'filename': 'abc', 'stage': '2'});
@@ -168,12 +171,18 @@ class _Moodle {
           writes++;
           final f = Uri.splitQueryString(body);
           if (f.containsKey('_qf__restore_review_form') && rollenSeite) {
-            answer = form({'restore': restore, 'stage': '32', 'substage': 'rolemapping', 'mapping5': '5'});
+            answer = form({
+              'restore': restore, 'stage': '32', 'substage': 'rolemapping',
+              'mapping5': rollenSonderfall == 'leer' ? '' : '5',
+              if (rollenSonderfall == 'zusatzfeld') 'unerwartet': '1',
+            });
           } else if (f.containsKey('substage')) {
             rollenBestaetigt++;
             starts++;
             if (completeOnStart) completed = true;
-            answer = page('Gestartet');
+            answer = rollenSonderfall == 'erneut'
+                ? form({'restore': restore, 'stage': '32', 'substage': 'rolemapping', 'mapping5': '5'})
+                : page('Gestartet');
           } else if (f.containsKey('_qf__restore_review_form')) {
             starts++;
             if (completeOnStart) completed = true;
@@ -327,6 +336,16 @@ void main() {
     final tool = (list['tools'] as List).cast<Map>().singleWhere((t) => t['name'] == 'wiederherstellen_datei');
     expect(tool['annotations']['readOnlyHint'], false);
     expect(tool['annotations']['destructiveHint'], true);
+  });
+
+  test('fehlendes Upload-Formular wird vor dem Hochladen mit Feldnamen gemeldet', () async {
+    external.uploadFormularFehlt = true;
+    final result = await client.tool('wiederherstellen_datei', arguments);
+    expect(result, contains('kein Formular mit dem Feld backupfile'));
+    expect(result, contains('anderes_feld'));
+    expect(result, isNot(contains('technisch')));
+    expect(external.writes, 0);
+    expect(external.starts, 0);
   });
 
   test('Wiederherstellung behält ohne Sichtbarkeitswahl die Quelle und benennt die Prüfgrenze', () async {
@@ -768,6 +787,24 @@ void main() {
     expect(external.starts, 1);
     expect(result, contains('1 fertig'));
   });
+
+  for (final fall in ['leer', 'zusatzfeld', 'erneut']) {
+    test('Rollenzuordnung $fall wird nicht blind bestätigt oder wiederholt', () async {
+      external.rollenSeite = true;
+      external.rollenSonderfall = fall;
+      external.progress = {'unexpected': true};
+      final result = await client.tool('wiederherstellen_datei', arguments);
+      expect(external.rollenBestaetigt, fall == 'erneut' ? 1 : 0);
+      expect(result, contains(switch (fall) {
+        'leer' => 'Unklar',
+        'zusatzfeld' => 'Gesperrt',
+        _ => 'Rollenzuordnung erneut',
+      }));
+      final v = (await Vorgaenge(folder.path, profilKennung: profile.kennung).alle()).single;
+      expect(v.wiederherstellung, WiederherstellungStand.unklar);
+      expect(v.verified, isFalse);
+    });
+  }
 
   test('Übertragungszeitlimit beim Sichern nennt Sicherungsnummer und Statuswerkzeug', () async {
     external.hold = Completer<void>();

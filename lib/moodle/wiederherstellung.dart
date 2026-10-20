@@ -920,6 +920,9 @@ Future<String> _gegenlesen(
     ?schreibPruefluecke,
   ].join(' ');
   final text = zusatz.isEmpty ? basis : '$basis $zusatz';
+  final pruefbefund = verifiziert
+      ? (verbergen ? 'verborgen: verified; verified: true' : 'verified: true (ohne Sichtbarkeit und Voraussetzungen)')
+      : 'verified: false; nicht verifiziert: Zuordnung, Sichtbarkeitswahl oder Anhänge/Vergleich nicht bestätigt, siehe Prüfbefund';
   if (fehler != null) {
     // Moodle meldete einen Fehler: Ob er den Inhalt betrifft, zeigt nur der Vergleich mit der Quelle.
     final abweichungen = [
@@ -944,17 +947,11 @@ Future<String> _gegenlesen(
         '(soweit geprüft).';
     final fertigText = '$kopf $text';
     await _uebergang(vorgaenge, vg, WiederherstellungStand.fertig, text: fertigText, verified: verifiziert);
-    final befundZeile = verifiziert
-        ? (verbergen ? 'verborgen: verified; verified: true' : 'verified: true (ohne Sichtbarkeit und Voraussetzungen)')
-        : 'nicht verifiziert: Prüflücken oder Ungeprüftes bleiben offen, siehe unten';
-    return '$kopf Wiederhergestellt (Nummer ${vg.id}): ${neue.isEmpty ? 'keine neuen Aktivitäten' : liste}. $befundZeile.'
+    return '$kopf Wiederhergestellt (Nummer ${vg.id}): ${neue.isEmpty ? 'keine neuen Aktivitäten' : liste}. $pruefbefund.'
         '${zusatz.isEmpty ? '' : ' $zusatz'}';
   }
   await _uebergang(vorgaenge, vg, WiederherstellungStand.fertig, text: text, verified: verifiziert);
-  final befund = verifiziert
-      ? (verbergen ? 'verborgen: verified; verified: true' : 'verified: true (ohne Sichtbarkeit und Voraussetzungen)')
-      : 'verified: false; Zuordnung, Sichtbarkeitswahl oder Anhänge/Vergleich nicht bestätigt, siehe Zustand oben';
-  return 'Wiederhergestellt (Nummer ${vg.id}): ${neue.isEmpty ? 'keine neuen Aktivitäten' : liste}. $befund.'
+  return 'Wiederhergestellt (Nummer ${vg.id}): ${neue.isEmpty ? 'keine neuen Aktivitäten' : liste}. $pruefbefund.'
       '${zusatz.isEmpty ? '' : ' $zusatz'}';
 }
 

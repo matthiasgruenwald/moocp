@@ -1166,8 +1166,9 @@ class MoodleZugang {
             ohneNutzerdaten(f),
       ),
     // Rollenzuordnung nach dem Prüfen (gemessen auf einer Produktivinstanz): Moodle hält
-    // an und wartet auf „Weiter". Nur die Felder dieser Seite, nur Zahlen als
-    // Rollennummern; es werden keine Nutzerdaten gelesen oder gesendet.
+    // an und wartet auf „Weiter". Nur die Felder dieser Seite; Moodle kann
+    // technische Zuordnungskennungen statt reiner Rollennummern verwenden.
+    // Die Werte bleiben auf kurze Kennungen begrenzt, Nutzerdaten ausgeschlossen.
     Erlaubt(
       'POST',
       r'^/backup/restore\.php$',

@@ -273,10 +273,9 @@ class Formular {
   };
 }
 
-///
 /// [mitFeld] wählt unter mehreren Formularen der Seite das, das dieses Feld
-/// trägt; sonst gilt das Hauptformular (E17: die Seite ist maßgeblich, nicht
-/// die Reihenfolge der Formulare).
+/// trägt; fehlt es, bricht die Auswahl ab. Ohne Feldwahl gilt das Hauptformular
+/// (E17: die Seite ist maßgeblich, nicht die Reihenfolge der Formulare).
 Future<Formular> formularHolen(
   MoodleZugang moodle,
   String adresse, {
@@ -294,17 +293,20 @@ Future<Formular> formularHolen(
     );
   }
   final doc = html_parser.parse(r.text);
-  final form =
-      (mitFeld == null
-          ? null
-          : doc
-                .querySelectorAll('form')
-                .where(
-                  (f) => f.querySelector('[name="$mitFeld"]') != null,
-                )
-                .firstOrNull) ??
-      hauptformular(doc);
+  final form = mitFeld == null
+      ? hauptformular(doc)
+      : doc.querySelectorAll('form')
+          .where((f) => f.querySelector('[name="$mitFeld"]') != null)
+          .firstOrNull;
   if (form == null) {
+    if (mitFeld != null) {
+      // Nur Feldnamen, keine Inhalte oder Formularwerte (E11).
+      final namen = doc.querySelectorAll('form [name]')
+          .map((e) => e.attributes['name']!)
+          .toSet().take(30).join(', ');
+      throw MoodleFehler('Moodle liefert kein Formular mit dem Feld $mitFeld '
+          '(Felder: $namen). Nichts geändert.');
+    }
     throw MoodleFehler(
       'Moodle liefert kein Bearbeitungsformular (HTTP ${r.status}). Gibt es das '
       'Ziel, und darf diese Sitzung es bearbeiten?',
