@@ -18,6 +18,7 @@ class TestMoodle {
   late HttpServer server;
   bool vorhanden = false;
   bool globaleSuche = false;
+  String suchformularAttribute = 'class="mform d-flex flex-wrap align-items-center searchform-navbar" action="/search/index.php"';
   bool bearbeitungsformularFehlt = false;
   Completer<void>? wartet;
   Completer<void>? fortsetzen;
@@ -59,7 +60,7 @@ class TestMoodle {
 
   String seite(String text) =>
       '<script>M.cfg = {"sesskey":"sk","courseId":12,"contextid":"55"};</script>'
-      '${globaleSuche ? '<form class="mform d-flex flex-wrap align-items-center searchform-navbar" action="/search/index.php"><input type="hidden" name="context" value="55"><input name="q"><button type="submit">Suchen</button></form>' : ''}$text';
+      '${globaleSuche ? '<form $suchformularAttribute><input type="hidden" name="context" value="55"><input name="q"><button type="submit">Suchen</button></form>' : ''}$text';
   Future<void> starten() async {
     server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     server.listen((r) async {
@@ -379,9 +380,15 @@ void main() {
     );
   });
 
-  for (final suche in [true, false]) {
-    test('Aktivität mit globaler Suche $suche wird über MCP gelesen und geändert', () async {
-      extern.globaleSuche = suche;
+  for (final fall in <String, String?>{
+    'mit Suchklasse und Suchpfad': 'class="mform searchform-navbar" action="/search/index.php"',
+    'ohne Suchleiste': null,
+    'nur mit Suchpfad, Installationspräfix und Query': 'class="mform" action="/moodle/search/index.php?context=55"',
+    'nur mit Suchklasse': 'class="mform searchform-navbar" action="/suche"',
+  }.entries) {
+    test('Aktivität ${fall.key} wird über MCP gelesen und geändert', () async {
+      extern.globaleSuche = fall.value != null;
+      if (fall.value != null) extern.suchformularAttribute = fall.value!;
       extern.vorhanden = true;
       freigaben.stufe = Bestaetigungen.keine;
       await starten();
