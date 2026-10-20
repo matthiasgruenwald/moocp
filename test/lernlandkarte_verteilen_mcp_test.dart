@@ -42,7 +42,7 @@ class _Akt {
   String intro = '';
   String? html;
   String svgcode =
-      '<svg><circle id="p1" cx="120"/><circle id="p2" cx="480"/><title id="titlep1">ZZ Karte</title></svg>';
+      '<svg><circle id="p1" cx="120"/><circle id="p2" cx="480"/><title id="titlep1">ZZ Karte</title><text id="textp1">ZZ Karte</text><title id="titlep2">ZZ Karte</title><text id="textp2">ZZ Karte</text></svg>';
 }
 
 const _sk = 'sk';
@@ -460,6 +460,22 @@ class _Moodle {
           if (x.modul == 'learningmap') {
             x.placestore = f['placestore'];
             x.svgcode = f['svgcode']!;
+            final karte = jsonDecode(x.placestore!) as Map;
+            for (final ort in karte['places'] as List) {
+              final cmid = (ort['linkedActivity'] as num?)?.toInt();
+              if (cmid == null) continue;
+              final ziel = akt.firstWhere((a) => a.cmid == cmid);
+              final id = RegExp.escape('${ort['id']}');
+              for (final tag in ['title', 'text']) {
+                final beschriftung = RegExp(
+                  '(<$tag id="$tag$id"[^>]*>)[^<]*(</$tag>)',
+                );
+                x.svgcode = x.svgcode.replaceAllMapped(
+                  beschriftung,
+                  (m) => '${m[1]}${ziel.name}${m[2]}',
+                );
+              }
+            }
             kartenSpeicherungen++;
           }
           r.response.redirect(
@@ -700,7 +716,7 @@ void main() {
       expect((store['places'] as List)[2]['placecolor'], 'red');
       expect(
         moodle.svgFuer(karte),
-        '<svg><circle id="p1" cx="120"/><circle id="p2" cx="480"/><title id="titlep1">ZZ Karte</title></svg>',
+        '<svg><circle id="p1" cx="120"/><circle id="p2" cx="480"/><title id="titlep1">ZZ Seite A</title><text id="textp1">ZZ Seite A</text><title id="titlep2">ZZ Seite B</title><text id="textp2">ZZ Seite B</text></svg>',
       );
       // Alles Kopierte bleibt verborgen; die Karte wird nie sichtbar.
       expect([a, b, karte].every((x) => !x.sichtbar), isTrue);
@@ -1102,7 +1118,19 @@ void main() {
         },
       ],
     });
-    expect(kopieLink, contains('verified: true'), reason: kopieLink);
+    expect(
+      kopieLink,
+      contains('verified: false'),
+      reason: 'Nach dem Entkoppeln gibt es keinen belegten Zielnamen.',
+    );
+    final kopierterStore =
+        jsonDecode(kartenKopie.placestore!) as Map<String, dynamic>;
+    expect(
+      (kopierterStore['places'] as List).singleWhere(
+        (ort) => (ort as Map)['id'] == 'p2',
+      ),
+      isNot(contains('linkedActivity')),
+    );
     expect(kopieLink, contains('automatisch freigegeben'));
     expect(freigabeTitel, isEmpty);
     final kopie = inZiel(31, 'page', 'ZZ Eigene A');
@@ -1209,7 +1237,12 @@ void main() {
           ],
         },
       );
-      expect(gesetzt, contains('verified: true'), reason: gesetzt);
+      expect(
+        gesetzt,
+        contains('verified: false'),
+        reason:
+            'Für die entkoppelte Ortsbeschriftung ist kein Zielname belegt.',
+      );
       expect(gesetzt, contains('automatisch freigegeben'));
       final nummer = RegExp(r'Nummer ([a-z0-9]+)')
           .firstMatch(uebernommen)!
