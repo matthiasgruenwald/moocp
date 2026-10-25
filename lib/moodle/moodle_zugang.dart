@@ -671,6 +671,67 @@ class MoodleZugang {
       formular: (f) =>
           _zahl(wertIn(f, 'id')) && f.any((e) => e.key.startsWith('_qf__')),
     ),
+    // Gruppierungen (E33): lesen nur Namen; die Seiten index, members und
+    // overview zeigen Mitglieder und bleiben gesperrt. Geschrieben wird nur
+    // Neues (id 0) und das Zuordnen von Gruppen -- nie Entfernen, Umbenennen
+    // oder Löschen.
+    Erlaubt(
+      'GET',
+      r'^/group/groupings\.php$',
+      'Gruppierungen eines Kurses (nur Namen)',
+      parameter: (q) => q.length == 1 && _zahl(q['id']),
+    ),
+    Erlaubt(
+      'GET',
+      r'^/group/grouping\.php$',
+      'Gruppierung: Formular lesen',
+      parameter: (q) => q.length == 1 && (_zahl(q['id']) || _zahl(q['courseid'])),
+    ),
+    Erlaubt(
+      'GET',
+      r'^/group/group\.php$',
+      'Neue Gruppe: Formular lesen',
+      parameter: (q) => q.length == 1 && _zahl(q['courseid']),
+    ),
+    Erlaubt(
+      'GET',
+      r'^/group/assign\.php$',
+      'Gruppen einer Gruppierung (nur Namen)',
+      parameter: (q) => q.length == 1 && _zahl(q['id']),
+    ),
+    Erlaubt(
+      'POST',
+      r'^/group/grouping\.php$',
+      'Neue Gruppierung speichern',
+      parameter: (q) => _nurSchluessel(q, {'courseid', 'id'}),
+      formular: (f) =>
+          wertIn(f, '_qf__grouping_form') != null &&
+          wertIn(f, 'id') == '0' &&
+          _zahl(wertIn(f, 'courseid')),
+    ),
+    Erlaubt(
+      'POST',
+      r'^/group/group\.php$',
+      'Neue Gruppe speichern',
+      parameter: (q) => _nurSchluessel(q, {'courseid', 'id'}),
+      formular: (f) =>
+          wertIn(f, '_qf__group_form') != null &&
+          wertIn(f, 'id') == '0' &&
+          _zahl(wertIn(f, 'courseid')),
+    ),
+    Erlaubt(
+      'POST',
+      r'^/group/assign\.php$',
+      'Gruppen einer Gruppierung zuordnen (nur Hinzufügen)',
+      parameter: (q) => q.isEmpty || _nurSchluessel(q, {'id'}),
+      formular: (f) =>
+          _zahl(wertIn(f, 'id')) &&
+          _gesetzt(wertIn(f, 'sesskey')) &&
+          wertIn(f, 'add') != null &&
+          wertIn(f, 'remove') == null &&
+          f.where((e) => e.key == 'addselect[]').every((e) => _zahl(e.value)) &&
+          f.every((e) => e.key != 'removeselect[]'),
+    ),
     Erlaubt(
       'POST',
       r'^/question/bank/exportquestions/export\.php$',

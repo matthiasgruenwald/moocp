@@ -440,6 +440,26 @@ void main() {
     expect(extern.gruppierung, '9');
   });
 
+  test('Eine fehlende Gruppierung bricht nicht still ab, sondern stellt die Rückfrage', () async {
+    await collaboraLesen();
+    final text = await client.tool('aendern', {
+      'ordner': 'cm-70',
+      'einstellungen': {'groupmode': 'Getrennte Gruppen', 'groupingid': 'ZZ Gibt es nicht'},
+    });
+    expect(
+      text,
+      allOf(
+        contains('Rückfrage an die Lehrkraft'),
+        contains('„ZZ Gibt es nicht" gibt es in Kurs 12 nicht'),
+        contains('ZZ Projektgruppen'),
+        contains('gruppierung_anlegen'),
+        contains('Nichts gespeichert'),
+      ),
+    );
+    expect(extern.formularSpeicherungen, 0);
+    expect(extern.gruppierung, '0');
+  });
+
   for (final fall in [
     'Text',
     'Name',

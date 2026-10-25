@@ -33,6 +33,7 @@ import '../moodle/formular_lesen.dart';
 import '../moodle/formular_schreiben.dart';
 import '../moodle/fortschrittsliste.dart';
 import '../moodle/fragen.dart';
+import '../moodle/gruppierung.dart';
 import '../moodle/kurs.dart';
 import '../moodle/kurs_aendern.dart';
 import '../moodle/kursfilter.dart';
@@ -1872,6 +1873,50 @@ class McpDienst {
       pflicht: ['kurs'],
       nurLesen: true,
       ausfuehren: (a) => kursFilter(moodle, _zahl(a, 'kurs')),
+    );
+
+    _aufrufe.registrieren(
+      server,
+      'gruppierungen_lesen',
+      titel: 'Gruppierungen eines Kurses',
+      beschreibung:
+          'Zeigt die Gruppierungen eines Kurses mit den Namen ihrer Gruppen -- nur Namen, nie Mitglieder. '
+          'Gruppen und Gruppierungen werden bei Sicherung und Wiederherstellung nicht mitgenommen; im Quellkurs '
+          'zeigt dieses Werkzeug, was im Zielkurs gebraucht wird. Eine Aktivität zeigt ihre Gruppierung in '
+          'aktivitaet_lesen (Einstellung groupingid). Nur lesen.',
+      parameter: {'kurs': _kurs},
+      pflicht: ['kurs'],
+      nurLesen: true,
+      ausfuehren: (a) => gruppierungenLesenText(moodle, _zahl(a, 'kurs')),
+    );
+
+    _aufrufe.registrieren(
+      server,
+      'gruppierung_anlegen',
+      titel: 'Gruppierung anlegen',
+      beschreibung:
+          'Legt in einem Kurs eine neue Gruppierung an, legt die genannten Gruppen an, soweit es sie im Kurs '
+          'noch nicht gibt, und ordnet sie der Gruppierung zu. Ohne Mitglieder. Erst aufrufen, wenn die '
+          'Lehrkraft gefragt wurde und zugestimmt hat -- aendern bricht bei einer fehlenden Gruppierung mit '
+          'genau dieser Rückfrage ab. Die Gruppen der Quelle zeigt gruppierungen_lesen im Quellkurs. '
+          'Gibt es die Gruppierung schon, ändert das Werkzeug nichts. Danach groupingid mit aendern setzen. '
+          'Nach Freigabe in der App; zurückgelesen wird die Gruppierung mit ihren Gruppen (verified).',
+      parameter: {
+        'kurs': _kurs,
+        'name': JsonSchema.string(description: 'Name der Gruppierung, genau wie in der Quelle'),
+        'gruppen': JsonSchema.array(
+          items: JsonSchema.string(),
+          description: 'Namen der Gruppen in der Gruppierung, genau wie in der Quelle',
+        ),
+      },
+      pflicht: ['kurs', 'name'],
+      ausfuehren: (a) => gruppierungAnlegen(
+        moodle,
+        freigaben,
+        kurs: _zahl(a, 'kurs'),
+        name: _text(a, 'name'),
+        gruppen: [for (final g in (a['gruppen'] as List? ?? const [])) '$g'],
+      ),
     );
 
     _aufrufe.registrieren(

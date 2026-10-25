@@ -41,6 +41,7 @@ import 'elemente.dart';
 import 'formeln.dart';
 import 'formular.dart';
 import 'formular_lesen.dart';
+import 'gruppierung.dart';
 import 'kurs.dart';
 import 'lernlandkarte_entwurf.dart';
 import 'moodle_zugang.dart';
@@ -1348,6 +1349,7 @@ Future<_Aenderung?> _vorbereiten(
     if (vorab.modul == 'collabora')
       for (final k in collaboraGruppenFelder) k: wertIn(vorab.felder, k) ?? '',
   };
+  gruppierungPruefen(vorab.form, einstellungen['groupingid'], vorab.kurs);
   final probeFelder = [...vorab.felder];
   final probeSetzen = einstellungenSetzen(vorab.form, probeFelder, einstellungen);
   final gruppenWahl = <String, String>{
