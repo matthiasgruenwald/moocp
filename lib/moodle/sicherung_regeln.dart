@@ -16,6 +16,10 @@ const Set<String> nutzerdatenOptionen = {
   'users', 'enrolments', 'groups', 'userscompletion', 'logs', 'grade_histories', 'badges',
 };
 
+const gruppierungsHinweis = 'Gruppen werden nicht mitgesichert. Die Zuordnung zu einer Gruppierung '
+    'im Zielkurs ist nicht garantiert und wird nicht gegengeprüft. Vorhandene Gruppen und der '
+    'Gruppenmodus ersetzen die Auswahl der Gruppierung nicht; nach der Wiederherstellung prüfen.';
+
 /// Das `_userinfo`-Feld je Aktivität und je Abschnitt (gemessen: jedes Abschnittsfeld hat eines).
 final RegExp _nutzerdatenUserinfo = RegExp(r'^setting_(activity|section)_[a-z0-9_]+_\d+_userinfo$');
 final RegExp _aktivitaetEingeschaltet = RegExp(r'^setting_activity_[a-z0-9_]+_(\d+)_included$');

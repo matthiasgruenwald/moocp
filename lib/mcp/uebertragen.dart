@@ -119,15 +119,22 @@ extension _Uebertragung on McpDienst {
             ganzerKurs: a['ganzer_kurs'] == true,
           );
     final karten = await quelleErfassen();
-    Future<bool> quelleUnveraendert() async {
-      if (!bindungPasst()) return false;
+    Future<String?> quellAbweichung() async {
+      if (!bindungPasst()) return 'Profil oder Instanz wurde gewechselt.';
       final frisch = await quelleErfassen();
-      return jsonEncode([
-            for (final k in karten) [k.cmid, k.name, k.stand, k.formularstand],
-          ]) ==
+      if (jsonEncode([
+            for (final k in karten) [k.cmid, k.name, k.stand],
+          ]) !=
           jsonEncode([
-            for (final k in frisch) [k.cmid, k.name, k.stand, k.formularstand],
-          ]);
+            for (final k in frisch) [k.cmid, k.name, k.stand],
+          ])) {
+        return 'Aktivitätsauswahl oder Kartendaten weichen ab.';
+      }
+      if (jsonEncode([for (final k in karten) k.formularstand]) !=
+          jsonEncode([for (final k in frisch) k.formularstand])) {
+        return 'Formularinhalt, Einstellungen oder Bilddateien der Lernlandkarte weichen ab.';
+      }
+      return null;
     }
 
     final kartenZeilen = [
@@ -197,8 +204,9 @@ extension _Uebertragung on McpDienst {
           '${freigaben.frist.inMinutes} Minuten freigegeben. Nichts geändert.';
     }
 
-    if (karten.isNotEmpty && !await quelleUnveraendert()) {
-      return 'Die Quellauswahl wurde seit dem Erfassen geändert. Nichts übertragen; neu lesen und planen.';
+    final vorSicherung = karten.isEmpty ? null : await quellAbweichung();
+    if (vorSicherung != null) {
+      return 'Die Quellauswahl wurde seit dem Erfassen geändert. $vorSicherung Nichts übertragen; neu lesen und planen.';
     }
 
     // Ohne datei zuerst auf dieser Instanz sichern. Die Datei gilt nur, wenn der Vorgang fertig ist.
@@ -253,8 +261,9 @@ extension _Uebertragung on McpDienst {
       );
     }
 
-    if (karten.isNotEmpty && !await quelleUnveraendert()) {
-      return 'Die Quellauswahl wurde seit dem Erfassen geändert. Die Sicherung wurde erstellt, '
+    final nachSicherung = karten.isEmpty ? null : await quellAbweichung();
+    if (nachSicherung != null) {
+      return 'Die Quellauswahl wurde seit dem Erfassen geändert. $nachSicherung Die Sicherung wurde erstellt, '
           'aber nichts übertragen; neu lesen und planen.';
     }
     var archivHatKarten = false;

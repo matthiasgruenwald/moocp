@@ -1053,10 +1053,33 @@ void _pruefeStand(
   String stand,
   Map<String, String> standFelder,
   Iterable<String> bereiche,
-  Iterable<String> einstellungen,
-) {
+  Iterable<String> einstellungen, {
+  bool nurGruppeneinstellungen = false,
+}) {
+  final datei = File(p.join(stand, 'formular.html'));
+  final vorher = datei.existsSync()
+      ? hauptformular(html_parser.parse(datei.readAsStringSync()))
+      : null;
+  final werte = vorher == null ? <MapEntry<String, String>>[] : formularFelder(vorher);
+  final warCollabora = wertIn(werte, 'modulename') == 'collabora';
+  final collabora = f.modul == 'collabora' && warCollabora &&
+      nurGruppeneinstellungen && einstellungen.isNotEmpty &&
+      einstellungen.every(const {'groupmode', 'groupingid'}.contains);
+  if ((f.modul == 'collabora' || warCollabora) && !collabora) {
+    throw MoodleFehler(
+      'Collabora: Nur Gruppenmodus (groupmode) und Gruppierung (groupingid) bestehender Aktivitäten können geändert werden; keine Texte, Dateien oder anderen Einstellungen. Bei geänderter Aktivitätsart neu lesen.',
+    );
+  }
+  if (collabora && (wertIn(werte, 'name') != f.name ||
+      wertIn(werte, 'course') != '${f.kurs}' ||
+      wertIn(f.felder, 'update') != '${ziel.id}')) {
+    throw MoodleFehler(
+      'Collabora: Name, Kurs oder Aktivitätsart stimmen nicht mehr mit dem gelesenen Stand überein. Nichts geändert.',
+    );
+  }
   if (ziel.art == Zielart.aktivitaet &&
-      !MoodleZugang.schreibbareModule.contains(f.modul)) {
+      !MoodleZugang.schreibbareModule.contains(f.modul) &&
+      !collabora) {
     throw MoodleFehler(
       'Ändern geht bisher für ${MoodleZugang.schreibbareModule.map(typName).join(", ")}; '
       '${ziel.bezeichnung} ist ${typName(f.modul)}.',
@@ -1298,6 +1321,13 @@ Future<_Aenderung?> _vorbereiten(
     alt,
     bereiche.map((b) => b.feld),
     einstellungen.keys,
+    nurGruppeneinstellungen:
+        zuSchreiben.isEmpty &&
+        bereiche.isEmpty &&
+        neu.isEmpty &&
+        geaendert.isEmpty &&
+        nichtMehr.isEmpty &&
+        !neuSpeichern,
   );
   final probeSetzen = einstellungenSetzen(vorab.form, [
     ...vorab.felder,
@@ -1420,6 +1450,12 @@ Future<(String, bool)> _schreibenOhneSperre(
       alt,
       a.bereiche.map((b) => b.feld),
       a.einstellungen.keys,
+      nurGruppeneinstellungen:
+          a.vorab.modul == 'collabora' &&
+          a.zuSchreiben.isEmpty &&
+          a.bereiche.isEmpty &&
+          a.neu.isEmpty &&
+          a.geaendert.isEmpty,
     );
     final gesetzt = einstellungenSetzen(f.form, f.felder, a.einstellungen);
     final geschrieben = <String, String>{};

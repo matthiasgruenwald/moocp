@@ -24,9 +24,11 @@ import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
 import 'package:crypto/crypto.dart';
+import 'package:html/parser.dart' as html_parser;
 import 'package:path/path.dart' as p;
 import 'package:xml/xml.dart';
 
+import 'formular_lesen.dart' show hauptformular, dateibereiche;
 import 'moodle_zugang.dart';
 import 'sicherung.dart';
 import 'wiederherstellung_regeln.dart' show WiederhergestellteAktivitaet, archivAktivitaetsElemente;
@@ -161,8 +163,27 @@ Future<({String? fehler, List<ZielAbruf> abrufe})> zielLesen(MoodleZugang moodle
   if (form.status != 200) {
     return (fehler: 'Bearbeitungsformular nicht lesbar (HTTP ${form.status})', abrufe: const <ZielAbruf>[]);
   }
+  final haupt = hauptformular(html_parser.parse(form.text));
+  if (haupt == null) {
+    return (
+      fehler: 'Bearbeitungsformular nicht gefunden',
+      abrufe: const <ZielAbruf>[],
+    );
+  }
+  // Die Seitenhülle trägt Logos, Editorressourcen und Profilbilder, keine Inhaltsdateien.
+  final inhalte = [
+    for (final feld in haupt.querySelectorAll('textarea[name]'))
+      if (feld.attributes['name']!.endsWith('[text]') ||
+          feld.attributes['name'] == 'svgcode')
+        feld.text,
+    for (final bereich in dateibereiche(form.text))
+      if (haupt.querySelector('[id="${bereich['target']}"]') != null)
+        for (final datei
+            in (bereich['list'] as List? ?? const []).whereType<Map>())
+          if (datei['url'] is String) datei['url'] as String,
+  ];
   final abrufe = <ZielAbruf>[];
-  for (final v in verweiseAus(form.text)) {
+  for (final v in verweiseAus(inhalte.join('\n'))) {
     int? status;
     String? sha;
     try {

@@ -1,6 +1,9 @@
 # Changelog
 
 ## 0.9.23
+- Unterrichtsverteilung: Wechselnde Entwurfsadressen im Kartenhintergrund lösen keinen falschen Änderungsabbruch mehr aus.
+- Wiederherstellung: Die Dateiprüfung berücksichtigt Inhaltsfelder statt Logos, Editorressourcen und Profilbildern der Seitenhülle.
+- Collabora: Gruppenmodus und Gruppierung bestehender Aktivitäten lassen sich begrenzt ändern und zurücklesen; die Gruppierungsübernahme bleibt ausdrücklich ungeprüft.
 - Formulare: Eine globale Moodle-Suche in der Kopfzeile stört das Lesen und Ändern von Aktivitäten nicht mehr.
 - Wiederherstellung und Unterrichtsverteilung: Sichtbarkeit und Voraussetzungen bleiben standardmäßig wie in der Quelle; Verbergen ist ausdrücklich wählbar, die Freigabe nennt die Wahl.
 - Sicherung und Wiederherstellung: Die normale Antwortfrist wird als laufende Hintergrundarbeit erklärt, mit Statusabfragen bis zu 30 Minuten.

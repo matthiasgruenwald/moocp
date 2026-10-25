@@ -23,6 +23,11 @@ class TestMoodle {
   Completer<void>? wartet;
   Completer<void>? fortsetzen;
   String name = 'ZZ Probe';
+  String modul = 'page';
+  String gruppenmodus = '1';
+  String gruppierung = '0';
+  bool gruppierungIgnorieren = false;
+  int formularSpeicherungen = 0;
   String inhalt = '<h3>ZZ Probe</h3><p>Vorher</p>';
   int objektKurs = 12;
   bool lernlandkarteVorhanden = false;
@@ -114,7 +119,7 @@ class TestMoodle {
               if (vorhanden || lernlandkarteVorhanden)
                 {
                   'id': 70,
-                  'module': 'page',
+                  'module': modul,
                   'name': lernlandkarteVorhanden ? 'ZZ Ziel' : name,
                   'visible': 0,
                   'sectionid': 1,
@@ -196,6 +201,11 @@ class TestMoodle {
           vorhanden = true;
           name = f['name']!;
           inhalt = f['page[text]']!;
+          formularSpeicherungen++;
+          if (modul == 'collabora') {
+            gruppenmodus = f['groupmode']!;
+            if (!gruppierungIgnorieren) gruppierung = f['groupingid']!;
+          }
           r.response.redirect(
             Uri.parse('/mod/page/view.php?id=70'),
             status: 303,
@@ -237,8 +247,9 @@ class TestMoodle {
         } else {
           antwort = seite(
             '''<form class="mform" action="/course/modedit.php" method="post">
-          <input name="_qf__mod_page_mod_form" value="1"><input name="sesskey" value="sk"><input name="course" value="$objektKurs">
-          <input name="modulename" value="page"><input name="name" value="$name">
+          <input name="_qf__mod_${modul}_mod_form" value="1"><input name="sesskey" value="sk"><input name="course" value="$objektKurs">
+          <input name="modulename" value="$modul"><input name="update" value="70"><input name="name" value="$name">
+          ${modul == 'collabora' ? '<div class="fitem row"><label class="col-form-label">Gruppenmodus</label><div class="felement" data-fieldtype="select"><select name="groupmode"><option value="0" ${gruppenmodus == "0" ? "selected" : ""}>Keine Gruppen</option><option value="1" ${gruppenmodus == "1" ? "selected" : ""}>Getrennte Gruppen</option></select></div></div><div class="fitem row"><label class="col-form-label">Gruppierung</label><div class="felement" data-fieldtype="select"><select name="groupingid"><option value="0" ${gruppierung == "0" ? "selected" : ""}>Keine</option><option value="8" ${gruppierung == "8" ? "selected" : ""}>ZZ Projektgruppen</option></select></div></div>' : ""}
           <select name="visible"><option value="0" selected>Verborgen</option><option value="1">Sichtbar</option></select>
           <textarea name="page[text]">${const HtmlEscape().convert(inhalt)}</textarea>
           <input name="page[format]" value="1"><input name="page[itemid]" value="9">
@@ -348,6 +359,91 @@ void main() {
     await extern.server.close(force: true);
     await ordner.delete(recursive: true);
   });
+
+  Future<void> collaboraLesen() async {
+    extern.modul = 'collabora';
+    extern.vorhanden = true;
+    freigaben.stufe = Bestaetigungen.keine;
+    await starten();
+    expect(
+      await client.tool('aktivitaet_lesen', {'cmid': 70}),
+      contains('collabora'),
+    );
+  }
+
+  test(
+    'Collabora-Gruppierung wird über MCP geändert und zurückgelesen',
+    () async {
+      await collaboraLesen();
+      final text = await client.tool('aendern', {
+        'ordner': 'cm-70',
+        'einstellungen': {
+          'groupmode': 'Getrennte Gruppen',
+          'groupingid': 'ZZ Projektgruppen',
+        },
+      });
+      expect(text, contains('verified: true'));
+      expect(extern.gruppierung, '8');
+      expect(extern.formularSpeicherungen, 1);
+    },
+  );
+
+  test(
+    'Collabora meldet ignorierte Gruppierung als nicht verifiziert',
+    () async {
+      await collaboraLesen();
+      extern.gruppierungIgnorieren = true;
+      final text = await client.tool('aendern', {
+        'ordner': 'cm-70',
+        'einstellungen': {'groupingid': 'ZZ Projektgruppen'},
+      });
+      expect(text, contains('verified: false'));
+      expect(extern.gruppierung, '0');
+    },
+  );
+
+  for (final fall in [
+    'Text',
+    'Name',
+    'unbekannte Gruppierung',
+    'neu speichern',
+    'Kurswechsel',
+    'Namenswechsel',
+    'Aktivitätsartwechsel',
+    'Ablehnung',
+    'Standwechsel',
+  ]) {
+    test('Collabora: $fall führt zu keiner Speicherung', () async {
+      await collaboraLesen();
+      final args = <String, Object?>{
+        'ordner': 'cm-70',
+        'einstellungen': {'groupingid': 'ZZ Projektgruppen'},
+      };
+      if (fall == 'Text') {
+        await File('${ordner.path}/cm-70/page.html')
+            .writeAsString('<p>Unbeauftragter Inhalt</p>');
+      }
+      if (fall == 'Name') args['einstellungen'] = {'name': 'Anders'};
+      if (fall == 'unbekannte Gruppierung') {
+        args['einstellungen'] = {'groupingid': 'Fremde Gruppierung'};
+      }
+      if (fall == 'neu speichern') args['neu_speichern'] = true;
+      if (fall == 'Kurswechsel') extern.objektKurs = 13;
+      if (fall == 'Namenswechsel') extern.name = 'ZZ Anders';
+      if (fall == 'Aktivitätsartwechsel') extern.modul = 'page';
+      if (fall == 'Ablehnung' || fall == 'Standwechsel') {
+        freigaben.stufe = Bestaetigungen.alle;
+        freigaben.addListener(() {
+          if (freigaben.aktuell?.offen != true) return;
+          if (fall == 'Standwechsel') extern.gruppierung = '8';
+          scheduleMicrotask(() => freigaben.entscheiden(fall != 'Ablehnung'));
+        });
+      }
+      final text = await client.tool('aendern', args);
+      expect(text, isNot(contains('verified: true')));
+      expect(extern.formularSpeicherungen, 0);
+    });
+  }
 
   test('eigene ZZ-Textseite wird über MCP angelegt, geändert, zurückgelesen und aufgeräumt', () async {
     await starten();

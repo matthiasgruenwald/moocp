@@ -507,6 +507,7 @@ Future<String> aktivitaetSichern(
       punkte: [
         'Sicherung der Aktivität „${a.name}" (cmid $cmid, $kursText)',
         'Ohne Nutzerdaten: keine Teilnehmenden, Abgaben, Bewertungen. Im Kurs ändert sich nichts.',
+        gruppierungsHinweis,
         'Datei: Sicherungsordner der App${ziel.isEmpty ? '' : '/$ziel'}, Name $dateiName',
       ]);
 }
@@ -691,6 +692,7 @@ Future<String> auswahlSichern(
         'Aktivitäten ($anzahl): ${ausgewaehlt.map((a) => '„${a.name}"').join(', ')}',
         if (art != AuswahlArt.ganzerKurs) 'Nicht enthalten: alle übrigen Abschnitte und Aktivitäten des Kurses',
         'Ohne Nutzerdaten: keine Teilnehmenden, Abgaben, Bewertungen. Im Kurs ändert sich nichts.',
+        gruppierungsHinweis,
         for (final l in luecken) 'Nicht mitgesichert, weil ohne Nutzerdaten: $l',
         'Datei: Sicherungsordner der App${ziel.isEmpty ? '' : '/$ziel'}, Name $dateiName',
       ]);
@@ -784,7 +786,7 @@ Future<String> _warten(
         verified: ok,
         text: ok ? '' : 'Die Größe der Datei stimmt nach dem Speichern nicht.');
     return ok
-        ? 'Gesichert: ${vg.datei} ($bytes Bytes, Nummer ${vg.id}). verified: true'
+        ? 'Gesichert: ${vg.datei} ($bytes Bytes, Nummer ${vg.id}). verified: true\n$gruppierungsHinweis'
         : 'Unklar (Nummer ${vg.id}): Die Größe der Datei stimmt nicht. verified: false';
   } on MoodleFehler {
     await vorgaenge.aktualisieren(vg,

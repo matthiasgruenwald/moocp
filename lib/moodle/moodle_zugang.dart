@@ -632,6 +632,11 @@ class MoodleZugang {
         return _zahl(wertIn(f, 'course')) &&
             (schreibbareModule.contains(modul) &&
                     wertIn(f, '_qf__mod_${modul}_mod_form') != null ||
+                modul == 'collabora' &&
+                    wertIn(f, '_qf__mod_collabora_mod_form') != null &&
+                    _zahl(wertIn(f, 'update')) &&
+                    const {'0', '1', '2'}.contains(wertIn(f, 'groupmode')) &&
+                    _zahl(wertIn(f, 'groupingid')) ||
                 modul == 'learningmap' &&
                     wertIn(f, '_qf__mod_learningmap_mod_form') != null &&
                     wertIn(f, 'placestore') != null &&

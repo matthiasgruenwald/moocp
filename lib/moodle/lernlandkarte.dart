@@ -191,12 +191,16 @@ bool _gleicheFelder(FormularGelesen vorher, FormularGelesen nachher) {
   return const JsonEncoder().convert(a) == const JsonEncoder().convert(b);
 }
 
+/// Moodle vergibt den Entwurfsbereich beim Lesen neu; Bildname und Inhalt
+/// bleiben maßgeblich, die Bytes werden separat geprüft.
+String lernlandkartenSvgVergleich(String svg) => svg.replaceAll(
+  RegExp(r'/draftfile\.php/\d+/user/draft/\d+/'),
+  '/draftfile.php/U/user/draft/X/',
+);
+
 String _vergleichHtml(String feld, String wert) =>
-    (feld == 'introeditor[text]' || feld == 'introeditor')
-    ? wert.replaceAll(
-        RegExp(r'/draftfile\.php/\d+/user/draft/\d+/'),
-        '/draftfile.php/U/user/draft/X/',
-      )
+    const {'introeditor[text]', 'introeditor', 'svgcode'}.contains(feld)
+    ? lernlandkartenSvgVergleich(wert)
     : wert;
 
 // Moodle setzt den ausgeschalteten Abschlusstermin bei jedem GET auf „jetzt“.
@@ -245,7 +249,8 @@ bool _gleicheSvgMitNeubeschriftungen(
     }
     if (!ortsbeschriftungVorhanden) return false;
   }
-  return vorher == normalisiert;
+  return lernlandkartenSvgVergleich(vorher) ==
+      lernlandkartenSvgVergleich(normalisiert);
 }
 
 /// Gleicher Formularstand ohne Entwurfs-IDs. Der Hintergrund wird über seine

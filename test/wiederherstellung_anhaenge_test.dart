@@ -61,6 +61,7 @@ class _Moodle extends MoodleZugang {
 
   /// Zusätzliche neue Aktivitäten im Kurs (cmid, modul, titel).
   final List<(int, String, String)> neueCmids;
+  final List<String> abrufe = [];
   final Map<int, bool> sichtbar = {1: true};
   final Map<int, String> namen = {1: 'Alt'};
 
@@ -104,8 +105,10 @@ class _Moodle extends MoodleZugang {
   }
 
   @override
-  Future<Antwort> lesen(String pfadMitQuery) async =>
-      seiten[pfadMitQuery] ?? _antwort(404, utf8.encode('nicht gefunden'));
+  Future<Antwort> lesen(String pfadMitQuery) async {
+    abrufe.add(pfadMitQuery);
+    return seiten[pfadMitQuery] ?? _antwort(404, utf8.encode('nicht gefunden'));
+  }
 }
 
 void main() {
@@ -157,6 +160,28 @@ void main() {
         (entwurf: false, pfad: '/pluginfile.php/9/mod_page/content/1/z.pdf', name: 'z.pdf'),
       ]);
     });
+  });
+
+  test('Zielprüfung liest Inhaltsbilder, aber keine Dateien der Seitenhülle', () async {
+    const pfad = '/draftfile.php/12/user/draft/77/bild.png';
+    final moodle = _Moodle({
+      '/course/modedit.php?update=2': _antwort(
+        200,
+        utf8.encode(
+          '<img src="/pluginfile.php/9/user/icon/boost/f2">'
+          '<script src="/pluginfile.php/4/theme/assets/editor.js"></script>'
+          '<form class="mform"><textarea name="page[text]">&lt;img src="$pfad"&gt;</textarea></form>',
+        ),
+      ),
+      pfad: _antwort(200, bild),
+    }, neueCmids: []);
+    final ziel = await zielLesen(moodle, 2);
+    final probe = vergleicheAnhaenge(
+      quelle: [(name: 'bild.png', sha1: _sha(bild), dateimanager: false)],
+      ziel: ziel.abrufe,
+    );
+    expect(probe.vollstaendig, isTrue);
+    expect(moodle.abrufe, ['/course/modedit.php?update=2', pfad]);
   });
 
   group('Vergleich', () {
@@ -251,7 +276,7 @@ void main() {
     }
 
     Antwort formular(int cmid) => _antwort(200, utf8.encode(
-        '<textarea>&lt;img src=&quot;/draftfile.php/12/user/draft/77/bild.png&quot;&gt;</textarea>'));
+        '<form class="mform"><textarea name="page[text]">&lt;img src=&quot;/draftfile.php/12/user/draft/77/bild.png&quot;&gt;</textarea></form>'));
 
     test('identische Datei: verborgen und verified, Bericht im Status', () async {
       final vg = Vorgaenge(ordner.path);

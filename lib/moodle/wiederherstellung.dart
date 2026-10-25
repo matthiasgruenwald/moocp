@@ -912,6 +912,7 @@ Future<String> _gegenlesen(
   final verifiziert = zuordnungUnveraendert && zugeordnet.isNotEmpty && sichtbarkeitOk &&
       anhangOk && vergleichOk && herkunftOk && schreibPruefluecke == null;
   final zusatz = [
+    gruppierungsHinweis,
     if (!verbergen) 'Sichtbarkeit und Voraussetzungen nicht gegengeprüft; verified gilt für die übrigen Prüfungen.',
     if (anhang != null) anhang.text,
     for (final v in vergleiche) v.text,

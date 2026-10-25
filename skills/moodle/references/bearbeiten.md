@@ -100,6 +100,20 @@ Datum nach der Frist.
 Fristen an bestehenden Aufgaben zu ändern trifft Lernende unmittelbar; die
 Freigabe zeigt es, sag es trotzdem vorher im Chat.
 
+### Collabora (`collabora`)
+
+Bei bestehenden Collabora-Aktivitäten ändert `aendern` ausschließlich Gruppenmodus
+und Gruppierung. Lies die Aktivität frisch und verwende die angebotenen Optionen
+aus dem Formular; eine Gruppierungsnummer aus einem anderen Kurs ist kein Beleg.
+Texte, Dateien, Name, andere Einstellungen und unverändertes Neuspeichern bleiben
+gesperrt. Die enge Änderungsstrecke ist lokal über MCP getestet, auf einer
+Moodle-Instanz noch nicht durchgespielt. Dokumentinhalte werden damit nicht bearbeitet.
+
+Sicherungen ohne Nutzerdaten nehmen keine Gruppen mit. Auch vorhandene Gruppen
+und „Getrennte Gruppen“ ersetzen die gewählte Gruppierung nicht. Nach einer
+Wiederherstellung bleibt deren Zuordnung ungeprüft; wähle sie nur nach ausdrücklicher
+fachlicher Vorgabe und bestätige das Rückleseergebnis, statt eine Übernahme zu behaupten.
+
 ### Wiki (`wiki`)
 
 | Schlüssel | Bedeutung |

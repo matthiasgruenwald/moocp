@@ -184,7 +184,10 @@ Future<List<KartenQuelle>> kartenErfassen(
     final stand = jsonEncode([
       for (final id in gewaehlt.toList()..sort())
         [id, struktur.nachCmid[id]?.modul, struktur.nachCmid[id]?.name],
-      daten,
+      {
+        ...daten,
+        'svgcode': lernlandkartenSvgVergleich(daten['svgcode'] as String),
+      },
     ]);
     karten.add(
       KartenQuelle(cmid, a.name, orte, stand, daten, formularstand, idnummer),
@@ -308,8 +311,12 @@ List<KartenZuordnung> kartenZuordnen(
             belege[a.cmid]?.formularstand == stand &&
             (quelle.modul != 'learningmap' ||
                 (belege[a.cmid]?.kartendaten != null &&
-                    belege[a.cmid]!.kartendaten!['svgcode'] ==
-                        quelle.beleg.kartendaten!['svgcode'] &&
+                    lernlandkartenSvgVergleich(
+                          belege[a.cmid]!.kartendaten!['svgcode'] as String,
+                        ) ==
+                        lernlandkartenSvgVergleich(
+                          quelle.beleg.kartendaten!['svgcode'] as String,
+                        ) &&
                     _gleicherKartenInhalt(
                       belege[a.cmid]!.kartendaten!,
                       quelle.beleg.kartendaten!,
@@ -403,7 +410,9 @@ String _kartenInhalt(Map<String, Object?> karte) {
       Map<String, dynamic>.from(ort)..remove('linkedActivity'),
   ];
   return jsonEncode([
-    ohneOrtsbeschriftung(karte['svgcode']),
+    ohneOrtsbeschriftung(
+      lernlandkartenSvgVergleich(karte['svgcode'] as String),
+    ),
     _kanonischeMap(store),
   ]);
 }

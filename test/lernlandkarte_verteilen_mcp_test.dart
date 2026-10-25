@@ -265,7 +265,7 @@ class _Moodle {
         <select name="visible"><option value="0" ${x.sichtbar ? '' : 'selected'}>Verborgen</option><option value="1" ${x.sichtbar ? 'selected' : ''}>Sichtbar</option></select>
         <textarea name="introeditor[text]">${const HtmlEscape().convert(x.intro)}</textarea><input name="introeditor[itemid]" value="$entwurf">
         <input type="hidden" name="backgroundfile" value="${entwurf + 1000}">
-        <textarea name="svgcode">${const HtmlEscape().convert(svgFuer(x))}</textarea>
+        <textarea name="svgcode">${const HtmlEscape().convert(svgFuer(x).replaceAll("ENTWURF", "$entwurf"))}</textarea>
         <input type="hidden" name="placestore" value='${const HtmlEscape().convert(x.placestore!)}'>
         <div class="fitem row" id="fitem_id_completionexpected"><div class="col-form-label">Erwarteter Abschluss</div><div class="felement" data-fieldtype="date_time_selector">
         <select name="completionexpected[year]"><option value="2026" selected>2026</option></select>
@@ -1361,6 +1361,20 @@ void main() {
     expect(staende, ['ausstehend']);
     expect(ergebnis, contains('1 offen'));
     expect(moodle.restoreStarts, 1);
+  });
+
+  test('wechselnde Entwurfsadresse im Kartenhintergrund verhindert keine Übertragung', () async {
+    moodle.karte.svgcode = moodle.karte.svgcode.replaceFirst(
+      '</svg>',
+      '<image href="${moodle.basis}/draftfile.php/55/user/draft/ENTWURF/background.png"/></svg>',
+    );
+    final ergebnis = await client.tool('uebertragen', auftrag(ziele: [31]));
+    expect(
+      ergebnis,
+      isNot(contains('Quellauswahl wurde seit dem Erfassen geändert')),
+    );
+    expect(moodle.restoreStarts, 1);
+    expect(ergebnis, contains('1 verknüpft'));
   });
 
   test('Quellkarte während der Startfreigabe geändert: keine veraltete Zuordnung kopieren', () async {
