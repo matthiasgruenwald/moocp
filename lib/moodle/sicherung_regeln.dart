@@ -490,7 +490,7 @@ String? zielOrdnerPruefen(String? ordner) {
   return teile.join('/');
 }
 
-/// Der Text, den ein Werkzeug bei Zeitlimit zurückgibt (Befund 9). Ist die
+/// Der Text, den ein Werkzeug bei Zeitlimit zurückgibt. Ist die
 /// Nummer schon vergeben, nennt er sie und genau einen Folgeaufruf. Ist sie es
 /// nicht, sagt er das, und es gibt keinen Folgeaufruf mit einer Nummer, die es
 /// noch nicht gibt. In beiden Fällen ist nichts neu gestartet.

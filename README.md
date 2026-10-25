@@ -109,7 +109,7 @@ Die Aktivitäten in dieser Tabelle kann die KI lesen, anlegen und ändern – Te
 
 Alle anderen Aktivitäten – Forum, Glossar, H5P und weitere – kann die KI lesen (Beschreibung und Einstellungen), verschieben, duplizieren, sichtbar schalten und löschen, aber nicht anlegen oder ändern. Abschnitte kann die KI anlegen, umbenennen, mit einer Beschreibung versehen, verschieben, sichtbar schalten und löschen.
 
-Collabora ist eine begrenzte Ausnahme: Bei bestehenden Aktivitäten kann `aendern` ausschließlich Gruppenmodus (`groupmode`) und Gruppierung (`groupingid`) nach frischem Lesen ändern und zurücklesen. Dokumentinhalte, Dateien, Namen und andere Einstellungen bleiben gesperrt; Anlegen wird nicht unterstützt. Diese Änderungsstrecke ist in lokalen MCP-Tests umgesetzt, auf einer Moodle-Instanz noch nicht durchgespielt.
+Collabora ist eine begrenzte Ausnahme: Bei bestehenden Aktivitäten kann `aendern` ausschließlich Gruppenmodus (`groupmode`) und Gruppierung (`groupingid`) nach frischem Lesen ändern und zurücklesen. Dokumentinhalte, Dateien, Namen und andere Einstellungen bleiben gesperrt; Anlegen wird nicht unterstützt.
 
 Sicherungen ohne Nutzerdaten enthalten keine Gruppen. Eine Gruppierungszuordnung im Zielkurs wird weder garantiert noch gegengeprüft; `verified` bestätigt diese Zuordnung nicht. Vorhandene Gruppen und „Getrennte Gruppen“ ersetzen die ausdrücklich ausgewählte Gruppierung nicht. Prüfen Sie sie nach der Wiederherstellung im Bearbeitungsformular der Aktivität.
 

@@ -1045,8 +1045,6 @@ Future<String> aktivitaetAnlegen(
 // aendern: jedes gelesene Formular zurückschreiben
 // ---------------------------------------------------------------------------
 
-/// Prüft ein frisch geholtes Formular gegen den Stand beim Lesen. Wirft,
-/// wenn Moodle seither geändert wurde -- dann wird nichts überschrieben.
 /// Feste Feldnamen einer Collabora-Aktivität, die ohne Neuanlage geändert werden dürfen.
 const collaboraGruppenFelder = ['groupmode', 'groupingid'];
 
@@ -1058,6 +1056,8 @@ dom.Element? _gespeichertesFormular(String stand) {
       : null;
 }
 
+/// Prüft ein frisch geholtes Formular gegen den Stand beim Lesen. Wirft,
+/// wenn Moodle seither geändert wurde -- dann wird nichts überschrieben.
 void _pruefeStand(
   Formular f,
   Formularziel ziel,
@@ -1556,7 +1556,7 @@ Future<(String, bool)> _schreibenOhneSperre(
 /// auch ohne Änderung einmal über das Formular speichern (CodeRunner prüft
 /// seine Musterlösung nur dort).
 /// Die Sperre des Ordners umfasst das Prüfen des Stands (.stand) bis zum Schreiben
-/// (Befund 6): Parallel gelesen oder geschrieben wird dieser Ordner dann nicht.
+/// Parallel gelesen oder geschrieben wird dieser Ordner dann nicht.
 /// Sie gilt auch während der Freigabe; das wartet auf die Lehrkraft (höchstens die Frist).
 Future<String> aendern(
   MoodleZugang moodle,

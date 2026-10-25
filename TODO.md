@@ -312,3 +312,4 @@ Messstand Quiz-Einfügen: Die zurückgelesenen Quizze waren verborgen. Die Dauer
 
 - Unterrichtsverteilung: Der Fingerabdruck der Kartenkopie (`_kartenInhalt` in `lib/moodle/lernlandkarte_verteilen.dart`) entfernt alle Ortsbeschriftungen pauschal über `ohneOrtsbeschriftung` (`lib/moodle/lernlandkarte.dart`). Moodle schreibt Beschriftungen beim Wiederherstellen ohnehin um, deshalb ist das bewusst; es ist aber weiter als nötig. Einengen auf `_gleicheSvgMitNeubeschriftungen`, mit Test für eine echte Änderung an Form oder Ort.
 - Weitere Quellverweise der Art „Ticket #n“ und „Befund n“ außerhalb der bereinigten Sicherungs- und Herkunftslogik bei künftigen Änderungen durch die Begründung ersetzen.
+- Collabora-Gruppenänderung (`aendern` mit `groupmode`/`groupingid`): in lokalen MCP-Tests umgesetzt, auf einer Moodle-Instanz noch nicht durchgespielt.

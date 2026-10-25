@@ -146,7 +146,7 @@ class ArchivBefund {
   /// Fragen je Quiz (Ordnername wie quiz_21), aus quiz.xml und questions.xml.
   final Map<String, List<QuizFrage>> quizFragen;
 
-  /// Quizze, deren quiz.xml oder questions.xml nicht lesbar ist (Befund 7): kein Abbruch
+  /// Quizze, deren quiz.xml oder questions.xml nicht lesbar ist: kein Abbruch
   /// des Archivs, sondern eine Prüflücke bei der Herkunft.
   final Set<String> quizUnlesbar;
 
@@ -533,7 +533,7 @@ bool _sperrt(DoppelstartEintrag e, int kurs) => switch (e.stand) {
       null => false,
     };
 
-/// Befund 8: Typen außerhalb der Positivliste (nicht schreibbar) werden nicht
+/// Typen außerhalb der Positivliste (nicht schreibbar) werden nicht
 /// verifiziert. Liefert den Prüflücke-Text oder null, wenn alle schreibbar sind.
 String? nichtSchreibbarePruefluecke(Iterable<String> moduln) {
   final nein = {for (final m in moduln) if (!MoodleZugang.schreibbareModule.contains(m)) m}.toList()..sort();
