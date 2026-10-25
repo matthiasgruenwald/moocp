@@ -1899,7 +1899,8 @@ class McpDienst {
           'noch nicht gibt, und ordnet sie der Gruppierung zu. Ohne Mitglieder. Erst aufrufen, wenn die '
           'Lehrkraft gefragt wurde und zugestimmt hat -- aendern bricht bei einer fehlenden Gruppierung mit '
           'genau dieser Rückfrage ab. Die Gruppen der Quelle zeigt gruppierungen_lesen im Quellkurs. '
-          'Gibt es die Gruppierung schon, ändert das Werkzeug nichts. Danach groupingid mit aendern setzen. '
+          'Gibt es die Gruppierung schon, ergänzt das Werkzeug nur fehlende Gruppen -- es entfernt und benennt nichts um --, '
+          'so lässt sich ein abgebrochener Aufruf wiederholen. Danach groupingid mit aendern setzen. '
           'Nach Freigabe in der App; zurückgelesen wird die Gruppierung mit ihren Gruppen (verified).',
       parameter: {
         'kurs': _kurs,

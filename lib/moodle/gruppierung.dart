@@ -69,6 +69,14 @@ dom.Element _formular(String html, String auswahl) {
   return f;
 }
 
+/// Wohin ein Browser das Formular schickt: an seine `action`, bei leerer
+/// `action` an die Adresse der Seite -- mit Query. (Uri.resolve('') verlöre sie;
+/// die Zuordnungsseite hat eine leere `action`.)
+Uri formularZiel(dom.Element form, Uri seite) {
+  final a = form.attributes['action'];
+  return a == null || a.isEmpty ? seite : seite.resolve(a);
+}
+
 /// Die Nummern aller Gruppierungen eines Kurses, aus den Verweisen der Übersicht.
 Future<List<int>> gruppierungsIds(MoodleZugang moodle, int kurs) async {
   final r = await moodle.lesen('/group/groupings.php?id=$kurs');
@@ -90,9 +98,9 @@ List<(String, String)> _optionen(dom.Element form, String name) => [
         if ((o.attributes['value'] ?? '').isNotEmpty) (o.attributes['value']!, _optionsText(o)),
 ];
 
-Future<(dom.Element, String)> _zuordnung(MoodleZugang moodle, int gruppierung) async {
+Future<(dom.Element, Uri)> _zuordnung(MoodleZugang moodle, int gruppierung) async {
   final r = await moodle.lesen('/group/assign.php?id=$gruppierung');
-  return (_formular(r.text, '#assignform'), r.text);
+  return (_formular(r.text, '#assignform'), r.adresse);
 }
 
 /// Alle Gruppierungen des Kurses mit ihren Gruppen (nur Namen).
@@ -144,7 +152,7 @@ Future<void> _speichern(MoodleZugang moodle, dom.Element form, String adresse, F
   final knopf = form.querySelectorAll('input[type=submit], button[type=submit]').firstOrNull;
   final knopfName = knopf?.attributes['name'];
   if (knopfName != null && knopfName.isNotEmpty) felder.add(MapEntry(knopfName, knopf!.attributes['value'] ?? '1'));
-  final ziel = Uri.parse(adresse).resolve(form.attributes['action'] ?? adresse);
+  final ziel = formularZiel(form, Uri.parse(adresse));
   final a = await moodle.senden(ziel.hasQuery ? '${ziel.path}?${ziel.query}' : ziel.path, felder);
   if (moodle.umleitungsziel(a) == null) {
     final meldung = _fehlerAus(a.text);
@@ -163,8 +171,9 @@ Future<void> _gruppeAnlegen(MoodleZugang moodle, int kurs, String name) async {
 
 /// Legt eine Gruppierung samt Gruppen an und ordnet die Gruppen zu. Gruppen,
 /// die es im Kurs schon gibt, werden nur zugeordnet, fehlende werden angelegt.
-/// Gibt es die Gruppierung schon, bricht das Werkzeug ab: Es ändert keine
-/// bestehende. Rückgelesen wird zum Schluss die Gruppierung mit ihren Gruppen.
+/// Gibt es die Gruppierung schon (etwa nach einem Abbruch mitten im Anlegen),
+/// werden ihr nur fehlende Gruppen hinzugefügt: nie entfernt, nie umbenannt.
+/// Rückgelesen wird zum Schluss die Gruppierung mit ihren Gruppen.
 Future<String> gruppierungAnlegen(
   MoodleZugang moodle,
   Freigaben freigaben, {
@@ -180,23 +189,27 @@ Future<String> gruppierungAnlegen(
     if (!namen.any((n) => n.toLowerCase() == g.toLowerCase())) namen.add(g);
   }
   final vorhanden = await gruppierungenLesen(moodle, kurs);
-  if (vorhanden.any((g) => g.name.toLowerCase() == wunsch.toLowerCase())) {
-    throw MoodleFehler(
-      'Die Gruppierung „$wunsch" gibt es in Kurs $kurs schon. Dieses Werkzeug ändert keine bestehende; '
-      'setze sie mit aendern (Einstellung groupingid) bei der Aktivität.',
-    );
+  final bestehende = vorhanden.where((g) => g.name.toLowerCase() == wunsch.toLowerCase()).firstOrNull;
+  // Was der Gruppierung noch fehlt; bei einer neuen alle.
+  final zuordnen = [
+    for (final g in namen)
+      if (bestehende == null || !bestehende.gruppen.any((o) => optionPasst(o, g))) g,
+  ];
+  if (bestehende != null && zuordnen.isEmpty) {
+    return 'Unverändert: Die Gruppierung „${bestehende.name}" (id ${bestehende.id}) gibt es in Kurs $kurs schon, '
+        'mit ${namen.isEmpty ? 'allen gewünschten' : 'diesen'} Gruppen: ${bestehende.gruppen.join(', ')}. verified: true';
   }
   final imKurs = await kursGruppen(moodle, vorhanden);
   final fehlen = [
-    for (final g in namen)
+    for (final g in zuordnen)
       if (imKurs == null || !imKurs.any((o) => optionPasst(o, g))) g,
   ];
   final ja = await freigaben.anfragen(FreigabeAnfrage(
-    titel: 'Gruppierung anlegen?',
+    titel: bestehende == null ? 'Gruppierung anlegen?' : 'Gruppen einer Gruppierung ergänzen?',
     punkte: [
-      'Gruppierung „$wunsch" in ${await kursBezeichnung(moodle, kurs)}',
-      if (namen.isNotEmpty) 'Gruppen darin: ${namen.join(', ')}',
-      if (imKurs == null && namen.isNotEmpty)
+      '${bestehende == null ? 'Gruppierung' : 'Bestehende Gruppierung'} „$wunsch" in ${await kursBezeichnung(moodle, kurs)}',
+      if (zuordnen.isNotEmpty) '${bestehende == null ? 'Gruppen darin' : 'Gruppen, die hinzukommen'}: ${zuordnen.join(', ')}',
+      if (imKurs == null && zuordnen.isNotEmpty)
         'Welche dieser Gruppen es im Kurs schon gibt, ist vorab nicht festzustellen; vorhandene werden nur zugeordnet, '
             'fehlende angelegt.'
       else if (fehlen.isNotEmpty)
@@ -214,31 +227,36 @@ Future<String> gruppierungAnlegen(
   }
 
   // 1. die Gruppierung
-  final leer = await moodle.lesen('/group/grouping.php?courseid=$kurs');
-  final gf = _formular(leer.text, 'form.mform');
-  final gfelder = formularFelder(gf);
-  setze(gfelder, 'name', wunsch);
-  await _speichern(moodle, gf, leer.adresse.toString(), gfelder, 'die Gruppierung „$wunsch"');
-  final neu = (await gruppierungenLesen(moodle, kurs)).where((g) => g.name.toLowerCase() == wunsch.toLowerCase());
-  if (neu.length != 1) {
-    throw MoodleFehler('Die Gruppierung „$wunsch" war nach dem Speichern nicht eindeutig zu finden '
-        '(${neu.length} Treffer). Nichts weiter angelegt.');
+  int id;
+  if (bestehende != null) {
+    id = bestehende.id;
+  } else {
+    final leer = await moodle.lesen('/group/grouping.php?courseid=$kurs');
+    final gf = _formular(leer.text, 'form.mform');
+    final gfelder = formularFelder(gf);
+    setze(gfelder, 'name', wunsch);
+    await _speichern(moodle, gf, leer.adresse.toString(), gfelder, 'die Gruppierung „$wunsch"');
+    final neu = (await gruppierungenLesen(moodle, kurs)).where((g) => g.name.toLowerCase() == wunsch.toLowerCase());
+    if (neu.length != 1) {
+      throw MoodleFehler('Die Gruppierung „$wunsch" war nach dem Speichern nicht eindeutig zu finden '
+          '(${neu.length} Treffer). Nichts weiter angelegt.');
+    }
+    id = neu.single.id;
   }
-  final id = neu.single.id;
 
   // 2. fehlende Gruppen anlegen, 3. alle zuordnen
   final angelegt = <String>[];
-  var (zf, _) = await _zuordnung(moodle, id);
-  for (final g in namen) {
+  var (zf, zadresse) = await _zuordnung(moodle, id);
+  for (final g in zuordnen) {
     if (!_optionen(zf, 'addselect[]').any((o) => optionPasst(o.$2, g))) {
       await _gruppeAnlegen(moodle, kurs, g);
       angelegt.add(g);
-      (zf, _) = await _zuordnung(moodle, id);
+      (zf, zadresse) = await _zuordnung(moodle, id);
     }
   }
   final waehlen = <String>[];
   final nichtGefunden = <String>[];
-  for (final g in namen) {
+  for (final g in zuordnen) {
     final o = _optionen(zf, 'addselect[]').where((o) => optionPasst(o.$2, g)).firstOrNull;
     if (o == null) {
       nichtGefunden.add(g);
@@ -253,7 +271,9 @@ Future<String> gruppierungAnlegen(
     }
     final knopf = zf.querySelector('input[name=add]');
     felder.add(MapEntry('add', knopf?.attributes['value'] ?? '1'));
-    final a = await moodle.senden('/group/assign.php', felder);
+    // Die Nummer der Gruppierung steht in der Adresse des Formulars, nicht in einem Feld.
+    final ziel = formularZiel(zf, zadresse);
+    final a = await moodle.senden(ziel.hasQuery ? '${ziel.path}?${ziel.query}' : ziel.path, felder);
     if (moodle.umleitungsziel(a) == null && a.status >= 400) {
       throw MoodleFehler('Moodle hat die Zuordnung der Gruppen nicht angenommen (Status ${a.status}).');
     }
@@ -266,7 +286,7 @@ Future<String> gruppierungAnlegen(
       if (danach == null || !danach.gruppen.any((o) => optionPasst(o, g))) g,
   ];
   final ok = danach != null && fehlt.isEmpty && nichtGefunden.isEmpty;
-  return '${ok ? 'Angelegt' : 'NICHT vollständig angelegt'}: Gruppierung „$wunsch" (id $id) in Kurs $kurs '
+  return '${ok ? (bestehende == null ? 'Angelegt' : 'Ergänzt') : 'NICHT vollständig angelegt'}: Gruppierung „$wunsch" (id $id) in Kurs $kurs '
       'mit Gruppen: ${danach == null || danach.gruppen.isEmpty ? 'keine' : danach.gruppen.join(', ')}. '
       '${angelegt.isEmpty ? '' : 'Neu angelegte Gruppen: ${angelegt.join(', ')}. '}'
       '${fehlt.isEmpty ? '' : 'In der Gruppierung fehlen: ${fehlt.join(', ')}. '}verified: $ok';

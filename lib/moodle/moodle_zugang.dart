@@ -194,6 +194,10 @@ class MoodleZugang {
     'mod_kanban_delete_card', 'mod_kanban_move_card',
   };
 
+  /// Das versteckte Feld `id` eines Moodle-Formulars: leer oder 0 heißt, das
+  /// Objekt wird neu angelegt; jede andere Nummer ändert ein bestehendes.
+  static bool _neuesObjekt(String? id) => id != null && (id.isEmpty || id == '0');
+
   static bool _nurSchluessel(Map<String, String> q, Set<String> erlaubt) =>
       q.keys.every(erlaubt.contains);
 
@@ -706,7 +710,7 @@ class MoodleZugang {
       parameter: (q) => _nurSchluessel(q, {'courseid', 'id'}),
       formular: (f) =>
           wertIn(f, '_qf__grouping_form') != null &&
-          wertIn(f, 'id') == '0' &&
+          _neuesObjekt(wertIn(f, 'id')) &&
           _zahl(wertIn(f, 'courseid')),
     ),
     Erlaubt(
@@ -716,20 +720,21 @@ class MoodleZugang {
       parameter: (q) => _nurSchluessel(q, {'courseid', 'id'}),
       formular: (f) =>
           wertIn(f, '_qf__group_form') != null &&
-          wertIn(f, 'id') == '0' &&
+          _neuesObjekt(wertIn(f, 'id')) &&
           _zahl(wertIn(f, 'courseid')),
     ),
     Erlaubt(
       'POST',
       r'^/group/assign\.php$',
       'Gruppen einer Gruppierung zuordnen (nur Hinzufügen)',
-      parameter: (q) => q.isEmpty || _nurSchluessel(q, {'id'}),
+      parameter: (q) => q.length == 1 && _zahl(q['id']),
       formular: (f) =>
-          _zahl(wertIn(f, 'id')) &&
           _gesetzt(wertIn(f, 'sesskey')) &&
           wertIn(f, 'add') != null &&
           wertIn(f, 'remove') == null &&
-          f.where((e) => e.key == 'addselect[]').every((e) => _zahl(e.value)) &&
+          // Die Werte der Auswahl stammen aus der Seite und sind keine reinen Zahlen
+          // (gemessen: vier Zeichen, gemischt); hier nur eine kurze Kennung.
+          f.where((e) => e.key == 'addselect[]').every((e) => RegExp(r'^[\w.-]{1,40}$').hasMatch(e.value)) &&
           f.every((e) => e.key != 'removeselect[]'),
     ),
     Erlaubt(
@@ -1858,7 +1863,7 @@ class MoodleZugang {
       Art.gesperrt,
       'Gesperrt: $methode ${adresseOhneWerte(uri)}'
       '${formular == null ? '' : ' (Felder: ${formular.map((e) => e.key).toSet().join(', ')})'}'
-      '${formular == null || uri.path != '/backup/restore.php' ? '' : ' (Wertformen: ${formular.map((e) => '${e.key}=${_wertform(e.value)}').join(', ')})'}',
+      '${formular == null || !const {'/backup/restore.php', '/group/assign.php'}.contains(uri.path) ? '' : ' (Wertformen: ${formular.map((e) => '${e.key}=${_wertform(e.value)}').join(', ')})'}',
     );
     throw MoodleFehler(
       'Gesperrt: $methode ${uri.path} steht nicht auf der Positivliste dieses Servers '

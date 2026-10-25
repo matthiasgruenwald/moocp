@@ -335,7 +335,7 @@ Was die KI mit den hier aufgeführten Werkzeugen ohne Klick anlegt, ist für Ler
 | `wikiseite_schreiben` | Legt eine Seite in einem gemeinsamen Wiki an oder ersetzt den Inhalt einer vorhandenen – auch das, was andere geschrieben haben. | Ersetzen: **ja**, außer im gerade verborgen angelegten Wiki; Anlegen: wenn das Wiki sichtbar ist, sonst bei „alle" |
 | `duplizieren` | Kopiert eine Aktivität oder einen Abschnitt samt Inhalt, ohne Daten von Lernenden. Nummer und Name müssen zusammenpassen. | bei „alle" |
 | `kategorie_anlegen` | Legt in einer bestehenden Fragensammlung eine Kategorie an, auf Wunsch unter einer anderen. Eine neue Fragensammlung ist dagegen eine Aktivität (`aktivitaet_anlegen`, Typ `qbank`). | bei „alle" |
-| `gruppierung_anlegen` | Legt eine Gruppierung an, dazu die Gruppen, die es im Kurs noch nicht gibt, und ordnet sie zu. Ohne Mitglieder; bestehende Gruppierungen ändert es nicht. Gerufen wird es erst nach der Zustimmung der Lehrkraft. | bei „alle" |
+| `gruppierung_anlegen` | Legt eine Gruppierung an, dazu die Gruppen, die es im Kurs noch nicht gibt, und ordnet sie zu. Ohne Mitglieder. Bei einer bestehenden Gruppierung ergänzt es nur fehlende Gruppen, entfernt aber nichts. Gerufen wird es erst nach der Zustimmung der Lehrkraft. | bei „alle" |
 | `fragen_importieren` | Legt Fragen aus einer XML-Datei im Arbeitsordner in einer Kategorie an, nach Prüfung der Datei. Lernende sehen sie erst in einem Test. | bei „alle", eine für die ganze Datei |
 
 #### Bestehendes ändern, verschieben, sichtbar schalten, löschen: mit Freigabe

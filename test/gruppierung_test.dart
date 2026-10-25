@@ -103,7 +103,7 @@ class GruppenMoodle {
             '<input type="submit" name="submitbutton" value="Änderungen speichern"></form>',
           );
         case '/group/assign.php':
-          final id = int.parse(post ? f['id']! : q['id']!);
+          final id = int.parse(q['id']!);
           if (post) {
             for (final e in raw) {
               final kv = e.split('=');
@@ -115,8 +115,8 @@ class GruppenMoodle {
           }
           final drin = gruppierungen[id]!.gruppen;
           antwort = seite(
-            '<form id="assignform" method="post" action="/group/assign.php">'
-            '<input type="hidden" name="sesskey" value="sk"><input type="hidden" name="id" value="$id">'
+            '<form id="assignform" method="post" action="">'
+            '<input type="hidden" name="sesskey" value="sk">'
             '<select name="removeselect[]" multiple>${[for (final g in drin) '<option value="$g">${_name(g)}</option>'].join()}</select>'
             '<select name="addselect[]" multiple>${[for (final g in gruppen.keys.where((g) => !drin.contains(g))) '<option value="$g">${_name(g)}</option>'].join()}</select>'
             '<input name="add" type="submit" value="Hinzufügen"><input name="remove" type="submit" value="Entfernen"></form>',
@@ -181,20 +181,25 @@ void main() {
     test('geschrieben wird nur Neues und das Hinzufügen', () {
       final gruppe = {'_qf__group_form': '1', 'id': '0', 'courseid': '12', 'name': 'ZZ'};
       expect(post('/group/group.php?courseid=12', felder(gruppe)), isTrue);
+      expect(post('/group/group.php?courseid=12', felder({...gruppe, 'id': ''})), isTrue, reason: 'leer heißt neu');
       expect(post('/group/group.php?courseid=12', felder({...gruppe, 'id': '5'})), isFalse);
+      expect(post('/group/group.php?courseid=12', felder({...gruppe}..remove('id'))), isFalse);
       final gr = {'_qf__grouping_form': '1', 'id': '0', 'courseid': '12', 'name': 'ZZ'};
       expect(post('/group/grouping.php?courseid=12', felder(gr)), isTrue);
+      expect(post('/group/grouping.php?courseid=12', felder({...gr, 'id': ''})), isTrue);
       expect(post('/group/grouping.php?courseid=12', felder({...gr, 'id': '5'})), isFalse);
       final zu = [
         const MapEntry('sesskey', 'sk'),
-        const MapEntry('id', '10'),
         const MapEntry('addselect[]', '4'),
         const MapEntry('add', '1'),
       ];
-      expect(post('/group/assign.php', zu), isTrue);
-      expect(post('/group/assign.php', [...zu, const MapEntry('removeselect[]', '4')]), isFalse);
-      expect(post('/group/assign.php', [...zu, const MapEntry('remove', '1')]), isFalse);
-      expect(post('/group/assign.php', [...zu, const MapEntry('addselect[]', 'x')]), isFalse);
+      expect(post('/group/assign.php?id=10', zu), isTrue);
+      expect(post('/group/assign.php', zu), isFalse, reason: 'ohne Nummer in der Adresse');
+      expect(post('/group/assign.php?id=10', [...zu, const MapEntry('removeselect[]', '4')]), isFalse);
+      expect(post('/group/assign.php?id=10', [...zu, const MapEntry('remove', '1')]), isFalse);
+      expect(post('/group/assign.php?id=10', [...zu, const MapEntry('addselect[]', 'g7_1')]), isTrue);
+      expect(post('/group/assign.php?id=10', [...zu, const MapEntry('addselect[]', '1;2')]), isFalse);
+      expect(post('/group/assign.php?id=10', [...zu, const MapEntry('addselect[]', '')]), isFalse);
       expect(post('/group/delete.php', felder({'confirm': '1'})), isFalse);
     });
   });
@@ -258,13 +263,37 @@ void main() {
     expect(punkte!.join('\n'), allOf(contains('„ZZ Neu"'), contains('ZZ Gruppe A, ZZ Gruppe B'), contains('Neu angelegt werden die Gruppen: ZZ Gruppe B')));
   });
 
-  test('Eine bestehende Gruppierung wird nicht angefasst', () async {
+  test('Eine bestehende Gruppierung bekommt nur fehlende Gruppen dazu, nichts wird entfernt', () async {
     entscheide(true);
-    await expectLater(
-      gruppierungAnlegen(moodle, freigaben, kurs: 12, name: 'zz alt', gruppen: ['ZZ Gruppe A']),
-      throwsA(isA<MoodleFehler>().having((e) => e.meldung, 'meldung', contains('schon'))),
-    );
-    expect(extern.gruppierungenAngelegt + extern.gruppenAngelegt + extern.zuordnungen, 0);
+    final text = await gruppierungAnlegen(moodle, freigaben,
+        kurs: 12, name: 'zz alt', gruppen: ['ZZ Gruppe A', 'ZZ Gruppe C']);
+    expect(text, startsWith('Ergänzt'), reason: text);
+    expect(text, contains('verified: true'));
+    expect(extern.gruppierungenAngelegt, 0);
+    expect(extern.gruppenAngelegt, 0);
+    expect(extern.gruppierungen[10]!.gruppen, {1, 2});
+  });
+
+  test('Fehlt der bestehenden Gruppierung nichts, geschieht nichts und niemand wird gefragt', () async {
+    var gefragt = false;
+    freigaben.addListener(() => gefragt = true);
+    final text = await gruppierungAnlegen(moodle, freigaben, kurs: 12, name: 'ZZ Alt', gruppen: ['ZZ Gruppe C']);
+    expect(text, startsWith('Unverändert'));
+    expect(text, contains('verified: true'));
+    expect(gefragt, isFalse);
+    expect(extern.zuordnungen, 0);
+  });
+
+  test('Nach einem Abbruch mitten im Anlegen führt ein zweiter Aufruf es zu Ende', () async {
+    entscheide(true);
+    extern.gruppierungen[30] = (name: 'ZZ Halb', gruppen: {});
+    extern.gruppen[31] = 'ZZ Gruppe H1';
+    final text = await gruppierungAnlegen(moodle, freigaben,
+        kurs: 12, name: 'ZZ Halb', gruppen: ['ZZ Gruppe H1', 'ZZ Gruppe H2']);
+    expect(text, contains('verified: true'), reason: text);
+    expect(extern.gruppierungenAngelegt, 0);
+    expect(extern.gruppenAngelegt, 1);
+    expect({for (final g in extern.gruppierungen[30]!.gruppen) extern.gruppen[g]}, {'ZZ Gruppe H1', 'ZZ Gruppe H2'});
   });
 
   group('Rückfrage statt stillem Abbruch', () {
