@@ -14,9 +14,8 @@
 // Die Prüfung repariert nichts. Eine Reparatur über aktivitaet_aendern wäre ein
 // eigener Schritt mit Freigabe und hier nicht enthalten.
 //
-// Lücke: Dateien, die nur im Dateimanager einer Aktivität liegen (mod_resource,
-// mod_folder), erscheinen nicht im Formular als Verweis. Sie sind eine Prüflücke („nicht
-// lesbar"), kein Fehlbefund, bis eine erlaubte Leseseite dafür in der Positivliste steht.
+// Dateimanager-Dateien ohne lesbaren Verweis in der Formularinitialisierung bleiben
+// eine Prüflücke („nicht lesbar“); ihr Fehlen dort belegt keine fehlende Zieldatei.
 
 import 'dart:convert';
 import 'dart:io';

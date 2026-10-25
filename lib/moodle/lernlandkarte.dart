@@ -193,10 +193,7 @@ bool _gleicheFelder(FormularGelesen vorher, FormularGelesen nachher) {
 
 /// Moodle vergibt den Entwurfsbereich beim Lesen neu; Bildname und Inhalt
 /// bleiben maßgeblich, die Bytes werden separat geprüft.
-String lernlandkartenSvgVergleich(String svg) => svg.replaceAll(
-  RegExp(r'/draftfile\.php/\d+/user/draft/\d+/'),
-  '/draftfile.php/U/user/draft/X/',
-);
+String lernlandkartenSvgVergleich(String svg) => normalisiert(svg);
 
 String _vergleichHtml(String feld, String wert) =>
     const {'introeditor[text]', 'introeditor', 'svgcode'}.contains(feld)

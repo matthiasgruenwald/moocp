@@ -26,6 +26,7 @@ class TestMoodle {
   String modul = 'page';
   String gruppenmodus = '1';
   String gruppierung = '0';
+  String projektGruppierung = '8';
   bool gruppierungIgnorieren = false;
   int formularSpeicherungen = 0;
   String inhalt = '<h3>ZZ Probe</h3><p>Vorher</p>';
@@ -249,7 +250,7 @@ class TestMoodle {
             '''<form class="mform" action="/course/modedit.php" method="post">
           <input name="_qf__mod_${modul}_mod_form" value="1"><input name="sesskey" value="sk"><input name="course" value="$objektKurs">
           <input name="modulename" value="$modul"><input name="update" value="70"><input name="name" value="$name">
-          ${modul == 'collabora' ? '<div class="fitem row"><label class="col-form-label">Gruppenmodus</label><div class="felement" data-fieldtype="select"><select name="groupmode"><option value="0" ${gruppenmodus == "0" ? "selected" : ""}>Keine Gruppen</option><option value="1" ${gruppenmodus == "1" ? "selected" : ""}>Getrennte Gruppen</option></select></div></div><div class="fitem row"><label class="col-form-label">Gruppierung</label><div class="felement" data-fieldtype="select"><select name="groupingid"><option value="0" ${gruppierung == "0" ? "selected" : ""}>Keine</option><option value="8" ${gruppierung == "8" ? "selected" : ""}>ZZ Projektgruppen</option></select></div></div>' : ""}
+          ${modul == 'collabora' ? '<div class="fitem row"><label class="col-form-label">Gruppenmodus</label><div class="felement" data-fieldtype="select"><select name="groupmode"><option value="0" ${gruppenmodus == "0" ? "selected" : ""}>Keine Gruppen</option><option value="1" ${gruppenmodus == "1" ? "selected" : ""}>Getrennte Gruppen</option></select></div></div><div class="fitem row"><label class="col-form-label">Gruppierung</label><div class="felement" data-fieldtype="select"><select name="groupingid"><option value="0" ${gruppierung == "0" ? "selected" : ""}>Keine</option><option value="$projektGruppierung" ${gruppierung == projektGruppierung ? "selected" : ""}>ZZ Projektgruppen</option><option value="9" ${gruppierung == "9" ? "selected" : ""}>ZZ Projektgruppen erweitert</option></select></div></div>' : ""}
           <select name="visible"><option value="0" selected>Verborgen</option><option value="1">Sichtbar</option></select>
           <textarea name="page[text]">${const HtmlEscape().convert(inhalt)}</textarea>
           <input name="page[format]" value="1"><input name="page[itemid]" value="9">
@@ -401,6 +402,29 @@ void main() {
       expect(extern.gruppierung, '0');
     },
   );
+
+  test('Collabora verifiziert keine andere Gruppierung mit ähnlichem Namen', () async {
+    await collaboraLesen();
+    extern.gruppierung = '9';
+    await client.tool('aktivitaet_lesen', {'cmid': 70});
+    extern.gruppierungIgnorieren = true;
+    final text = await client.tool('aendern', {'ordner': 'cm-70', 'einstellungen': {'groupingid': 'ZZ Projektgruppen'}});
+    expect(text, contains('verified: false'));
+    expect(extern.gruppierung, '9');
+  });
+
+  test('Collabora bindet die freigegebene Gruppierung an ihre ID', () async {
+    await collaboraLesen();
+    freigaben.stufe = Bestaetigungen.alle;
+    freigaben.addListener(() {
+      if (freigaben.aktuell?.offen != true) return;
+      extern.projektGruppierung = '10';
+      scheduleMicrotask(() => freigaben.entscheiden(true));
+    });
+    final text = await client.tool('aendern', {'ordner': 'cm-70', 'einstellungen': {'groupingid': 'ZZ Projektgruppen'}});
+    expect(text, isNot(contains('verified: true')));
+    expect(extern.formularSpeicherungen, 0);
+  });
 
   for (final fall in [
     'Text',

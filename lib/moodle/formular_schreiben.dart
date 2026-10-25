@@ -1165,6 +1165,7 @@ class _Aenderung {
     required this.bereiche,
     required this.einstellungen,
     required this.vorab,
+    required this.gruppenWahl,
     required this.wo,
     required this.einzelheiten,
     required this.vergleich,
@@ -1181,6 +1182,7 @@ class _Aenderung {
   final List<BereichAenderung> bereiche;
   final Map<String, Object?> einstellungen;
   final Formular vorab;
+  final Map<String, String> gruppenWahl;
 
   /// ", Kurs 12 „…"" oder leer.
   final String wo;
@@ -1329,9 +1331,12 @@ Future<_Aenderung?> _vorbereiten(
         nichtMehr.isEmpty &&
         !neuSpeichern,
   );
-  final probeSetzen = einstellungenSetzen(vorab.form, [
-    ...vorab.felder,
-  ], einstellungen);
+  final probeFelder = [...vorab.felder];
+  final probeSetzen = einstellungenSetzen(vorab.form, probeFelder, einstellungen);
+  final gruppenWahl = <String, String>{
+    if (vorab.modul == 'collabora')
+      for (final k in ['groupmode', 'groupingid']) k: wertIn(probeFelder, k) ?? '',
+  };
   final kurs = vorab.kurs;
   final wo = kurs == null ? '' : ', ${await kursBezeichnung(moodle, kurs)}';
 
@@ -1417,6 +1422,7 @@ Future<_Aenderung?> _vorbereiten(
     bereiche: bereiche,
     einstellungen: einstellungen,
     vorab: vorab,
+    gruppenWahl: gruppenWahl,
     wo: wo,
     einzelheiten: einzelheiten,
     vergleich: vergleich,
@@ -1458,6 +1464,9 @@ Future<(String, bool)> _schreibenOhneSperre(
           a.geaendert.isEmpty,
     );
     final gesetzt = einstellungenSetzen(f.form, f.felder, a.einstellungen);
+    if (a.gruppenWahl.entries.any((e) => wertIn(f.felder, e.key) != e.value)) {
+      throw MoodleFehler('Collabora: Die freigegebene Gruppenwahl hat sich seit der Freigabe geändert. Nichts gespeichert; neu lesen und planen.');
+    }
     final geschrieben = <String, String>{};
     for (final k in a.zuSchreiben) {
       geschrieben[k] = await feldSetzen(moodle, f, k, a.lokal[k]!, a.quelle, {
@@ -1498,6 +1507,17 @@ Future<(String, bool)> _schreibenOhneSperre(
     bereiche: {for (final b in a.bereiche) b.feld: b.lokal},
     einstellungen: gesetzt,
   );
+  if (a.gruppenWahl.isNotEmpty) {
+    final rueckForm = hauptformular(html_parser.parse(
+      File(p.join(g.ordner, '.stand', 'formular.html')).readAsStringSync(),
+    ));
+    final rueckWerte = rueckForm == null ? <MapEntry<String, String>>[] : formularFelder(rueckForm);
+    probe.pruefe(g.modul == 'collabora' && g.kurs == a.vorab.kurs && g.name == a.vorab.name,
+        'Collabora: Aktivitätsart, Kurs und Name');
+    for (final e in a.gruppenWahl.entries) {
+      probe.pruefe(wertIn(rueckWerte, e.key) == e.value, 'Collabora: exakter Wert ${e.key}');
+    }
+  }
   final text = [
     'Gespeichert: ${_was(a.ziel, a.vorab)} „${g.name}" (${zurueck.bezeichnung}${a.wo}).',
     if (a.zuSchreiben.isNotEmpty) 'Felder: ${a.zuSchreiben.join(", ")}.',

@@ -184,6 +184,27 @@ void main() {
     expect(moodle.abrufe, ['/course/modedit.php?update=2', pfad]);
   });
 
+  for (final fall in ['gleich', 'geändert', 'fehlend']) {
+    test('Dateibereich: $fall wird über Formular und Dateiabruf geprüft', () async {
+      const pfad = '/draftfile.php/12/user/draft/77/bild.png';
+      final moodle = _Moodle({
+        '/course/modedit.php?update=2': _antwort(200, utf8.encode(
+          '<form class="mform"><input id="id_files" name="files" value="77"></form>'
+          '<script>M.form_filemanager.init(Y, {"target":"id_files","itemid":77,"list":[{"url":"$pfad"}]});</script>',
+        )),
+        pfad: _antwort(fall == 'fehlend' ? 404 : 200, fall == 'geändert' ? [9, 9] : bild),
+      }, neueCmids: []);
+      final ziel = await zielLesen(moodle, 2);
+      final probe = vergleicheAnhaenge(
+        quelle: [(name: 'bild.png', sha1: _sha(bild), dateimanager: true)],
+        ziel: ziel.abrufe,
+      );
+      expect(probe.vollstaendig, fall == 'gleich');
+      expect(moodle.abrufe, ['/course/modedit.php?update=2', pfad]);
+      if (fall != 'gleich') expect(probe.abweichend, isTrue);
+    });
+  }
+
   group('Vergleich', () {
     const quelle = [(name: 'bild.png', sha1: 'aaa', dateimanager: false)];
     ZielAbruf ok(String name, String sha) => (name: name, entwurf: false, status: 200, sha1: sha);
