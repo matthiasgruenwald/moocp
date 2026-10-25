@@ -1,6 +1,6 @@
 # E33 Gruppierungen lesen und anlegen; Fehlendes ist eine Rückfrage
 
-Seit 2026-10-26. Status: umgesetzt; Lesen, Anlegen, Zuordnen und die Rückfrage sind auf einer Testinstanz durchgespielt. Ergänzt [E3](0003-sperrliste-und-positivliste.md) und [E29](0029-sicherungen-und-verzweigung.md). Die Kurzfassung steht im Index der [CLAUDE.md](../../CLAUDE.md).
+Seit 2026-10-25. Status: umgesetzt; Lesen, Anlegen, Zuordnen und die Rückfrage sind auf einer Testinstanz durchgespielt. Ergänzt [E3](0003-sperrliste-und-positivliste.md) und [E29](0029-sicherungen-und-verzweigung.md). Die Kurzfassung steht im Index der [CLAUDE.md](../../CLAUDE.md).
 
 ## Entscheidung
 

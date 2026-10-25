@@ -740,6 +740,7 @@ Future<(Map<String, String>, List<Gesetzt>)> formularFuellen(
   String? name,
   String was = 'Formular',
 }) async {
+  gruppierungPruefen(f.form, einstellungen['groupingid'], f.kurs);
   final gesetzt = einstellungenSetzen(f.form, f.felder, einstellungen);
   if (name != null) nameSetzen(f.form, f.felder, name);
   final geschrieben = <String, String>{};
@@ -1070,15 +1071,15 @@ void _pruefeStand(
   final werte = vorher == null ? <MapEntry<String, String>>[] : formularFelder(vorher);
   final vorherModul = wertIn(werte, 'modulename');
   final nurGruppen = MoodleZugang.nurGruppenModule;
-  final collabora = nurGruppen.contains(f.modul) && vorherModul == f.modul &&
+  final nurGruppenAenderung = nurGruppen.contains(f.modul) && vorherModul == f.modul &&
       nurGruppeneinstellungen && einstellungen.isNotEmpty &&
       einstellungen.every(MoodleZugang.gruppenFelder.contains);
-  if ((nurGruppen.contains(f.modul) || nurGruppen.contains(vorherModul)) && !collabora) {
+  if ((nurGruppen.contains(f.modul) || nurGruppen.contains(vorherModul)) && !nurGruppenAenderung) {
     throw MoodleFehler(
       '${typName(nurGruppen.contains(f.modul) ? f.modul : vorherModul)}: Nur Gruppenmodus (groupmode) und Gruppierung (groupingid) bestehender Aktivitäten können geändert werden; keine Texte, Dateien oder anderen Einstellungen. Bei geänderter Aktivitätsart neu lesen.',
     );
   }
-  if (collabora && (wertIn(werte, 'name') != f.name ||
+  if (nurGruppenAenderung && (wertIn(werte, 'name') != f.name ||
       wertIn(werte, 'course') != '${f.kurs}' ||
       wertIn(f.felder, 'update') != '${ziel.id}')) {
     throw MoodleFehler(
@@ -1087,7 +1088,7 @@ void _pruefeStand(
   }
   if (ziel.art == Zielart.aktivitaet &&
       !MoodleZugang.schreibbareModule.contains(f.modul) &&
-      !collabora) {
+      !nurGruppenAenderung) {
     throw MoodleFehler(
       'Ändern geht bisher für ${MoodleZugang.schreibbareModule.map(typName).join(", ")}; '
       '${ziel.bezeichnung} ist ${typName(f.modul)}.',

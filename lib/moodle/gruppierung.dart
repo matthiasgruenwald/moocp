@@ -56,7 +56,7 @@ void gruppierungPruefen(dom.Element form, Object? wunsch, int? kurs) {
   if (auswahl == null) return;
   final text = '$wunsch'.trim();
   final optionen = auswahl.querySelectorAll('option');
-  if (optionen.any((o) => _optionsText(o).toLowerCase() == text.toLowerCase() || o.attributes['value'] == text)) return;
+  if (optionen.any((o) => optionPasst(_optionsText(o), text) || o.attributes['value'] == text)) return;
   throw GruppierungFehlt(text, kurs, [
     for (final o in optionen)
       if (o.attributes['value'] != '0') _optionsText(o),
@@ -76,6 +76,8 @@ Uri formularZiel(dom.Element form, Uri seite) {
   final a = form.attributes['action'];
   return a == null || a.isEmpty ? seite : seite.resolve(a);
 }
+
+String _pfadMitQuery(Uri u) => u.hasQuery ? '${u.path}?${u.query}' : u.path;
 
 /// Die Nummern aller Gruppierungen eines Kurses, aus den Verweisen der Übersicht.
 Future<List<int>> gruppierungsIds(MoodleZugang moodle, int kurs) async {
@@ -133,7 +135,8 @@ String gruppierungenText(int kurs, String kursname, List<Gruppierung> gs) {
   for (final g in gs) {
     b.writeln('  „${g.name}" (id ${g.id}): ${g.gruppen.isEmpty ? 'keine Gruppen' : g.gruppen.join(', ')}');
   }
-  b.write('Nur Namen; Mitglieder liest die App nicht.');
+  b.write('Nur Namen; Mitglieder liest die App nicht. Gruppennamen können Namen von Lernenden enthalten: '
+      'nicht an Dritte weitergeben und nicht in erzeugte Inhalte übernehmen.');
   return b.toString();
 }
 
@@ -153,7 +156,7 @@ Future<void> _speichern(MoodleZugang moodle, dom.Element form, String adresse, F
   final knopfName = knopf?.attributes['name'];
   if (knopfName != null && knopfName.isNotEmpty) felder.add(MapEntry(knopfName, knopf!.attributes['value'] ?? '1'));
   final ziel = formularZiel(form, Uri.parse(adresse));
-  final a = await moodle.senden(ziel.hasQuery ? '${ziel.path}?${ziel.query}' : ziel.path, felder);
+  final a = await moodle.senden(_pfadMitQuery(ziel), felder);
   if (moodle.umleitungsziel(a) == null) {
     final meldung = _fehlerAus(a.text);
     throw MoodleFehler('Moodle hat $was nicht angenommen${meldung.isEmpty ? '' : ': $meldung'}.');
@@ -273,7 +276,7 @@ Future<String> gruppierungAnlegen(
     felder.add(MapEntry('add', knopf?.attributes['value'] ?? '1'));
     // Die Nummer der Gruppierung steht in der Adresse des Formulars, nicht in einem Feld.
     final ziel = formularZiel(zf, zadresse);
-    final a = await moodle.senden(ziel.hasQuery ? '${ziel.path}?${ziel.query}' : ziel.path, felder);
+    final a = await moodle.senden(_pfadMitQuery(ziel), felder);
     if (moodle.umleitungsziel(a) == null && a.status >= 400) {
       throw MoodleFehler('Moodle hat die Zuordnung der Gruppen nicht angenommen (Status ${a.status}).');
     }

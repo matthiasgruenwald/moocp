@@ -1884,7 +1884,7 @@ class McpDienst {
       beschreibung:
           'Zeigt die Gruppierungen eines Kurses mit den Namen ihrer Gruppen -- nur Namen, nie Mitglieder. '
           'Gruppen und Gruppierungen werden bei Sicherung und Wiederherstellung nicht mitgenommen; im Quellkurs '
-          'zeigt dieses Werkzeug, was im Zielkurs gebraucht wird. Eine Aktivität zeigt ihre Gruppierung in '
+          'zeigt dieses Werkzeug, was im Zielkurs gebraucht wird. Gruppennamen können Namen von Lernenden enthalten; nicht weitergeben. Eine Aktivität zeigt ihre Gruppierung in '
           'aktivitaet_lesen (Einstellung groupingid). Nur lesen.',
       parameter: {'kurs': _kurs},
       pflicht: ['kurs'],
