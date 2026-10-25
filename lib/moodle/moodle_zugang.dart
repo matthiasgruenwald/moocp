@@ -270,6 +270,16 @@ class MoodleZugang {
     'checklist', 'wiki', 'board', 'kanban', 'url', 'resource',
   };
 
+  /// Aktivitätstypen, bei denen `aendern` ausschließlich Gruppenmodus und
+  /// Gruppierung ändert -- keine Texte, Dateien oder anderen Einstellungen,
+  /// kein Anlegen. Ein Typ kommt erst hinein, wenn sein Formular so im
+  /// Testkurs gemessen ist (E33). Die Positivliste und die Prüfungen in
+  /// formular_schreiben.dart richten sich nach dieser einen Stelle.
+  static const Set<String> nurGruppenModule = {'collabora'};
+
+  /// Die Felder, die bei [nurGruppenModule] geändert werden dürfen.
+  static const List<String> gruppenFelder = ['groupmode', 'groupingid'];
+
   /// Module, die das allgemeine Werkzeug anlegen kann. Lernlandkarten
   /// verwenden ihr eigenes, separat geprüftes Änderungswerkzeug.
   static const Set<String> anlegbareModule = {
@@ -636,8 +646,8 @@ class MoodleZugang {
         return _zahl(wertIn(f, 'course')) &&
             (schreibbareModule.contains(modul) &&
                     wertIn(f, '_qf__mod_${modul}_mod_form') != null ||
-                modul == 'collabora' &&
-                    wertIn(f, '_qf__mod_collabora_mod_form') != null &&
+                nurGruppenModule.contains(modul) &&
+                    wertIn(f, '_qf__mod_${modul}_mod_form') != null &&
                     _zahl(wertIn(f, 'update')) &&
                     const {'0', '1', '2'}.contains(wertIn(f, 'groupmode')) &&
                     _zahl(wertIn(f, 'groupingid')) ||

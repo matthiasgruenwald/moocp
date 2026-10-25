@@ -530,8 +530,10 @@ class McpDienst {
           'Prüft zuerst, dass Moodle noch den Stand vom Lesen zeigt, zeigt der Lehrkraft in der '
           'App eine Änderungsübersicht mit Zeilenvergleich und schreibt nur nach ihrer Freigabe. '
           'Danach Rückleseprobe (verified). Sichtbarkeit: sichtbarkeit_setzen. '
-          'Collabora: nur groupmode und groupingid bestehender Aktivitäten, keine Texte, Dateien, '
-          'anderen Einstellungen oder unverändertes Neuspeichern; Optionen frisch aus dem Formular lesen.',
+          '${MoodleZugang.nurGruppenModule.map(typName).join(", ")}: nur groupmode und groupingid '
+          'bestehender Aktivitäten, keine Texte, Dateien, anderen Einstellungen oder unverändertes '
+          'Neuspeichern; Optionen frisch aus dem Formular lesen. Gibt es die gewünschte Gruppierung '
+          'im Kurs nicht, bricht das Werkzeug mit einer Rückfrage ab (gruppierung_anlegen).',
       parameter: {
         'ordner': JsonSchema.string(
           description: 'Der gelesene Ordner im Arbeitsordner, absolut oder relativ dazu, etwa cm-815',

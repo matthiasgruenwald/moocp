@@ -1377,6 +1377,19 @@ void main() {
     expect(ergebnis, contains('1 verknüpft'));
   });
 
+  test('Beschreibung der Quellkarte während der Startfreigabe geändert: Abbruch mit der Kategorie Formularinhalt', () async {
+    freigaben.addListener(() {
+      if (freigaben.aktuell?.titel.startsWith('Übertragung') != true) return;
+      moodle.karte.intro = '${moodle.karte.intro} geändert';
+    });
+    final ergebnis = await client.tool('uebertragen', auftrag(ziele: [31]));
+    expect(ergebnis, contains('Quellauswahl wurde seit dem Erfassen geändert'));
+    expect(ergebnis, contains('Formularinhalt, Einstellungen oder Bilddateien der Lernlandkarte weichen ab'));
+    expect(ergebnis, isNot(contains('Aktivitätsauswahl oder Kartendaten')));
+    expect(moodle.restoreStarts, 0);
+    expect(moodle.kartenSpeicherungen, 0);
+  });
+
   test('Quellkarte während der Startfreigabe geändert: keine veraltete Zuordnung kopieren', () async {
     freigaben.addListener(() {
       if (freigaben.aktuell?.titel.startsWith('Übertragung') != true) return;

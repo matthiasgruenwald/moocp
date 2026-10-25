@@ -113,7 +113,16 @@ void main() {
 
   tearDown(() async {
     await doppel.stoppen();
-    if (arbeitsordner.existsSync()) arbeitsordner.deleteSync(recursive: true);
+    // Unter Last meldet macOS beim Löschen gelegentlich „Directory not empty",
+    // solange der Dateidienst noch etwas hält; ein zweiter Versuch genügt.
+    for (var versuch = 0; arbeitsordner.existsSync(); versuch++) {
+      try {
+        arbeitsordner.deleteSync(recursive: true);
+      } on FileSystemException {
+        if (versuch >= 4) rethrow;
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+      }
+    }
   });
 
   /// Der vollständige Stand einer gelesenen Frage: Quelltext, Bild, XML, Übersicht.

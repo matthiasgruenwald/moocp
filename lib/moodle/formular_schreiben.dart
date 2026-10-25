@@ -72,6 +72,7 @@ String typName(String? typ) => switch (typ) {
   'url' => 'Link',
   'resource' => 'Datei',
   'forum' => 'Forum',
+  'collabora' => 'Collabora',
   _ => typ ?? '?',
 };
 
@@ -1046,9 +1047,6 @@ Future<String> aktivitaetAnlegen(
 // aendern: jedes gelesene Formular zurückschreiben
 // ---------------------------------------------------------------------------
 
-/// Feste Feldnamen einer Collabora-Aktivität, die ohne Neuanlage geändert werden dürfen.
-const collaboraGruppenFelder = ['groupmode', 'groupingid'];
-
 /// Das Hauptformular aus dem gespeicherten Stand (`.stand`-Ordner); null, wenn es fehlt.
 dom.Element? _gespeichertesFormular(String stand) {
   final datei = File(p.join(stand, 'formular.html'));
@@ -1070,20 +1068,21 @@ void _pruefeStand(
 }) {
   final vorher = _gespeichertesFormular(stand);
   final werte = vorher == null ? <MapEntry<String, String>>[] : formularFelder(vorher);
-  final warCollabora = wertIn(werte, 'modulename') == 'collabora';
-  final collabora = f.modul == 'collabora' && warCollabora &&
+  final vorherModul = wertIn(werte, 'modulename');
+  final nurGruppen = MoodleZugang.nurGruppenModule;
+  final collabora = nurGruppen.contains(f.modul) && vorherModul == f.modul &&
       nurGruppeneinstellungen && einstellungen.isNotEmpty &&
-      einstellungen.every(collaboraGruppenFelder.contains);
-  if ((f.modul == 'collabora' || warCollabora) && !collabora) {
+      einstellungen.every(MoodleZugang.gruppenFelder.contains);
+  if ((nurGruppen.contains(f.modul) || nurGruppen.contains(vorherModul)) && !collabora) {
     throw MoodleFehler(
-      'Collabora: Nur Gruppenmodus (groupmode) und Gruppierung (groupingid) bestehender Aktivitäten können geändert werden; keine Texte, Dateien oder anderen Einstellungen. Bei geänderter Aktivitätsart neu lesen.',
+      '${typName(nurGruppen.contains(f.modul) ? f.modul : vorherModul)}: Nur Gruppenmodus (groupmode) und Gruppierung (groupingid) bestehender Aktivitäten können geändert werden; keine Texte, Dateien oder anderen Einstellungen. Bei geänderter Aktivitätsart neu lesen.',
     );
   }
   if (collabora && (wertIn(werte, 'name') != f.name ||
       wertIn(werte, 'course') != '${f.kurs}' ||
       wertIn(f.felder, 'update') != '${ziel.id}')) {
     throw MoodleFehler(
-      'Collabora: Name, Kurs oder Aktivitätsart stimmen nicht mehr mit dem gelesenen Stand überein. Nichts geändert.',
+      '${typName(f.modul)}: Name, Kurs oder Aktivitätsart stimmen nicht mehr mit dem gelesenen Stand überein. Nichts geändert.',
     );
   }
   if (ziel.art == Zielart.aktivitaet &&
@@ -1346,15 +1345,15 @@ Future<_Aenderung?> _vorbereiten(
         !neuSpeichern,
   );
   final gruppenStand = <String, String>{
-    if (vorab.modul == 'collabora')
-      for (final k in collaboraGruppenFelder) k: wertIn(vorab.felder, k) ?? '',
+    if (MoodleZugang.nurGruppenModule.contains(vorab.modul))
+      for (final k in MoodleZugang.gruppenFelder) k: wertIn(vorab.felder, k) ?? '',
   };
   gruppierungPruefen(vorab.form, einstellungen['groupingid'], vorab.kurs);
   final probeFelder = [...vorab.felder];
   final probeSetzen = einstellungenSetzen(vorab.form, probeFelder, einstellungen);
   final gruppenWahl = <String, String>{
-    if (vorab.modul == 'collabora')
-      for (final k in collaboraGruppenFelder) k: wertIn(probeFelder, k) ?? '',
+    if (MoodleZugang.nurGruppenModule.contains(vorab.modul))
+      for (final k in MoodleZugang.gruppenFelder) k: wertIn(probeFelder, k) ?? '',
   };
   final kurs = vorab.kurs;
   final wo = kurs == null ? '' : ', ${await kursBezeichnung(moodle, kurs)}';
@@ -1477,7 +1476,7 @@ Future<(String, bool)> _schreibenOhneSperre(
       a.bereiche.map((b) => b.feld),
       a.einstellungen.keys,
       nurGruppeneinstellungen:
-          a.vorab.modul == 'collabora' &&
+          MoodleZugang.nurGruppenModule.contains(a.vorab.modul) &&
           a.zuSchreiben.isEmpty &&
           a.bereiche.isEmpty &&
           a.neu.isEmpty &&
@@ -1485,12 +1484,12 @@ Future<(String, bool)> _schreibenOhneSperre(
     );
     // Vor der Mutation: Moodle zeigt noch den Stand von der Planung.
     if (a.gruppenStand.entries.any((e) => wertIn(f.felder, e.key) != e.value)) {
-      throw MoodleFehler('Collabora: Die Gruppeneinstellungen haben sich seit dem Planen geändert. Nichts gespeichert; neu lesen und planen.');
+      throw MoodleFehler('${typName(a.vorab.modul)}: Die Gruppeneinstellungen haben sich seit dem Planen geändert. Nichts gespeichert; neu lesen und planen.');
     }
     final gesetzt = einstellungenSetzen(f.form, f.felder, a.einstellungen);
     // Nach der Mutation: der Name ist jetzt auf eine ID aufgelöst; passt sie nicht zur geplanten, wird nichts gespeichert.
     if (a.gruppenWahl.entries.any((e) => wertIn(f.felder, e.key) != e.value)) {
-      throw MoodleFehler('Collabora: Die freigegebene Gruppenwahl hat sich seit der Freigabe geändert. Nichts gespeichert; neu lesen und planen.');
+      throw MoodleFehler('${typName(a.vorab.modul)}: Die freigegebene Gruppenwahl hat sich seit der Freigabe geändert. Nichts gespeichert; neu lesen und planen.');
     }
     final geschrieben = <String, String>{};
     for (final k in a.zuSchreiben) {
@@ -1535,10 +1534,10 @@ Future<(String, bool)> _schreibenOhneSperre(
   if (a.gruppenWahl.isNotEmpty) {
     final rueckForm = _gespeichertesFormular(p.join(g.ordner, '.stand'));
     final rueckWerte = rueckForm == null ? <MapEntry<String, String>>[] : formularFelder(rueckForm);
-    probe.pruefe(g.modul == 'collabora' && g.kurs == a.vorab.kurs && g.name == a.vorab.name,
-        'Collabora: Aktivitätsart, Kurs und Name');
+    probe.pruefe(g.modul == a.vorab.modul && g.kurs == a.vorab.kurs && g.name == a.vorab.name,
+        '${typName(a.vorab.modul)}: Aktivitätsart, Kurs und Name');
     for (final e in a.gruppenWahl.entries) {
-      probe.pruefe(wertIn(rueckWerte, e.key) == e.value, 'Collabora: exakter Wert ${e.key}');
+      probe.pruefe(wertIn(rueckWerte, e.key) == e.value, '${typName(a.vorab.modul)}: exakter Wert ${e.key}');
     }
   }
   final text = [
