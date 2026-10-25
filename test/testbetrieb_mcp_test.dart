@@ -426,6 +426,20 @@ void main() {
     expect(extern.formularSpeicherungen, 0);
   });
 
+  test('Collabora bricht ab, wenn sich die Gruppierung während der Freigabe ändert', () async {
+    await collaboraLesen();
+    freigaben.stufe = Bestaetigungen.alle;
+    freigaben.addListener(() {
+      if (freigaben.aktuell?.offen != true) return;
+      extern.gruppierung = '9';
+      scheduleMicrotask(() => freigaben.entscheiden(true));
+    });
+    final text = await client.tool('aendern', {'ordner': 'cm-70', 'einstellungen': {'groupingid': 'ZZ Projektgruppen'}});
+    expect(text, isNot(contains('verified: true')));
+    expect(extern.formularSpeicherungen, 0);
+    expect(extern.gruppierung, '9');
+  });
+
   for (final fall in [
     'Text',
     'Name',

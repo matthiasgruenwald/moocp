@@ -194,7 +194,7 @@ void main() {
       expect(b.ok, isFalse);
     });
 
-    test('leere Bewertungs- und Rollendateien einer Sicherung ohne Nutzerdaten werden angenommen (Regression Live-Messung #8)', () async {
+    test('leere Bewertungs- und Rollendateien einer Sicherung ohne Nutzerdaten werden angenommen (Regression Live-Messung)', () async {
       // Form wie in der gemessenen Sicherung: das Wurzelelement grade_history ist kein Eintrag zu einer Person.
       final b = await archivPruefen(_mbz([
         _eintrag('moodle_backup.xml', _xml(_sicherungXml())),

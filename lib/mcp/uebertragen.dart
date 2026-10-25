@@ -44,7 +44,7 @@ extension _Uebertragung on McpDienst {
     return text;
   }
 
-  /// Übertragung in einem Auftrag (Issue #10). Die Entscheidungen stehen in
+  /// Übertragung in einem Auftrag. Die Entscheidungen stehen in
   /// uebertragung_lauf.dart; hier nur die Verdrahtung mit Moodle und Freigabe.
   /// Reihenfolge: prüfen, Wiederholungsschutz, eine Freigabe mit der
   /// Zusammenfassung, sichern (nur ohne datei), dann je Ziel wiederherstellen.
@@ -137,6 +137,10 @@ extension _Uebertragung on McpDienst {
       return null;
     }
 
+    // Ohne Karten gibt es nichts zu vergleichen; so bleibt die Prüfung an beiden Stellen gleich.
+    Future<String?> quellAbweichungWennKarten() async =>
+        karten.isEmpty ? null : await quellAbweichung();
+
     final kartenZeilen = [
       for (final k in karten) ...[
         'Lernlandkarte „${k.name}" (cmid ${k.cmid}): ${k.orte.length} verknüpfte '
@@ -150,7 +154,7 @@ extension _Uebertragung on McpDienst {
       ],
     ];
 
-    // Die Zusammenfassung vor dem ersten Schreibschritt (Issue #5, uebertragungsZusammenfassung).
+    // Die Zusammenfassung vor dem ersten Schreibschritt (uebertragungsZusammenfassung).
     final zielZeilen = [
       for (final z in geprueft)
         '„${z.name}" (Kurs ${z.kurs}): ${z.weg.nennung}',
@@ -204,7 +208,7 @@ extension _Uebertragung on McpDienst {
           '${freigaben.frist.inMinutes} Minuten freigegeben. Nichts geändert.';
     }
 
-    final vorSicherung = karten.isEmpty ? null : await quellAbweichung();
+    final vorSicherung = await quellAbweichungWennKarten();
     if (vorSicherung != null) {
       return 'Die Quellauswahl wurde seit dem Erfassen geändert. $vorSicherung Nichts übertragen; neu lesen und planen.';
     }
@@ -261,7 +265,7 @@ extension _Uebertragung on McpDienst {
       );
     }
 
-    final nachSicherung = karten.isEmpty ? null : await quellAbweichung();
+    final nachSicherung = await quellAbweichungWennKarten();
     if (nachSicherung != null) {
       return 'Die Quellauswahl wurde seit dem Erfassen geändert. $nachSicherung Die Sicherung wurde erstellt, '
           'aber nichts übertragen; neu lesen und planen.';

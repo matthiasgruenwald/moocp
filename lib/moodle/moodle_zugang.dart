@@ -1104,7 +1104,7 @@ class MoodleZugang {
           wertIn(f, 'stage') == '2' &&
           _gesetzt(wertIn(f, 'sesskey')),
     ),
-    // Zielwahl je Zielweg (Issue #9): jeder Weg hat eine eigene, enge Schlüsselmenge.
+    // Zielwahl je Zielweg (E9): jeder Weg hat eine eigene, enge Schlüsselmenge.
     // Der Wert target ist der gemessene Moodle-Wert des Weges; ein anderer wird abgelehnt.
     // Kein _qf__-Feld auf dieser Seite (gemessen). Die Felder search (Kurssuche) und
     // catsearch (Kategoriesuche) gehören je nur zu den Wegen, die sie brauchen.

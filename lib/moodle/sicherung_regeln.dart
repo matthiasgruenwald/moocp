@@ -349,7 +349,7 @@ enum SicherungStand {
   }
 }
 
-/// Frist für den Stillstandshinweis (Ticket #18, Spec #17): so lange ohne neuen
+/// Frist für den Stillstandshinweis: so lange ohne neuen
 /// Fortschrittswert gilt ein laufender Vorgang als möglicherweise hängend. Die
 /// Lehrkraft hat 15 Minuten bestätigt. Ungemessen ist, wie lange Moodle für eine
 /// Sicherung oder Wiederherstellung braucht; 15 Minuten sind ein Vielfaches des
@@ -367,7 +367,7 @@ bool istStillstand(DateTime jetzt, DateTime? seit) =>
 /// Sonst bliebe [seit] leer und ein Stillstand würde nie erkannt.
 bool fortschrittNeuBeobachtet(double? alt, double? neu, DateTime? seit) => neu != alt || seit == null;
 
-/// Der Hinweistext bei Stillstand (Ticket #18). Feste Worte und Kennzahlen, keine
+/// Der Hinweistext bei Stillstand. Feste Worte und Kennzahlen, keine
 /// Moodle-Inhalte. Stillstand ist keine Aussage über Erfolg oder Fehler: Die letzte
 /// Abfrage nannte weder Ende noch Fehler (oder die Angaben fehlten), und ob der
 /// Vorgang hängt, ist nicht belegt.

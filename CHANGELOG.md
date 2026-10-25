@@ -5,6 +5,8 @@
 - Wiederherstellung: Die Dateiprüfung berücksichtigt Inhaltsfelder statt Logos, Editorressourcen und Profilbildern der Seitenhülle.
 - Collabora: Gruppenmodus und Gruppierung bestehender Aktivitäten lassen sich begrenzt ändern und zurücklesen; die Gruppierungsübernahme bleibt ausdrücklich ungeprüft.
 - Formulare: Eine globale Moodle-Suche in der Kopfzeile stört das Lesen und Ändern von Aktivitäten nicht mehr.
+- Collabora: Ändert sich die Gruppierung während der Freigabe oder zwischen Planen und Schreiben, bricht die Änderung ab, bevor etwas gespeichert wird.
+- Wiederherstellung: Ein Dateibereich ohne Gegenstück im Formular wird als Lücke gemeldet statt unbemerkt übergangen.
 - Wiederherstellung und Unterrichtsverteilung: Sichtbarkeit und Voraussetzungen bleiben standardmäßig wie in der Quelle; Verbergen ist ausdrücklich wählbar, die Freigabe nennt die Wahl.
 - Sicherung und Wiederherstellung: Die normale Antwortfrist wird als laufende Hintergrundarbeit erklärt, mit Statusabfragen bis zu 30 Minuten.
 - Wiederherstellung: Hält Moodle nach dem Prüfen mit der Seite „Rollenzuordnungen“ an, bestätigt die App die Vorgabe einmal; vorher blieb der Vorgang ohne Fehlermeldung auf „wartet“ stehen.

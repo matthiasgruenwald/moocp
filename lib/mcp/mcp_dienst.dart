@@ -1149,7 +1149,7 @@ class McpDienst {
       },
     );
 
-    // ---- Übertragung in einem Auftrag (Issue #10): dieser Instanz sichern, dann je Ziel wiederherstellen
+    // ---- Übertragung in einem Auftrag: dieser Instanz sichern, dann je Ziel wiederherstellen
     _aufrufe.registrieren(
       server,
       'uebertragen',
@@ -2198,7 +2198,7 @@ class McpDienst {
       ),
     );
 
-    // ---- Übertragung (Issue #5): Rollen und Projektkontext, nur in der App gespeichert
+    // ---- Übertragung: Rollen und Projektkontext, nur in der App gespeichert
     _aufrufe.registrieren(
       server,
       'uebertragung_rolle_setzen',

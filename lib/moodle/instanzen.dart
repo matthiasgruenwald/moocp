@@ -1,4 +1,4 @@
-// Die Registry der Moodle-Instanzen (Issue #4): je Profil (profil.dart) genau
+// Die Registry der Moodle-Instanzen (E31): je Profil (profil.dart) genau
 // ein MoodleZugang mit eigenen Cookies und eigenem sesskey. Zwei Profile teilen
 // sich nichts an Sitzung; ein Ablauf der einen Sitzung berührt die andere nicht,
 // weil jeder Zugang seine Anmeldung selbst hält (moodle_zugang.dart).

@@ -1,5 +1,4 @@
-// Bilder und Anhänge importierter Aktivitäten zurücklesen und vergleichen (Ticket #21,
-// Spec #17, E2, E3, E17).
+// Bilder und Anhänge importierter Aktivitäten zurücklesen und vergleichen (E2, E3, E17).
 //
 // Quelle: die Sicherungsdatei im Sicherungsordner (vorgaenge.ordner/datei). Je
 // eindeutig zugeordneter Aktivität nennt inforef.xml die Dateien, files.xml gibt Name
@@ -169,17 +168,24 @@ Future<({String? fehler, List<ZielAbruf> abrufe})> zielLesen(MoodleZugang moodle
       abrufe: const <ZielAbruf>[],
     );
   }
+  final bereiche = dateibereiche(form.text);
+  // Ein Dateibereich ohne Zielelement würde still ausgelassen und die Prüfung läse sich vollständig.
+  if (bereiche.any((b) => haupt.querySelector('[id="${b['target']}"]') == null)) {
+    return (
+      fehler: 'Dateibereich im Formular nicht gefunden',
+      abrufe: const <ZielAbruf>[],
+    );
+  }
   // Die Seitenhülle trägt Logos, Editorressourcen und Profilbilder, keine Inhaltsdateien.
   final inhalte = [
     for (final feld in haupt.querySelectorAll('textarea[name]'))
       if (feld.attributes['name']!.endsWith('[text]') ||
           feld.attributes['name'] == 'svgcode')
         feld.text,
-    for (final bereich in dateibereiche(form.text))
-      if (haupt.querySelector('[id="${bereich['target']}"]') != null)
-        for (final datei
-            in (bereich['list'] as List? ?? const []).whereType<Map>())
-          if (datei['url'] is String) datei['url'] as String,
+    for (final bereich in bereiche)
+      for (final datei
+          in (bereich['list'] as List? ?? const []).whereType<Map>())
+        if (datei['url'] case final String url) url,
   ];
   final abrufe = <ZielAbruf>[];
   for (final v in verweiseAus(inhalte.join('\n'))) {

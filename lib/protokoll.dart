@@ -81,7 +81,7 @@ class Protokoll extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Eine Sicht auf dieses Protokoll für ein Instanzprofil (Issue #4): Jeder
+  /// Eine Sicht auf dieses Protokoll für ein Instanzprofil: Jeder
   /// Eintrag bekommt den Profilnamen voran, damit man ihn Moodle zuordnen kann.
   /// Die Einträge landen im selben Protokoll und in derselben Datei.
   Protokoll fuer(String profil) => _ProfilProtokoll(this, profil);

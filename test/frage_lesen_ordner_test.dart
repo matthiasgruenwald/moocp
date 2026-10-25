@@ -1,4 +1,4 @@
-// Ticket #22 (Spec #17): wiederholtes und gleichzeitiges Fragenlesen über den
+// Wiederholtes und gleichzeitiges Fragenlesen über den
 // Weg des Werkzeugs frage_lesen (frageLesen -> formularLesen). Die Moodle-Grenze
 // ist ein lokales Test-Doppel auf 127.0.0.1; der Arbeitsordner ist ein
 // Temp-Verzeichnis. Es geht um den Arbeitsordner frage-<id>, der beim Lesen

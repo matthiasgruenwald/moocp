@@ -1,4 +1,4 @@
-// Offline prüfbar: Instanzprofile (Issue #4, E31). Altbestand-Migration der
+// Offline prüfbar: Instanzprofile (E31). Altbestand-Migration der
 // Einstellungen, Port und Servername je Profil, und die Registry der Zugänge.
 import 'dart:math';
 

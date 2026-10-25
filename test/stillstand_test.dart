@@ -1,4 +1,4 @@
-// Ticket #18 (Spec #17, E29): Status von Sicherung und Wiederherstellung.
+// E29: Status von Sicherung und Wiederherstellung.
 //
 // Geprüft werden die Aufrufe, die die MCP-Werkzeuge sicherung_status und
 // wiederherstellung_status ausführen, gegen einen Vorgangsspeicher in einem

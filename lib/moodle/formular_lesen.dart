@@ -234,7 +234,7 @@ class FormularGelesen {
         'Gelesen: ${name ?? "(ohne Namen)"} (${[if (modul != null) modul, ziel.bezeichnung, if (kurs != null) 'Kurs $kurs'].join(', ')})',
       )
       ..writeln('Ordner: $ordner');
-    // Ticket #23, E3: Ein Typ außerhalb der Positivliste wird gelesen, aber nicht
+    // E3: Ein Typ außerhalb der Positivliste wird gelesen, aber nicht
     // geändert. Die Lücke steht im Ergebnis, damit eine Auswertung ohne Verweise
     // nicht wie ein stiller Erfolg aussieht.
     if (ziel.art == Zielart.aktivitaet &&
@@ -545,7 +545,7 @@ String? _nameIn(dom.Element form) {
   return null;
 }
 
-/// Ticket #22: Je Zielordner läuft im Prozess höchstens ein Lesen gleichzeitig.
+/// Je Zielordner läuft im Prozess höchstens ein Lesen gleichzeitig.
 /// Ohne das löscht ein Lesen den Ordner, während ein anderes ihn gerade füllt;
 /// dann schlägt das Löschen oder Schreiben fehl. Die Sperre gilt je Pfad, nicht
 /// global: verschiedene Fragen lesen weiter parallel.

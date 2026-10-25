@@ -1,4 +1,4 @@
-// Doppelstart-Schutz der Wiederherstellung (Ticket #19, Spec #17): Eine Datei für
+// Doppelstart-Schutz der Wiederherstellung : Eine Datei für
 // denselben Kurs und Zielweg wird nicht ein zweites Mal gestartet, solange ein
 // Vorgang offen ist. Ohne Netz; der Speicher läuft über eine Datei im Temp-Ordner.
 

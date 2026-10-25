@@ -1,4 +1,4 @@
-// Ticket #21 (Spec #17, E2, E3): Bilder und Anhänge importierter Aktivitäten
+// E2, E3: Bilder und Anhänge importierter Aktivitäten
 // zurücklesen und mit der Quellaufnahme im Archiv vergleichen.
 //
 // Die Moodle-Grenze ist ein Doppel (MoodleZugang mit vorgegebenen Antworten für
@@ -204,6 +204,21 @@ void main() {
       if (fall != 'gleich') expect(probe.abweichend, isTrue);
     });
   }
+
+  test('Dateibereich ohne Zielelement im Formular ist eine Lücke, kein stilles Auslassen', () async {
+    const pfad = '/draftfile.php/12/user/draft/77/bild.png';
+    final moodle = _Moodle({
+      '/course/modedit.php?update=2': _antwort(200, utf8.encode(
+        '<form class="mform"><textarea name="page[text]">Ohne Verweis</textarea></form>'
+        '<script>M.form_filemanager.init(Y, {"target":"id_files","itemid":77,"list":[{"url":"$pfad"}]});</script>',
+      )),
+      pfad: _antwort(200, bild),
+    }, neueCmids: []);
+    final ziel = await zielLesen(moodle, 2);
+    expect(ziel.fehler, isNotNull);
+    expect(ziel.abrufe, isEmpty);
+    expect(moodle.abrufe, ['/course/modedit.php?update=2']);
+  });
 
   group('Vergleich', () {
     const quelle = [(name: 'bild.png', sha1: 'aaa', dateimanager: false)];
