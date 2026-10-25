@@ -935,6 +935,7 @@ Diese Typen haben eigene Werkzeuge, weil ihr Inhalt nicht im Formular steht. **L
 | Board | `board_lesen`, `board_aendern` | Spalten und **eigene** Notizen; Notizen anderer werden nur gezählt |
 | Kanban | `kanban_lesen`, `kanban_aendern` | nur das Kursboard, ohne Ersteller und Zuweisung |
 | Bewertungsschema einer Aufgabe | `bewertungsschema_lesen`, `bewertungsschema_setzen` | nur die Definition, nie ausgefüllte Raster |
+| Gruppierungen eines Kurses | `gruppierungen_lesen`, `gruppierung_anlegen`; zugeordnet wird mit `aendern` (`groupingid`) | nur Namen, nie Mitglieder; fehlt eine Gruppierung, fragst du die Lehrkraft (`references/bearbeiten.md`) |
 
 Bei Fortschrittsliste, Wiki, Board und Kanban stammt ein Teil des Inhalts von Lernenden. Fragt jemand „wer hat das geschrieben?" oder „wer hat abgehakt?", gilt dasselbe wie bei Noten: Das kann die App bewusst nicht. **Löschen fragt in Moodle bei diesen vier nicht nach** — die Freigabe der App ist die einzige Rückfrage.
 

@@ -106,13 +106,25 @@ Bei bestehenden Collabora-Aktivitäten ändert `aendern` ausschließlich Gruppen
 und Gruppierung. Lies die Aktivität frisch und verwende die angebotenen Optionen
 aus dem Formular; eine Gruppierungsnummer aus einem anderen Kurs ist kein Beleg.
 Texte, Dateien, Name, andere Einstellungen und unverändertes Neuspeichern bleiben
-gesperrt. Die enge Änderungsstrecke ist lokal über MCP getestet, auf einer
-Moodle-Instanz noch nicht durchgespielt. Dokumentinhalte werden damit nicht bearbeitet.
+gesperrt. Dokumentinhalte werden damit nicht bearbeitet.
 
-Sicherungen ohne Nutzerdaten nehmen keine Gruppen mit. Auch vorhandene Gruppen
-und „Getrennte Gruppen“ ersetzen die gewählte Gruppierung nicht. Nach einer
-Wiederherstellung bleibt deren Zuordnung ungeprüft; wähle sie nur nach ausdrücklicher
-fachlicher Vorgabe und bestätige das Rückleseergebnis, statt eine Übernahme zu behaupten.
+### Gruppierungen nach der Wiederherstellung
+
+Sicherungen ohne Nutzerdaten nehmen keine Gruppen und Gruppierungen mit. Auch
+vorhandene Gruppen und „Getrennte Gruppen“ ersetzen die gewählte Gruppierung
+nicht. Wer eine Aktivität mit Gruppierung wiederherstellt, ordnet sie danach zu:
+
+1. Im Quellkurs `gruppierungen_lesen` und die Gruppierung der Aktivität
+   (`aktivitaet_lesen`, Einstellung `groupingid`).
+2. Im Zielkurs `aendern` mit `groupingid` auf den Namen aus der Quelle.
+3. Meldet `aendern` eine **Rückfrage**, weil es die Gruppierung im Zielkurs nicht
+   gibt: Stelle sie der Lehrkraft in diesen Worten -- „Soll die Gruppierung
+   ‚…‘ mit den Gruppen … angelegt werden?" --, nenne die Gruppen aus der Quelle,
+   und rufe erst nach ihrem Ja `gruppierung_anlegen` auf, danach `aendern` noch
+   einmal. Ohne Ja bleibt die Aktivität ohne Gruppierung; sag ausdrücklich,
+   dass sie fehlt. Lass sie nie stillschweigend weg.
+
+Bestätige das Rückleseergebnis (`verified`), statt eine Übernahme zu behaupten.
 
 ### Wiki (`wiki`)
 
