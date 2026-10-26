@@ -100,13 +100,13 @@ Datum nach der Frist.
 Fristen an bestehenden Aufgaben zu ändern trifft Lernende unmittelbar; die
 Freigabe zeigt es, sag es trotzdem vorher im Chat.
 
-### Collabora (`collabora`)
+### Collabora (`collabora`) und Gruppenwahl (`choicegroup`)
 
-Bei bestehenden Collabora-Aktivitäten ändert `aendern` ausschließlich Gruppenmodus
+Bei bestehenden Collabora-Aktivitäten und Gruppenwahlen ändert `aendern` ausschließlich Gruppenmodus
 und Gruppierung. Lies die Aktivität frisch und verwende die angebotenen Optionen
 aus dem Formular; eine Gruppierungsnummer aus einem anderen Kurs ist kein Beleg.
 Texte, Dateien, Name, andere Einstellungen und unverändertes Neuspeichern bleiben
-gesperrt. Dokumentinhalte werden damit nicht bearbeitet.
+gesperrt. Dokumentinhalte werden damit nicht bearbeitet. Meldet das Zurücklesen `verified: false` mit „übrige Felder unverändert“, hat Moodle beim Speichern noch etwas anderes verändert: Sag es der Lehrkraft und lies die Aktivität neu, statt es zu überspielen.
 
 ### Gruppierungen nach der Wiederherstellung
 

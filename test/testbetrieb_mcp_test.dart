@@ -28,6 +28,7 @@ class TestMoodle {
   String gruppierung = '0';
   String projektGruppierung = '8';
   bool gruppierungIgnorieren = false;
+  bool inhaltNachSpeichernAendern = false;
   int formularSpeicherungen = 0;
   String inhalt = '<h3>ZZ Probe</h3><p>Vorher</p>';
   int objektKurs = 12;
@@ -203,7 +204,8 @@ class TestMoodle {
           name = f['name']!;
           inhalt = f['page[text]']!;
           formularSpeicherungen++;
-          if (modul == 'collabora') {
+          if (const {'collabora', 'choicegroup'}.contains(modul)) {
+            if (inhaltNachSpeichernAendern) inhalt = '$inhalt fremd';
             gruppenmodus = f['groupmode']!;
             if (!gruppierungIgnorieren) gruppierung = f['groupingid']!;
           }
@@ -250,7 +252,7 @@ class TestMoodle {
             '''<form class="mform" action="/course/modedit.php" method="post">
           <input name="_qf__mod_${modul}_mod_form" value="1"><input name="sesskey" value="sk"><input name="course" value="$objektKurs">
           <input name="modulename" value="$modul"><input name="update" value="70"><input name="name" value="$name">
-          ${modul == 'collabora' ? '<div class="fitem row"><label class="col-form-label">Gruppenmodus</label><div class="felement" data-fieldtype="select"><select name="groupmode"><option value="0" ${gruppenmodus == "0" ? "selected" : ""}>Keine Gruppen</option><option value="1" ${gruppenmodus == "1" ? "selected" : ""}>Getrennte Gruppen</option></select></div></div><div class="fitem row"><label class="col-form-label">Gruppierung</label><div class="felement" data-fieldtype="select"><select name="groupingid"><option value="0" ${gruppierung == "0" ? "selected" : ""}>Keine</option><option value="$projektGruppierung" ${gruppierung == projektGruppierung ? "selected" : ""}>ZZ Projektgruppen</option><option value="9" ${gruppierung == "9" ? "selected" : ""}>ZZ Projektgruppen erweitert</option></select></div></div>' : ""}
+          ${const {'collabora', 'choicegroup'}.contains(modul) ? '<div class="fitem row"><label class="col-form-label">Gruppenmodus</label><div class="felement" data-fieldtype="select"><select name="groupmode"><option value="0" ${gruppenmodus == "0" ? "selected" : ""}>Keine Gruppen</option><option value="1" ${gruppenmodus == "1" ? "selected" : ""}>Getrennte Gruppen</option></select></div></div><div class="fitem row"><label class="col-form-label">Gruppierung</label><div class="felement" data-fieldtype="select"><select name="groupingid"><option value="0" ${gruppierung == "0" ? "selected" : ""}>Keine</option><option value="$projektGruppierung" ${gruppierung == projektGruppierung ? "selected" : ""}>ZZ Projektgruppen</option><option value="9" ${gruppierung == "9" ? "selected" : ""}>ZZ Projektgruppen erweitert</option></select></div></div>' : ""}
           <select name="visible"><option value="0" selected>Verborgen</option><option value="1">Sichtbar</option></select>
           <textarea name="page[text]">${const HtmlEscape().convert(inhalt)}</textarea>
           <input name="page[format]" value="1"><input name="page[itemid]" value="9">
@@ -388,6 +390,53 @@ void main() {
       expect(extern.formularSpeicherungen, 1);
     },
   );
+
+  test('Gruppenwahl: Gruppenmodus und Gruppierung werden über MCP geändert und zurückgelesen', () async {
+    extern.modul = 'choicegroup';
+    extern.vorhanden = true;
+    freigaben.stufe = Bestaetigungen.keine;
+    await starten();
+    final gelesen = await client.tool('aktivitaet_lesen', {'cmid': 70});
+    expect(gelesen, contains('choicegroup'));
+    expect(gelesen, contains('Gruppenmodus (groupmode) und Gruppierung'));
+    final text = await client.tool('aendern', {
+      'ordner': 'cm-70',
+      'einstellungen': {'groupmode': 'Getrennte Gruppen', 'groupingid': 'ZZ Projektgruppen'},
+    });
+    expect(text, contains('verified: true'), reason: text);
+    expect(extern.gruppierung, '8');
+    expect(extern.formularSpeicherungen, 1);
+  });
+
+  test('Gruppenwahl: Ändert Moodle beim Speichern etwas anderes, ist das nicht verifiziert', () async {
+    extern.modul = 'choicegroup';
+    extern.vorhanden = true;
+    extern.inhaltNachSpeichernAendern = true;
+    freigaben.stufe = Bestaetigungen.keine;
+    await starten();
+    await client.tool('aktivitaet_lesen', {'cmid': 70});
+    final text = await client.tool('aendern', {
+      'ordner': 'cm-70',
+      'einstellungen': {'groupingid': 'ZZ Projektgruppen'},
+    });
+    expect(text, contains('verified: false'), reason: text);
+    expect(text, contains('übrige Felder unverändert'));
+    expect(text, contains('page[text]'));
+  });
+
+  test('Gruppenwahl: Texte und andere Einstellungen bleiben gesperrt', () async {
+    extern.modul = 'choicegroup';
+    extern.vorhanden = true;
+    freigaben.stufe = Bestaetigungen.keine;
+    await starten();
+    await client.tool('aktivitaet_lesen', {'cmid': 70});
+    final text = await client.tool('aendern', {
+      'ordner': 'cm-70',
+      'einstellungen': {'visible': 'Sichtbar'},
+    });
+    expect(text, contains('Nur Gruppenmodus (groupmode) und Gruppierung'));
+    expect(extern.formularSpeicherungen, 0);
+  });
 
   test(
     'Collabora meldet ignorierte Gruppierung als nicht verifiziert',

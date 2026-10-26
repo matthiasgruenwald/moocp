@@ -273,9 +273,10 @@ class MoodleZugang {
   /// Aktivitätstypen, bei denen `aendern` ausschließlich Gruppenmodus und
   /// Gruppierung ändert -- keine Texte, Dateien oder anderen Einstellungen,
   /// kein Anlegen. Ein Typ kommt erst hinein, wenn sein Formular so im
-  /// Testkurs gemessen ist (E33). Die Positivliste und die Prüfungen in
+  /// Testkurs gemessen ist (E33); `choicegroup` steht ungemessen darin, abgesichert
+  /// durch den Vergleich aller übrigen Felder beim Zurücklesen. Die Positivliste und die Prüfungen in
   /// formular_schreiben.dart richten sich nach dieser einen Stelle.
-  static const Set<String> nurGruppenModule = {'collabora'};
+  static const Set<String> nurGruppenModule = {'collabora', 'choicegroup'};
 
   /// Die Felder, die bei [nurGruppenModule] geändert werden dürfen.
   static const List<String> gruppenFelder = ['groupmode', 'groupingid'];

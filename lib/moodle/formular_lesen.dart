@@ -242,8 +242,12 @@ class FormularGelesen {
         modul != 'learningmap' &&
         !MoodleZugang.schreibbareModule.contains(modul)) {
       b.writeln(
-        'Prüflücke: Typ „$modul" ist nicht schreibbar -- gelesen, nicht geändert (aendern lehnt ab). '
-        'Die Verweisprüfung erfasst nur Textfelder; Auswahlfelder werden nicht geprüft.',
+        MoodleZugang.nurGruppenModule.contains(modul)
+            ? 'Prüflücke: Typ „$modul" ändert aendern nur in Gruppenmodus (groupmode) und Gruppierung '
+                  '(groupingid); alles andere ist gelesen, nicht änderbar. '
+                  'Die Verweisprüfung erfasst nur Textfelder; Auswahlfelder werden nicht geprüft.'
+            : 'Prüflücke: Typ „$modul" ist nicht schreibbar -- gelesen, nicht geändert (aendern lehnt ab). '
+                  'Die Verweisprüfung erfasst nur Textfelder; Auswahlfelder werden nicht geprüft.',
       );
     }
     if (fehlend.isNotEmpty) {

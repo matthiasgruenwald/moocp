@@ -311,14 +311,14 @@ void main() {
 
     test('eine fehlende Gruppierung wird zur Rückfrage mit dem Weg weiter', () {
       expect(
-        () => gruppierungPruefen(form, 'Auseinanderbau', 1835),
+        () => gruppierungPruefen(form, 'Auseinanderbau', 12),
         throwsA(
           isA<GruppierungFehlt>().having(
             (e) => e.meldung,
             'meldung',
             allOf(
               contains('Rückfrage an die Lehrkraft'),
-              contains('„Auseinanderbau" gibt es in Kurs 1835 nicht'),
+              contains('„Auseinanderbau" gibt es in Kurs 12 nicht'),
               contains('Expertengruppierung, Testersatzgruppierung'),
               contains('gruppierungen_lesen'),
               contains('gruppierung_anlegen'),

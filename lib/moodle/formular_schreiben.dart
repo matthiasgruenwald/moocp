@@ -73,6 +73,7 @@ String typName(String? typ) => switch (typ) {
   'resource' => 'Datei',
   'forum' => 'Forum',
   'collabora' => 'Collabora',
+  'choicegroup' => 'Gruppenwahl',
   _ => typ ?? '?',
 };
 
@@ -1048,6 +1049,34 @@ Future<String> aktivitaetAnlegen(
 // aendern: jedes gelesene Formular zurückschreiben
 // ---------------------------------------------------------------------------
 
+/// Die Namen der Felder, deren Werte sich zwischen zwei Lesungen desselben
+/// Formulars unterscheiden -- ohne die Gruppenfelder und ohne das, was Moodle
+/// bei jedem Laden neu vergibt (Sitzung, Entwurfsnummern, aufgeklappte
+/// Bereiche) oder bei ausgeschalteten Datumsfeldern mit der Uhrzeit füllt.
+List<String> uebrigeFelderAbweichung(Felder vorher, Felder nachher) {
+  bool fluechtig(String k) =>
+      MoodleZugang.gruppenFelder.contains(k) ||
+      k == 'sesskey' ||
+      k.startsWith('_qf__') ||
+      k.startsWith('mform_isexpanded') ||
+      k.contains('[itemid]') ||
+      RegExp(r'\[(day|month|year|hour|minute)\]$').hasMatch(k);
+  Map<String, List<String>> gruppiert(Felder f) {
+    final m = <String, List<String>>{};
+    for (final e in f) {
+      if (!fluechtig(e.key)) (m[e.key] ??= []).add(e.value);
+    }
+    return m;
+  }
+
+  final a = gruppiert(vorher);
+  final b = gruppiert(nachher);
+  return [
+    for (final k in {...a.keys, ...b.keys})
+      if (a[k]?.join('\u0000') != b[k]?.join('\u0000')) k,
+  ]..sort();
+}
+
 /// Das Hauptformular aus dem gespeicherten Stand (`.stand`-Ordner); null, wenn es fehlt.
 dom.Element? _gespeichertesFormular(String stand) {
   final datei = File(p.join(stand, 'formular.html'));
@@ -1540,6 +1569,10 @@ Future<(String, bool)> _schreibenOhneSperre(
     for (final e in a.gruppenWahl.entries) {
       probe.pruefe(wertIn(rueckWerte, e.key) == e.value, '${typName(a.vorab.modul)}: exakter Wert ${e.key}');
     }
+    // Alles andere muss unverändert sein: Der Typ ist nur für diese zwei Felder gemessen.
+    final anders = uebrigeFelderAbweichung(a.vorab.felder, rueckWerte);
+    probe.pruefe(anders.isEmpty,
+        '${typName(a.vorab.modul)}: übrige Felder unverändert${anders.isEmpty ? '' : ' (abweichend: ${anders.join(', ')})'}');
   }
   final text = [
     'Gespeichert: ${_was(a.ziel, a.vorab)} „${g.name}" (${zurueck.bezeichnung}${a.wo}).',
