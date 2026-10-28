@@ -44,7 +44,7 @@ extension _Uebertragung on McpDienst {
     return text;
   }
 
-  /// Übertragung in einem Auftrag (Issue #10). Die Entscheidungen stehen in
+  /// Übertragung in einem Auftrag. Die Entscheidungen stehen in
   /// uebertragung_lauf.dart; hier nur die Verdrahtung mit Moodle und Freigabe.
   /// Reihenfolge: prüfen, Wiederholungsschutz, eine Freigabe mit der
   /// Zusammenfassung, sichern (nur ohne datei), dann je Ziel wiederherstellen.
@@ -119,16 +119,27 @@ extension _Uebertragung on McpDienst {
             ganzerKurs: a['ganzer_kurs'] == true,
           );
     final karten = await quelleErfassen();
-    Future<bool> quelleUnveraendert() async {
-      if (!bindungPasst()) return false;
+    Future<String?> quellAbweichung() async {
+      if (!bindungPasst()) return 'Profil oder Instanz wurde gewechselt.';
       final frisch = await quelleErfassen();
-      return jsonEncode([
-            for (final k in karten) [k.cmid, k.name, k.stand, k.formularstand],
-          ]) ==
+      if (jsonEncode([
+            for (final k in karten) [k.cmid, k.name, k.stand],
+          ]) !=
           jsonEncode([
-            for (final k in frisch) [k.cmid, k.name, k.stand, k.formularstand],
-          ]);
+            for (final k in frisch) [k.cmid, k.name, k.stand],
+          ])) {
+        return 'Aktivitätsauswahl oder Kartendaten weichen ab.';
+      }
+      if (jsonEncode([for (final k in karten) k.formularstand]) !=
+          jsonEncode([for (final k in frisch) k.formularstand])) {
+        return 'Formularinhalt, Einstellungen oder Bilddateien der Lernlandkarte weichen ab.';
+      }
+      return null;
     }
+
+    // Ohne Karten gibt es nichts zu vergleichen; so bleibt die Prüfung an beiden Stellen gleich.
+    Future<String?> quellAbweichungWennKarten() async =>
+        karten.isEmpty ? null : await quellAbweichung();
 
     final kartenZeilen = [
       for (final k in karten) ...[
@@ -143,7 +154,7 @@ extension _Uebertragung on McpDienst {
       ],
     ];
 
-    // Die Zusammenfassung vor dem ersten Schreibschritt (Issue #5, uebertragungsZusammenfassung).
+    // Die Zusammenfassung vor dem ersten Schreibschritt (uebertragungsZusammenfassung).
     final zielZeilen = [
       for (final z in geprueft)
         '„${z.name}" (Kurs ${z.kurs}): ${z.weg.nennung}',
@@ -197,8 +208,9 @@ extension _Uebertragung on McpDienst {
           '${freigaben.frist.inMinutes} Minuten freigegeben. Nichts geändert.';
     }
 
-    if (karten.isNotEmpty && !await quelleUnveraendert()) {
-      return 'Die Quellauswahl wurde seit dem Erfassen geändert. Nichts übertragen; neu lesen und planen.';
+    final vorSicherung = await quellAbweichungWennKarten();
+    if (vorSicherung != null) {
+      return 'Die Quellauswahl wurde seit dem Erfassen geändert. $vorSicherung Nichts übertragen; neu lesen und planen.';
     }
 
     // Ohne datei zuerst auf dieser Instanz sichern. Die Datei gilt nur, wenn der Vorgang fertig ist.
@@ -253,8 +265,9 @@ extension _Uebertragung on McpDienst {
       );
     }
 
-    if (karten.isNotEmpty && !await quelleUnveraendert()) {
-      return 'Die Quellauswahl wurde seit dem Erfassen geändert. Die Sicherung wurde erstellt, '
+    final nachSicherung = await quellAbweichungWennKarten();
+    if (nachSicherung != null) {
+      return 'Die Quellauswahl wurde seit dem Erfassen geändert. $nachSicherung Die Sicherung wurde erstellt, '
           'aber nichts übertragen; neu lesen und planen.';
     }
     var archivHatKarten = false;

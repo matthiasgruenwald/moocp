@@ -1,4 +1,4 @@
-// Ticket #21 (Spec #17, E2, E3): Bilder und Anhänge importierter Aktivitäten
+// E2, E3: Bilder und Anhänge importierter Aktivitäten
 // zurücklesen und mit der Quellaufnahme im Archiv vergleichen.
 //
 // Die Moodle-Grenze ist ein Doppel (MoodleZugang mit vorgegebenen Antworten für
@@ -36,11 +36,11 @@ Uint8List _archiv({required List<int> bild, bool mitNutzerdatei = false}) {
   const backup = '<moodle_backup><activities><activity><modulename>page</modulename>'
       '<title>Infoblatt</title><directory>activities/page_7</directory></activity></activities></moodle_backup>';
   final files = StringBuffer('<files>'
-      '<file><id>1</id><contenthash>${_sha(bild)}</contenthash><filename>bild.png</filename>'
+      '<file id="1"><contenthash>${_sha(bild)}</contenthash><filename>bild.png</filename>'
       '<filepath>/</filepath><component>mod_page</component><filearea>content</filearea></file>'
-      '<file><id>2</id><contenthash>${_sha(const [1])}</contenthash><filename>eigen.png</filename>'
+      '<file id="2"><contenthash>${_sha(const [1])}</contenthash><filename>eigen.png</filename>'
       '<filepath>/</filepath><component>user</component><filearea>draft</filearea></file>'
-      '<file><id>3</id><contenthash>x</contenthash><filename>.</filename>'
+      '<file id="3"><contenthash>x</contenthash><filename>.</filename>'
       '<filepath>/</filepath><component>mod_page</component><filearea>content</filearea></file>'
       '</files>');
   return _mbz({
@@ -61,6 +61,7 @@ class _Moodle extends MoodleZugang {
 
   /// Zusätzliche neue Aktivitäten im Kurs (cmid, modul, titel).
   final List<(int, String, String)> neueCmids;
+  final List<String> abrufe = [];
   final Map<int, bool> sichtbar = {1: true};
   final Map<int, String> namen = {1: 'Alt'};
 
@@ -104,8 +105,10 @@ class _Moodle extends MoodleZugang {
   }
 
   @override
-  Future<Antwort> lesen(String pfadMitQuery) async =>
-      seiten[pfadMitQuery] ?? _antwort(404, utf8.encode('nicht gefunden'));
+  Future<Antwort> lesen(String pfadMitQuery) async {
+    abrufe.add(pfadMitQuery);
+    return seiten[pfadMitQuery] ?? _antwort(404, utf8.encode('nicht gefunden'));
+  }
 }
 
 void main() {
@@ -125,7 +128,7 @@ void main() {
         'moodle_backup.xml': utf8.encode('<moodle_backup><activities><activity><modulename>resource</modulename>'
             '<title>Blatt</title><directory>activities/resource_3</directory></activity></activities></moodle_backup>'),
         'activities/resource_3/inforef.xml': utf8.encode('<inforef><fileref><file><id>1</id></file></fileref></inforef>'),
-        'files.xml': utf8.encode('<files><file><id>1</id><contenthash>abc</contenthash><filename>blatt.pdf</filename>'
+        'files.xml': utf8.encode('<files><file id="1"><contenthash>abc</contenthash><filename>blatt.pdf</filename>'
             '<component>mod_resource</component><filearea>content</filearea></file></files>'),
       });
       expect(quelldateienAus(mbz, modul: 'resource', titel: 'Blatt'),
@@ -157,6 +160,64 @@ void main() {
         (entwurf: false, pfad: '/pluginfile.php/9/mod_page/content/1/z.pdf', name: 'z.pdf'),
       ]);
     });
+  });
+
+  test('Zielprüfung liest Inhaltsbilder, aber keine Dateien der Seitenhülle', () async {
+    const pfad = '/draftfile.php/12/user/draft/77/bild.png';
+    final moodle = _Moodle({
+      '/course/modedit.php?update=2': _antwort(
+        200,
+        utf8.encode(
+          '<img src="/pluginfile.php/9/user/icon/boost/f2">'
+          '<script src="/pluginfile.php/4/theme/assets/editor.js"></script>'
+          '<form class="mform"><textarea name="page[text]">&lt;img src="$pfad"&gt;</textarea></form>',
+        ),
+      ),
+      pfad: _antwort(200, bild),
+    }, neueCmids: []);
+    final ziel = await zielLesen(moodle, 2);
+    final probe = vergleicheAnhaenge(
+      quelle: [(name: 'bild.png', sha1: _sha(bild), dateimanager: false)],
+      ziel: ziel.abrufe,
+    );
+    expect(probe.vollstaendig, isTrue);
+    expect(moodle.abrufe, ['/course/modedit.php?update=2', pfad]);
+  });
+
+  for (final fall in ['gleich', 'geändert', 'fehlend']) {
+    test('Dateibereich: $fall wird über Formular und Dateiabruf geprüft', () async {
+      const pfad = '/draftfile.php/12/user/draft/77/bild.png';
+      final moodle = _Moodle({
+        '/course/modedit.php?update=2': _antwort(200, utf8.encode(
+          '<form class="mform"><input id="id_files" name="files" value="77"></form>'
+          '<script>M.form_filemanager.init(Y, {"target":"id_files","itemid":77,"list":[{"url":"$pfad"}]});</script>',
+        )),
+        pfad: _antwort(fall == 'fehlend' ? 404 : 200, fall == 'geändert' ? [9, 9] : bild),
+      }, neueCmids: []);
+      final ziel = await zielLesen(moodle, 2);
+      final probe = vergleicheAnhaenge(
+        quelle: [(name: 'bild.png', sha1: _sha(bild), dateimanager: true)],
+        ziel: ziel.abrufe,
+      );
+      expect(probe.vollstaendig, fall == 'gleich');
+      expect(moodle.abrufe, ['/course/modedit.php?update=2', pfad]);
+      if (fall != 'gleich') expect(probe.abweichend, isTrue);
+    });
+  }
+
+  test('Dateibereich ohne Zielelement im Formular ist eine Lücke, kein stilles Auslassen', () async {
+    const pfad = '/draftfile.php/12/user/draft/77/bild.png';
+    final moodle = _Moodle({
+      '/course/modedit.php?update=2': _antwort(200, utf8.encode(
+        '<form class="mform"><textarea name="page[text]">Ohne Verweis</textarea></form>'
+        '<script>M.form_filemanager.init(Y, {"target":"id_files","itemid":77,"list":[{"url":"$pfad"}]});</script>',
+      )),
+      pfad: _antwort(200, bild),
+    }, neueCmids: []);
+    final ziel = await zielLesen(moodle, 2);
+    expect(ziel.fehler, isNotNull);
+    expect(ziel.abrufe, isEmpty);
+    expect(moodle.abrufe, ['/course/modedit.php?update=2']);
   });
 
   group('Vergleich', () {
@@ -251,7 +312,7 @@ void main() {
     }
 
     Antwort formular(int cmid) => _antwort(200, utf8.encode(
-        '<textarea>&lt;img src=&quot;/draftfile.php/12/user/draft/77/bild.png&quot;&gt;</textarea>'));
+        '<form class="mform"><textarea name="page[text]">&lt;img src=&quot;/draftfile.php/12/user/draft/77/bild.png&quot;&gt;</textarea></form>'));
 
     test('identische Datei: verborgen und verified, Bericht im Status', () async {
       final vg = Vorgaenge(ordner.path);

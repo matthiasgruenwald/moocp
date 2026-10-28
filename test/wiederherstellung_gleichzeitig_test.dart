@@ -1,4 +1,4 @@
-// Befund 1 und 2 (Review): Zwei gleichzeitige Aufrufe mit derselben Datei und
+// Zwei gleichzeitige Aufrufe mit derselben Datei und
 // demselben Zielweg dürfen nur einen Freigabedialog erzeugen. Der zweite Aufruf
 // wartet nicht auf die Freigabe des ersten, er wird sofort abgewiesen.
 //
@@ -75,6 +75,17 @@ class _ZaehlFreigaben extends Freigaben {
   }
 }
 
+/// Wartet, bis die erste Freigabe-Anfrage da ist (das Archiv zu lesen dauert
+/// unter Last unterschiedlich lang), und lässt dem zweiten Aufruf danach Zeit,
+/// fälschlich eine zweite zu stellen.
+Future<void> _warteAufErsteAnfrage(_ZaehlFreigaben freigaben) async {
+  final ende = DateTime.now().add(const Duration(seconds: 20));
+  while (freigaben.gezaehlt < 1 && DateTime.now().isBefore(ende)) {
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+  }
+  await Future<void>.delayed(const Duration(milliseconds: 300));
+}
+
 void main() {
   test('zwei gleichzeitige Aufrufe mit derselben Datei: nur einer fragt, der andere wird abgewiesen', () async {
     final ordner = Directory.systemTemp.createTempSync('wh_gleichzeitig_');
@@ -100,7 +111,7 @@ void main() {
     final zweiter = aufruf().then<Object>((v) => v, onError: (Object e) => e);
 
     // Genau einer erreicht die Freigabe; welcher zuerst das Archiv liest, ist offen.
-    await Future<void>.delayed(const Duration(milliseconds: 200));
+    await _warteAufErsteAnfrage(freigaben);
     expect(freigaben.gezaehlt, 1, reason: 'Der zweite Aufruf darf keinen zweiten Dialog erzeugen.');
 
     freigaben.entscheiden(false);
@@ -123,7 +134,7 @@ void main() {
 
     final freigaben = _ZaehlFreigaben(Protokoll());
     final zweiter = aufruf(freigaben).then<Object>((v) => v, onError: (Object e) => e);
-    await Future<void>.delayed(const Duration(milliseconds: 200));
+    await _warteAufErsteAnfrage(freigaben);
     expect(freigaben.gezaehlt, 1, reason: 'Der zweite Aufruf darf nicht als Doppelstart abgewiesen werden.');
     freigaben.entscheiden(false);
     expect(await zweiter, contains('Nicht wiederhergestellt'));

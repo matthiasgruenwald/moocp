@@ -376,6 +376,7 @@ Future<String> _ausfuehren(
     }
 
     // Formular „Wiederherstellen" holen; der Entwurfsbereich ist sein Feld backupfile.
+    await vorgaenge.aktualisieren(vg, text: 'Phase: Uploadformular lesen.');
     final f = await formularHolen(
       moodle,
       '/backup/restorefile.php?contextid=$kontext',
@@ -389,8 +390,10 @@ Future<String> _ausfuehren(
         'Das Formular nennt keinen Entwurfsbereich (Felder: $namen). Nichts geändert.',
       );
     }
+    await vorgaenge.aktualisieren(vg, text: 'Phase: Sicherungsdatei hochladen.');
     await hochladen(moodle, f, itemid, '/', name, bytes);
     await _uebergang(vorgaenge, vg, WiederherstellungStand.hochgeladen,
+        text: 'Phase: Restore-Assistent, Sicherungsdetails und Ziel.',
         vorherCmids: vorherCmids, wiederherstellungAktivitaeten: wiederherstellungAktivitaeten);
 
     // Formular absenden: Moodle legt die Datei ab und leitet zum Assistenten.
@@ -434,6 +437,7 @@ Future<String> _ausfuehren(
     }
 
     // Schritt 4: Einstellungen, nur wenn keine Nutzerdaten vorgesehen sind.
+    await vorgaenge.aktualisieren(vg, text: 'Phase: Restore-Assistent, Einstellungen und Schema.');
     if (!ohneNutzerdaten(s4.felder)) {
       throw MoodleFehler('Die Einstellungen sehen Nutzerdaten vor; abgebrochen. Nichts geändert.');
     }
@@ -466,6 +470,7 @@ Future<String> _ausfuehren(
     // Ab hier: Schritt 16 startet die Wiederherstellung. Nie erneut senden.
     vorUpload = false;
     await _uebergang(vorgaenge, vg, WiederherstellungStand.laufend,
+        text: 'Phase: Wiederherstellungsstart senden; Ausgang noch nicht bestätigt.',
         laufzeit: laufzeit, backupid: restoreid, kontext: kontext);
     try {
       var start = await moodle.senden(s16.aktion, s16.felder);
@@ -480,6 +485,7 @@ Future<String> _ausfuehren(
       // ohnehin ausgeschlossen (ohneNutzerdaten). Genau eine solche Seite, nie mehr.
       final rollen = rollenzuordnung(start);
       if (rollen != null) {
+        await vorgaenge.aktualisieren(vg, text: 'Phase: Restore-Assistent, Rollenzuordnung.');
         start = await moodle.senden(rollen.aktion, rollen.felder);
         if (start.status >= 400) {
           throw MoodleFehler('Die Rollenzuordnung wurde mit HTTP ${start.status} beantwortet. '
@@ -491,9 +497,18 @@ Future<String> _ausfuehren(
               'mit wiederherstellung_status prüfen, nicht neu senden.');
         }
       }
+      // HTTP 200 und ein Controller im Zustand 700 belegen keinen angenommenen Start.
+      final doc = html_parser.parse(start.text);
+      if (doc.querySelector('.alert-danger, .notifyproblem, .errorbox') != null ||
+          restoreFormulare(start).any((f) => wertIn(f.felder, 'substage') != null)) {
+        final diagnose = startDiagnose(start);
+        await vorgaenge.aktualisieren(vg, text: 'Phase: Restore-Assistent blockiert. $diagnose');
+        throw MoodleFehler('Unklar: Der Restore-Assistent meldet einen Fehler oder wartet auf weitere Angaben. '
+            '$diagnose. Der Start ist unklar; nichts erneut senden.');
+      }
     } catch (_) {
       await _uebergang(vorgaenge, vg, WiederherstellungStand.unklar,
-          text: 'Der Start ist nicht bestätigt. wiederherstellung_status prüft erneut; nicht neu senden.');
+          text: '${vg.text} Der Start ist nicht bestätigt; nicht neu senden.');
       rethrow;
     }
     final ergebnis = await _warten(moodle, vorgaenge, vg,
@@ -512,10 +527,11 @@ Future<String> _ausfuehren(
           text: platzhalter
               ? 'Der Platzhalterkurs ist möglicherweise angelegt; in Moodle prüfen. Nichts weiter gestartet '
                   '(nativer Abbruch der Angaben: UNGEMESSEN).'
-              : 'Vor dem Start abgebrochen; im Kurs ist nichts geändert.');
+              : '${vg.text} Fehlerart: ${e.runtimeType}. Vor dem Start abgebrochen; im Kurs ist nichts geändert.');
     } else if (vg.wiederherstellung != WiederherstellungStand.fertig) {
       await _uebergang(vorgaenge, vg, WiederherstellungStand.unklar,
-          text: 'Der Lauf konnte nicht abschließend geprüft werden. Mit wiederherstellung_status und der Nummer erneut prüfen.');
+          text: '${vg.text} Fehlerart: ${e.runtimeType}. Der Lauf konnte nicht abschließend geprüft werden. '
+              'Mit wiederherstellung_status und der Nummer erneut prüfen; nichts erneut senden.');
     }
     rethrow;
   }
@@ -630,7 +646,7 @@ List<({String aktion, Felder felder})> restoreFormulare(Antwort r) {
 
 /// Fragt den Hintergrundauftrag ab. Dann liest sie den Kurs zurück. Bei neuer_kurs
 /// ist die Kursnummer unbekannt (UNGEMESSEN): dann wird nicht gegengelesen.
-/// Stillstand wird am Anfang des Aufrufs geprüft, wie bei der Sicherung.
+/// Stillstand wird bei jeder Beobachtung geprüft, auch innerhalb desselben Aufrufs.
 Future<String> _warten(
   MoodleZugang moodle,
   Vorgaenge vorgaenge,
@@ -647,9 +663,9 @@ Future<String> _warten(
   Duration takt = const Duration(seconds: 3),
 }) async {
   final ende = jetzt().add(gesamt);
-  var erster = true;
   String? letzteDiagnose;
   try {
+    await vorgaenge.aktualisieren(vg, text: 'Phase: Moodle-Fortschritt abfragen.');
     while (true) {
       vorgaenge.pruefeBindung(vg);
       // Operation „restore" und die Restore-ID als backupids: ungemessen, siehe TODO.md.
@@ -659,6 +675,7 @@ Future<String> _warten(
       });
       final stand = bewerteFortschritt(antwort, restoreid);
       final diagnose = fortschrittDiagnose(antwort, restoreid);
+      await vorgaenge.aktualisieren(vg, text: 'Phase: Moodle-Prozess. $diagnose');
       if (diagnose != letzteDiagnose) {
         moodle.protokoll.eintrag(Art.info, 'Wiederherstellung, Fortschritt: $diagnose');
         letzteDiagnose = diagnose;
@@ -691,7 +708,7 @@ Future<String> _warten(
       if (fortschrittNeuBeobachtet(vg.fortschritt, fortschritt, vg.fortschrittSeit)) {
         await vorgaenge.aktualisieren(vg, fortschritt: fortschritt, fortschrittSeit: jetzige);
       }
-      if (erster && istStillstand(jetzige, vg.fortschrittSeit)) {
+      if (istStillstand(jetzige, vg.fortschrittSeit)) {
         return stillstandText(
           nummer: vg.id,
           werkzeug: 'wiederherstellung_status',
@@ -701,7 +718,6 @@ Future<String> _warten(
               'die Administration prüft das. Die Wiederherstellung ist nicht als gescheitert gemeldet.',
         );
       }
-      erster = false;
       if (jetzt().isAfter(ende)) {
         return 'Die Wiederherstellung läuft noch (Nummer ${vg.id}), letzte Beobachtung '
             '${fortschritt == null ? 'unbekannt' : '${(fortschritt * 100).round()} %'}. '
@@ -717,11 +733,14 @@ Future<String> _warten(
       return 'Neuer Kurs angelegt (Nummer ${vg.id}). Die Kursnummer ist nicht bekannt; Kurs bitte in Moodle prüfen '
           '(nicht verifiziert).${sichtbarGesetzt ? ' Verborgen gesetzt, sofern das Formular es bot.' : ''}';
     }
+    await vorgaenge.aktualisieren(vg, text: 'Phase: Zielkurs und Dateien gegenlesen.');
     return await _gegenlesen(moodle, vorgaenge, vg, kurs: kurs, vorherCmids: vorherCmids,
         erwartet: wiederherstellungAktivitaeten, quizQuellen: quizQuellen, herkunftEigen: herkunftEigen);
-  } on MoodleFehler {
-    await _uebergang(vorgaenge, vg, WiederherstellungStand.unklar,
-        text: 'Abfrage nicht gelungen; wiederherstellung_status prüft erneut.');
+  } catch (e) {
+    if (vg.wiederherstellung != WiederherstellungStand.fertig) {
+      await _uebergang(vorgaenge, vg, WiederherstellungStand.unklar,
+          text: '${vg.text} Abfrage nicht gelungen (${e.runtimeType}); wiederherstellung_status prüft erneut.');
+    }
     rethrow;
   }
 }
@@ -912,6 +931,7 @@ Future<String> _gegenlesen(
   final verifiziert = zuordnungUnveraendert && zugeordnet.isNotEmpty && sichtbarkeitOk &&
       anhangOk && vergleichOk && herkunftOk && schreibPruefluecke == null;
   final zusatz = [
+    gruppierungsHinweis,
     if (!verbergen) 'Sichtbarkeit und Voraussetzungen nicht gegengeprüft; verified gilt für die übrigen Prüfungen.',
     if (anhang != null) anhang.text,
     for (final v in vergleiche) v.text,
@@ -1024,7 +1044,16 @@ Future<String> wiederherstellungStatus(MoodleZugang moodle, Vorgaenge vorgaenge,
     throw MoodleFehler('Keine Wiederherstellung mit der Nummer $id.');
   }
   if (_laufendeWiederherstellungen.contains(v.id)) {
-    return laufText('Die Wiederherstellung', v.id, 'wiederherstellung_status');
+    final fortschritt = v.fortschritt == null ? 'unbekannt' : '${(v.fortschritt! * 100).round()} %';
+    final seit = v.fortschrittSeit ?? v.aktualisiert;
+    final stillstand = istStillstand(jetzt(), seit)
+        ? stillstandText(nummer: v.id, werkzeug: 'wiederherstellung_status', fortschritt: v.fortschritt,
+            seit: jetzt().difference(seit),
+            ursachen: 'Moodle wartet im Assistenten oder auf eine Ad-hoc-Aufgabe; die Administration kann den Auftrag prüfen.')
+        : 'Die Wiederherstellung läuft weiter (Nummer ${v.id}).';
+    return '$stillstand ${v.text} Letzter gespeicherter Stand: ${v.aktualisiert.toIso8601String()}, '
+        'Fortschritt $fortschritt. Eine Operation ist noch aktiv; dieser Aufruf fragt Moodle nicht zusätzlich ab. '
+        'Mit wiederherstellung_status erneut prüfen; den Auftrag nicht erneut senden.';
   }
   final stand = v.wiederherstellung!;
   if (stand == WiederherstellungStand.anstehend || stand == WiederherstellungStand.hochgeladen) {

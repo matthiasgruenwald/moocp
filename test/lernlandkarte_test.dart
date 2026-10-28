@@ -1,4 +1,4 @@
-// Ticket #23 (Spec #17): Lernlandkarte-Verknüpfungen prüfbar machen oder die
+// Lernlandkarte-Verknüpfungen prüfbar machen oder die
 // Prüflücke melden. Gelesen wird über den Weg des Werkzeugs aktivitaet_lesen
 // (formularLesen); geändert über aendern. Die Moodle-Grenze ist ein lokales
 // Test-Doppel auf 127.0.0.1, der Arbeitsordner ein Temp-Verzeichnis.

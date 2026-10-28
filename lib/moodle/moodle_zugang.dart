@@ -194,6 +194,10 @@ class MoodleZugang {
     'mod_kanban_delete_card', 'mod_kanban_move_card',
   };
 
+  /// Das versteckte Feld `id` eines Moodle-Formulars: leer oder 0 heißt, das
+  /// Objekt wird neu angelegt; jede andere Nummer ändert ein bestehendes.
+  static bool _neuesObjekt(String? id) => id != null && (id.isEmpty || id == '0');
+
   static bool _nurSchluessel(Map<String, String> q, Set<String> erlaubt) =>
       q.keys.every(erlaubt.contains);
 
@@ -265,6 +269,17 @@ class MoodleZugang {
     'qbank', //
     'checklist', 'wiki', 'board', 'kanban', 'url', 'resource',
   };
+
+  /// Aktivitätstypen, bei denen `aendern` ausschließlich Gruppenmodus und
+  /// Gruppierung ändert -- keine Texte, Dateien oder anderen Einstellungen,
+  /// kein Anlegen. Ein Typ kommt erst hinein, wenn sein Formular so im
+  /// Testkurs gemessen ist (E33); `choicegroup` steht ungemessen darin, abgesichert
+  /// durch den Vergleich aller übrigen Felder beim Zurücklesen. Die Positivliste und die Prüfungen in
+  /// formular_schreiben.dart richten sich nach dieser einen Stelle.
+  static const Set<String> nurGruppenModule = {'collabora', 'choicegroup'};
+
+  /// Die Felder, die bei [nurGruppenModule] geändert werden dürfen.
+  static const List<String> gruppenFelder = ['groupmode', 'groupingid'];
 
   /// Module, die das allgemeine Werkzeug anlegen kann. Lernlandkarten
   /// verwenden ihr eigenes, separat geprüftes Änderungswerkzeug.
@@ -632,6 +647,11 @@ class MoodleZugang {
         return _zahl(wertIn(f, 'course')) &&
             (schreibbareModule.contains(modul) &&
                     wertIn(f, '_qf__mod_${modul}_mod_form') != null ||
+                nurGruppenModule.contains(modul) &&
+                    wertIn(f, '_qf__mod_${modul}_mod_form') != null &&
+                    _zahl(wertIn(f, 'update')) &&
+                    const {'0', '1', '2'}.contains(wertIn(f, 'groupmode')) &&
+                    _zahl(wertIn(f, 'groupingid')) ||
                 modul == 'learningmap' &&
                     wertIn(f, '_qf__mod_learningmap_mod_form') != null &&
                     wertIn(f, 'placestore') != null &&
@@ -665,6 +685,68 @@ class MoodleZugang {
       parameter: (q) => q.isEmpty,
       formular: (f) =>
           _zahl(wertIn(f, 'id')) && f.any((e) => e.key.startsWith('_qf__')),
+    ),
+    // Gruppierungen (E33): lesen nur Namen; die Seiten index, members und
+    // overview zeigen Mitglieder und bleiben gesperrt. Geschrieben wird nur
+    // Neues (id 0) und das Zuordnen von Gruppen -- nie Entfernen, Umbenennen
+    // oder Löschen.
+    Erlaubt(
+      'GET',
+      r'^/group/groupings\.php$',
+      'Gruppierungen eines Kurses (nur Namen)',
+      parameter: (q) => q.length == 1 && _zahl(q['id']),
+    ),
+    Erlaubt(
+      'GET',
+      r'^/group/grouping\.php$',
+      'Gruppierung: Formular lesen',
+      parameter: (q) => q.length == 1 && (_zahl(q['id']) || _zahl(q['courseid'])),
+    ),
+    Erlaubt(
+      'GET',
+      r'^/group/group\.php$',
+      'Neue Gruppe: Formular lesen',
+      parameter: (q) => q.length == 1 && _zahl(q['courseid']),
+    ),
+    Erlaubt(
+      'GET',
+      r'^/group/assign\.php$',
+      'Gruppen einer Gruppierung (nur Namen)',
+      parameter: (q) => q.length == 1 && _zahl(q['id']),
+    ),
+    Erlaubt(
+      'POST',
+      r'^/group/grouping\.php$',
+      'Neue Gruppierung speichern',
+      parameter: (q) => _nurSchluessel(q, {'courseid', 'id'}),
+      formular: (f) =>
+          wertIn(f, '_qf__grouping_form') != null &&
+          _neuesObjekt(wertIn(f, 'id')) &&
+          _zahl(wertIn(f, 'courseid')),
+    ),
+    Erlaubt(
+      'POST',
+      r'^/group/group\.php$',
+      'Neue Gruppe speichern',
+      parameter: (q) => _nurSchluessel(q, {'courseid', 'id'}),
+      formular: (f) =>
+          wertIn(f, '_qf__group_form') != null &&
+          _neuesObjekt(wertIn(f, 'id')) &&
+          _zahl(wertIn(f, 'courseid')),
+    ),
+    Erlaubt(
+      'POST',
+      r'^/group/assign\.php$',
+      'Gruppen einer Gruppierung zuordnen (nur Hinzufügen)',
+      parameter: (q) => q.length == 1 && _zahl(q['id']),
+      formular: (f) =>
+          _gesetzt(wertIn(f, 'sesskey')) &&
+          wertIn(f, 'add') != null &&
+          wertIn(f, 'remove') == null &&
+          // Die Werte der Auswahl stammen aus der Seite und sind keine reinen Zahlen
+          // (gemessen: vier Zeichen, gemischt); hier nur eine kurze Kennung.
+          f.where((e) => e.key == 'addselect[]').every((e) => RegExp(r'^[\w.-]{1,40}$').hasMatch(e.value)) &&
+          f.every((e) => e.key != 'removeselect[]'),
     ),
     Erlaubt(
       'POST',
@@ -1099,7 +1181,7 @@ class MoodleZugang {
           wertIn(f, 'stage') == '2' &&
           _gesetzt(wertIn(f, 'sesskey')),
     ),
-    // Zielwahl je Zielweg (Issue #9): jeder Weg hat eine eigene, enge Schlüsselmenge.
+    // Zielwahl je Zielweg (E9): jeder Weg hat eine eigene, enge Schlüsselmenge.
     // Der Wert target ist der gemessene Moodle-Wert des Weges; ein anderer wird abgelehnt.
     // Kein _qf__-Feld auf dieser Seite (gemessen). Die Felder search (Kurssuche) und
     // catsearch (Kategoriesuche) gehören je nur zu den Wegen, die sie brauchen.
@@ -1792,7 +1874,7 @@ class MoodleZugang {
       Art.gesperrt,
       'Gesperrt: $methode ${adresseOhneWerte(uri)}'
       '${formular == null ? '' : ' (Felder: ${formular.map((e) => e.key).toSet().join(', ')})'}'
-      '${formular == null || uri.path != '/backup/restore.php' ? '' : ' (Wertformen: ${formular.map((e) => '${e.key}=${_wertform(e.value)}').join(', ')})'}',
+      '${formular == null || !const {'/backup/restore.php', '/group/assign.php'}.contains(uri.path) ? '' : ' (Wertformen: ${formular.map((e) => '${e.key}=${_wertform(e.value)}').join(', ')})'}',
     );
     throw MoodleFehler(
       'Gesperrt: $methode ${uri.path} steht nicht auf der Positivliste dieses Servers '

@@ -101,6 +101,10 @@ verifiziert weiter.
 Bei einem Stillstand (kein Fortschritt seit 15 Minuten) gilt dasselbe wie bei der
 Sicherung: nicht belegt, nicht neu starten; die Administration prüft Cron und
 Ad-hoc-Aufgaben.
+Bei noch aktiver Abfrage nennt der Status den gespeicherten Stand mit Phase,
+Zeitpunkt und Fortschritt; dieser Aufruf fragt Moodle nicht zusätzlich ab.
+Gib diese Unterscheidung weiter. Meldet der Restore-Assistent einen Fehler
+oder weitere Angaben, bleibt der Ausgang unklar und der Vorgang gesperrt.
 Startet es nie neu: Steht „fehlgeschlagen" da, sag das so, und frag die
 Lehrkraft, bevor du etwas erneut versuchst.
 
@@ -935,6 +939,7 @@ Diese Typen haben eigene Werkzeuge, weil ihr Inhalt nicht im Formular steht. **L
 | Board | `board_lesen`, `board_aendern` | Spalten und **eigene** Notizen; Notizen anderer werden nur gezählt |
 | Kanban | `kanban_lesen`, `kanban_aendern` | nur das Kursboard, ohne Ersteller und Zuweisung |
 | Bewertungsschema einer Aufgabe | `bewertungsschema_lesen`, `bewertungsschema_setzen` | nur die Definition, nie ausgefüllte Raster |
+| Gruppierungen eines Kurses | `gruppierungen_lesen`, `gruppierung_anlegen`; zugeordnet wird mit `aendern` (`groupingid`) | nur Namen, nie Mitglieder; fehlt eine Gruppierung, fragst du die Lehrkraft (`references/bearbeiten.md`) |
 
 Bei Fortschrittsliste, Wiki, Board und Kanban stammt ein Teil des Inhalts von Lernenden. Fragt jemand „wer hat das geschrieben?" oder „wer hat abgehakt?", gilt dasselbe wie bei Noten: Das kann die App bewusst nicht. **Löschen fragt in Moodle bei diesen vier nicht nach** — die Freigabe der App ist die einzige Rückfrage.
 

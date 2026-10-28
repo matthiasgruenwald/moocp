@@ -1,4 +1,4 @@
-// Zwei Moodle-Instanzen (Issue #4) mit denselben Nummern: Kurs 12 und
+// Zwei Moodle-Instanzen mit denselben Nummern: Kurs 12 und
 // Aktivität 34 gibt es auf beiden. Die Instanzen sind lokale Test-Doppel auf
 // 127.0.0.1 und laufen über den Testzugang MoodleZugang.fuerTest.
 //

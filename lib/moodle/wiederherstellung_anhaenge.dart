@@ -1,5 +1,4 @@
-// Bilder und Anhänge importierter Aktivitäten zurücklesen und vergleichen (Ticket #21,
-// Spec #17, E2, E3, E17).
+// Bilder und Anhänge importierter Aktivitäten zurücklesen und vergleichen (E2, E3, E17).
 //
 // Quelle: die Sicherungsdatei im Sicherungsordner (vorgaenge.ordner/datei). Je
 // eindeutig zugeordneter Aktivität nennt inforef.xml die Dateien, files.xml gibt Name
@@ -14,9 +13,8 @@
 // Die Prüfung repariert nichts. Eine Reparatur über aktivitaet_aendern wäre ein
 // eigener Schritt mit Freigabe und hier nicht enthalten.
 //
-// Lücke: Dateien, die nur im Dateimanager einer Aktivität liegen (mod_resource,
-// mod_folder), erscheinen nicht im Formular als Verweis. Sie sind eine Prüflücke („nicht
-// lesbar"), kein Fehlbefund, bis eine erlaubte Leseseite dafür in der Positivliste steht.
+// Dateimanager-Dateien ohne lesbaren Verweis in der Formularinitialisierung bleiben
+// eine Prüflücke („nicht lesbar“); ihr Fehlen dort belegt keine fehlende Zieldatei.
 
 import 'dart:convert';
 import 'dart:io';
@@ -24,9 +22,11 @@ import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
 import 'package:crypto/crypto.dart';
+import 'package:html/parser.dart' as html_parser;
 import 'package:path/path.dart' as p;
 import 'package:xml/xml.dart';
 
+import 'formular_lesen.dart' show hauptformular, dateibereiche;
 import 'moodle_zugang.dart';
 import 'sicherung.dart';
 import 'wiederherstellung_regeln.dart' show WiederhergestellteAktivitaet, archivAktivitaetsElemente;
@@ -104,7 +104,8 @@ List<QuellDatei>? quelldateienAus(Uint8List mbz, {required String modul, require
     };
     final liste = <QuellDatei>[];
     for (final f in XmlDocument.parse(utf8.decode(filesXml, allowMalformed: true)).findAllElements('file')) {
-      if (!ids.contains(_text(f, 'id'))) continue;
+      // files.xml trägt die ID als Attribut; inforef.xml referenziert sie als Kindelement.
+      if (!ids.contains(f.getAttribute('id'))) continue;
       if ((_text(f, 'component') ?? '').startsWith('user')) continue; // A1: Nutzerdateien nie
       final name = _text(f, 'filename') ?? '';
       if (name.isEmpty || name == '.') continue; // Verzeichniseinträge
@@ -161,8 +162,34 @@ Future<({String? fehler, List<ZielAbruf> abrufe})> zielLesen(MoodleZugang moodle
   if (form.status != 200) {
     return (fehler: 'Bearbeitungsformular nicht lesbar (HTTP ${form.status})', abrufe: const <ZielAbruf>[]);
   }
+  final haupt = hauptformular(html_parser.parse(form.text));
+  if (haupt == null) {
+    return (
+      fehler: 'Bearbeitungsformular nicht gefunden',
+      abrufe: const <ZielAbruf>[],
+    );
+  }
+  final bereiche = dateibereiche(form.text);
+  // Ein Dateibereich ohne Zielelement würde still ausgelassen und die Prüfung läse sich vollständig.
+  if (bereiche.any((b) => haupt.querySelector('[id="${b['target']}"]') == null)) {
+    return (
+      fehler: 'Dateibereich im Formular nicht gefunden',
+      abrufe: const <ZielAbruf>[],
+    );
+  }
+  // Die Seitenhülle trägt Logos, Editorressourcen und Profilbilder, keine Inhaltsdateien.
+  final inhalte = [
+    for (final feld in haupt.querySelectorAll('textarea[name]'))
+      if (feld.attributes['name']!.endsWith('[text]') ||
+          feld.attributes['name'] == 'svgcode')
+        feld.text,
+    for (final bereich in bereiche)
+      for (final datei
+          in (bereich['list'] as List? ?? const []).whereType<Map>())
+        if (datei['url'] case final String url) url,
+  ];
   final abrufe = <ZielAbruf>[];
-  for (final v in verweiseAus(form.text)) {
+  for (final v in verweiseAus(inhalte.join('\n'))) {
     int? status;
     String? sha;
     try {

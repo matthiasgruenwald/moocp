@@ -5,6 +5,7 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:html/parser.dart' as html_parser;
 import 'package:moocp/moodle/formular.dart';
+import 'package:moocp/moodle/formular_lesen.dart';
 import 'package:moocp/moodle/formular_schreiben.dart';
 import 'package:moocp/moodle/moodle_zugang.dart';
 
@@ -33,6 +34,71 @@ final formular = '''<form class="mform">
 </form>''';
 
 void main() {
+  String radios({String name = 'completion', String selected = '0', String disabled = ''}) => '''<form>
+    <fieldset><legend>Abschlussverfolgung</legend>
+    ${['Keine', 'Manuell markieren', 'Automatisch abschließen'].asMap().entries.map((e) => '''
+    <div class="row fitem" id="fitem_id_$name"><div class="col-form-label"></div>
+    <div class="felement" data-fieldtype="radio"><label for="${name}_${e.key}">${e.value}</label>
+    <input type="radio" id="${name}_${e.key}" name="$name" value="${e.key}"
+      ${selected == '${e.key}' ? 'checked' : ''} ${disabled == '${e.key}' ? 'disabled' : ''}></div></div>''').join()}
+    </fieldset></form>''';
+
+  test('Optionsfelder werden nach Namen als Auswahl statt als erstes ja gelesen', () {
+    final form = html_parser.parse(radios(selected: '1')).querySelector('form')!;
+    final gelesen = einstellungenLesen(form);
+    expect(gelesen, hasLength(1));
+    expect(gelesen.single.schluessel, 'completion');
+    expect(gelesen.single.wert, 'Manuell markieren');
+    expect(gelesen.single.toJson()['optionen'], hasLength(3));
+  });
+
+  test('jede Radioauswahl wird eindeutig geschrieben und zurückgelesen', () {
+    for (final name in ['completion', 'anderes_feld']) {
+      for (final value in ['0', '1', '2']) {
+        final form = html_parser.parse(radios(name: name)).querySelector('form')!;
+        final felder = formularFelder(form);
+        final gesetzt = einstellungenSetzen(form, felder, {name: value}).single;
+        expect(felder.where((e) => e.key == name).map((e) => e.value), [value]);
+        final rueck = html_parser.parse(radios(name: name, selected: value)).querySelector('form')!;
+        expect(einstellungenLesen(rueck).single.wert, gesetzt.nachher);
+        expect(gesetzt.erwartet, [gesetzt.nachher]);
+      }
+    }
+    final form = html_parser.parse(radios(disabled: '2')).querySelector('form')!;
+    final felder = formularFelder(form);
+    einstellungenSetzen(form, felder, {'completion': 'Manuell markieren'});
+    expect(wertIn(felder, 'completion'), '1');
+    expect(() => einstellungenSetzen(form, felder, {'completion': '2'}), throwsA(isA<MoodleFehler>()));
+    expect(() => einstellungenSetzen(form, felder, {'completion': 'unbekannt'}), throwsA(isA<MoodleFehler>()));
+    expect(wertIn(felder, 'completion'), '1');
+  });
+
+  test('Rückleseprobe akzeptiert bei Optionsfeldern keine bloße Teilgleichheit', () async {
+    final form = html_parser.parse(radios(selected: '2').replaceAll('Automatisch abschließen', 'Keine manuelle Markierung'))
+        .querySelector('form')!;
+    final gelesen = FormularGelesen(Formularziel.aktivitaet(5), 12, 'ZZ Probe', 'assign', '',
+        [], [], [], [], {}, [], einstellungen: einstellungenLesen(form));
+    final probe = await zuruecklesen(gelesen, felder: {}, dateien: {}, bereiche: {},
+        einstellungen: [Gesetzt('completion', 'Abschlussverfolgung', '', 'Keine', ['Keine'])]);
+    expect(probe.ok, isFalse);
+  });
+
+  test('Rückleseprobe unterscheidet gleiche Radiobeschriftungen anhand des technischen Werts', () async {
+    final quelle = radios().replaceAll('Manuell markieren', 'Keine');
+    final form = html_parser.parse(quelle).querySelector('form')!;
+    final gesetzt = einstellungenSetzen(form, formularFelder(form), {'completion': '1'});
+    FormularGelesen gelesen(String selected) => FormularGelesen(
+        Formularziel.aktivitaet(5), 12, 'ZZ Probe', 'assign', '', [], [], [], [], {}, [],
+        einstellungen: einstellungenLesen(html_parser.parse(radios(selected: selected)
+            .replaceAll('Manuell markieren', 'Keine')).querySelector('form')!));
+    final falsch = await zuruecklesen(gelesen('0'), felder: {}, dateien: {}, bereiche: {}, einstellungen: gesetzt);
+    final richtig = await zuruecklesen(gelesen('1'), felder: {}, dateien: {}, bereiche: {}, einstellungen: gesetzt);
+    expect(falsch.ok, isFalse);
+    expect(richtig.ok, isTrue);
+    expect(() => einstellungenSetzen(form, formularFelder(form), {'completion': 'Keine'}),
+        throwsA(isA<MoodleFehler>()));
+  });
+
   test('Einstellungen lesen: Datum, Gruppe, Auswahl', () {
     final form = html_parser.parse(formular).querySelector('form')!;
     expect({for (final e in einstellungenLesen(form)) e.schluessel: e.wert}, {

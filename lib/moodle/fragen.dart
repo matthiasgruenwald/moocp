@@ -151,7 +151,7 @@ Future<String> fragenLesen(MoodleZugang moodle, String arbeitsordner,
 // frage_lesen
 // ---------------------------------------------------------------------------
 
-/// Die Sperre des Ordners umfasst das Lesen, das frage.xml-Schreiben (Befund 6) und
+/// Die Sperre des Ordners umfasst das Lesen, das frage.xml-Schreiben und
 /// damit auch die Zeit bis zum Ende des Lesens; sonst lösche ein Parallelaufruf den Ordner.
 Future<String> frageLesen(MoodleZugang moodle, String arbeitsordner, {required int sammlung, required int frage}) {
   final ziel = Formularziel.frage(sammlung, frage);

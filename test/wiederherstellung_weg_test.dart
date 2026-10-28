@@ -1,4 +1,4 @@
-// Zielwege der Wiederherstellung (Issue #9): Zuordnung, Rückfragen und die enge
+// Zielwege der Wiederherstellung Zuordnung, Rückfragen und die enge
 // Positivliste je Weg. Ohne Netz; die Positivliste wird ohne Versand geprüft.
 
 import 'package:flutter_test/flutter_test.dart';

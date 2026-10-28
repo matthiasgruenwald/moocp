@@ -1,7 +1,7 @@
 // Instanzprofile: Moodle-Instanzen, mit denen die App gleichzeitig angemeldet
-// sein kann (Issue #4, E31). Ein Profil hat eine stabile Kennung, einen
-// Anzeigenamen, die Adresse, eine optionale Rolle in der Übertragung (Issue #5,
-// Rolle; Richtung und Prüfung in uebertragung.dart), einen eigenen Port und
+// sein kann (E31). Ein Profil hat eine stabile Kennung, einen
+// Anzeigenamen, die Adresse, eine optionale Rolle in der Übertragung
+// (Rolle; Richtung und Prüfung in uebertragung.dart), einen eigenen Port und
 // einen technischen Servernamen.
 //
 // Je Profil läuft ein eigener MCP-Server (mcp/mcp_dienst.dart) auf eigenem Port
@@ -23,7 +23,7 @@ import 'dart:math';
 import 'einstellungen_ort.dart';
 import 'freigabe.dart';
 
-/// Rolle eines Profils für die Übertragung von Kursen (Issue #5). Die Rolle
+/// Rolle eines Profils für die Übertragung von Kursen. Die Rolle
 /// ist eine lokale App-Einstellung; Moodle wird dadurch nicht geändert. Gespeichert
 /// wird der Name des Werts (`quelle`, `ziel`), nicht die Anzeige.
 enum Rolle {

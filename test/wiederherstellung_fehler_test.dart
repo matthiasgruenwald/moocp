@@ -15,8 +15,10 @@ Map<String, Object?> _e({Object? error, Object? errorcode, Object? status, doubl
 
 void main() {
   group('Prozess beendet', () {
-    test('Status 800 (Moodle: beendet mit Fehler) belegt das Ende', () {
-      expect(fehlerBeendet([_e(error: 'x', status: 800)], 'r-1'), isTrue);
+    test('Status 900 belegt das Ende, 800 bedeutet noch Ausführung', () {
+      expect(fehlerBeendet([_e(error: 'x', status: 900)], 'r-1'), isTrue);
+      expect(fehlerBeendet([_e(error: 'x', status: 800)], 'r-1'), isFalse);
+      expect(bewerteFortschritt([_e(status: 900)], 'r-1'), SicherungStand.fehlgeschlagen);
     });
     test('ein Fehlerfeld allein belegt das Ende nicht', () {
       expect(fehlerBeendet([_e(error: 'x')], 'r-1'), isFalse);

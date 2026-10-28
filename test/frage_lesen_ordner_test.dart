@@ -1,4 +1,4 @@
-// Ticket #22 (Spec #17): wiederholtes und gleichzeitiges Fragenlesen über den
+// Wiederholtes und gleichzeitiges Fragenlesen über den
 // Weg des Werkzeugs frage_lesen (frageLesen -> formularLesen). Die Moodle-Grenze
 // ist ein lokales Test-Doppel auf 127.0.0.1; der Arbeitsordner ist ein
 // Temp-Verzeichnis. Es geht um den Arbeitsordner frage-<id>, der beim Lesen
@@ -113,7 +113,16 @@ void main() {
 
   tearDown(() async {
     await doppel.stoppen();
-    if (arbeitsordner.existsSync()) arbeitsordner.deleteSync(recursive: true);
+    // Unter Last meldet macOS beim Löschen gelegentlich „Directory not empty",
+    // solange der Dateidienst noch etwas hält; ein zweiter Versuch genügt.
+    for (var versuch = 0; arbeitsordner.existsSync(); versuch++) {
+      try {
+        arbeitsordner.deleteSync(recursive: true);
+      } on FileSystemException {
+        if (versuch >= 4) rethrow;
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+      }
+    }
   });
 
   /// Der vollständige Stand einer gelesenen Frage: Quelltext, Bild, XML, Übersicht.

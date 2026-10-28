@@ -16,6 +16,14 @@ const Set<String> nutzerdatenOptionen = {
   'users', 'enrolments', 'groups', 'userscompletion', 'logs', 'grade_histories', 'badges',
 };
 
+const gruppierungsHinweis = 'Gruppen werden nicht mitgesichert. Die Zuordnung zu einer Gruppierung '
+    'im Zielkurs ist nicht garantiert und wird nicht gegengeprüft. Vorhandene Gruppen und der '
+    'Gruppenmodus ersetzen die Auswahl der Gruppierung nicht; nach der Wiederherstellung prüfen. '
+    'Zuordnen: gruppierungen_lesen zeigt im Quellkurs, welche Gruppierungen mit welchen Gruppen '
+    'gebraucht werden; aendern setzt groupingid je Aktivität. Fehlt die Gruppierung im Zielkurs, '
+    'stellt aendern die Rückfrage, sie samt Gruppen mit gruppierung_anlegen anzulegen -- nicht '
+    'still weglassen.';
+
 /// Das `_userinfo`-Feld je Aktivität und je Abschnitt (gemessen: jedes Abschnittsfeld hat eines).
 final RegExp _nutzerdatenUserinfo = RegExp(r'^setting_(activity|section)_[a-z0-9_]+_\d+_userinfo$');
 final RegExp _aktivitaetEingeschaltet = RegExp(r'^setting_activity_[a-z0-9_]+_(\d+)_included$');
@@ -345,7 +353,7 @@ enum SicherungStand {
   }
 }
 
-/// Frist für den Stillstandshinweis (Ticket #18, Spec #17): so lange ohne neuen
+/// Frist für den Stillstandshinweis: so lange ohne neuen
 /// Fortschrittswert gilt ein laufender Vorgang als möglicherweise hängend. Die
 /// Lehrkraft hat 15 Minuten bestätigt. Ungemessen ist, wie lange Moodle für eine
 /// Sicherung oder Wiederherstellung braucht; 15 Minuten sind ein Vielfaches des
@@ -363,7 +371,7 @@ bool istStillstand(DateTime jetzt, DateTime? seit) =>
 /// Sonst bliebe [seit] leer und ein Stillstand würde nie erkannt.
 bool fortschrittNeuBeobachtet(double? alt, double? neu, DateTime? seit) => neu != alt || seit == null;
 
-/// Der Hinweistext bei Stillstand (Ticket #18). Feste Worte und Kennzahlen, keine
+/// Der Hinweistext bei Stillstand. Feste Worte und Kennzahlen, keine
 /// Moodle-Inhalte. Stillstand ist keine Aussage über Erfolg oder Fehler: Die letzte
 /// Abfrage nannte weder Ende noch Fehler (oder die Angaben fehlten), und ob der
 /// Vorgang hängt, ist nicht belegt.
@@ -410,17 +418,18 @@ SicherungStand bewerteFortschritt(Object? antwort, String backupid) {
   if (eintrag['error'] != null || eintrag['errorcode'] != null) return SicherungStand.fehlgeschlagen;
   final p = eintrag['progress'];
   final s = eintrag['status'];
+  if (s == 900) return SicherungStand.fehlgeschlagen;
   if (p is num && s is num && p >= 1 && s == 1000) return SicherungStand.fertig;
   if (p is num && p < 1) return SicherungStand.laufend;
   return SicherungStand.unklar;
 }
 
-/// Ob Moodle den Vorgang als beendet mit Fehler führt (Status 800, `backup::STATUS_FINISHED_ERR`;
+/// Ob Moodle den Vorgang als beendet mit Fehler führt (Status 900, `backup::STATUS_FINISHED_ERR`;
 /// ungemessen). Ein Fehlerfeld allein belegt das Ende nicht: Ohne diesen Status kann der
 /// Hintergrundauftrag noch laufen oder hängen.
 bool fehlerBeendet(Object? antwort, String backupid) {
   final s = _eintrag(antwort, backupid)?['status'];
-  return s is num && s == 800;
+  return s is num && s == 900;
 }
 
 /// Die Art des gemeldeten Fehlers, nur als kurzer Bezeichner (Fehlercode, sonst das Fehlerfeld,
@@ -486,7 +495,7 @@ String? zielOrdnerPruefen(String? ordner) {
   return teile.join('/');
 }
 
-/// Der Text, den ein Werkzeug bei Zeitlimit zurückgibt (Befund 9). Ist die
+/// Der Text, den ein Werkzeug bei Zeitlimit zurückgibt. Ist die
 /// Nummer schon vergeben, nennt er sie und genau einen Folgeaufruf. Ist sie es
 /// nicht, sagt er das, und es gibt keinen Folgeaufruf mit einer Nummer, die es
 /// noch nicht gibt. In beiden Fällen ist nichts neu gestartet.

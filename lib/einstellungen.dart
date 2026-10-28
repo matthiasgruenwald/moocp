@@ -34,8 +34,8 @@ class Einstellungen {
     this.projektkontext,
   }) : profile = _verteilt(profile ?? (moodleAdresse.isEmpty ? [] : [Profil.migriert(moodleAdresse)]));
 
-  /// Quellkurs und Durchführungskurse der Übertragung (uebertragung.dart,
-  /// Issue #5). Null, solange die Lehrkraft noch keinen Kontext gesetzt hat.
+  /// Quellkurs und Durchführungskurse der Übertragung (uebertragung.dart).
+  /// Null, solange die Lehrkraft noch keinen Kontext gesetzt hat.
   Projektkontext? projektkontext;
 
   /// Setzt die Rolle des Profils mit der Kennung [kennung] nur im Speicher;
@@ -163,7 +163,7 @@ class Einstellungen {
     return standard;
   }
 
-  /// Liest den Inhalt der Datei. Ohne `profile` (Stand bis Issue #4) wird die
+  /// Liest den Inhalt der Datei. Ohne `profile` (Stand vor den Profilen) wird die
   /// Adresse `moodleAdresse` mit dem alten Port `port` zum ersten Profil; beim
   /// nächsten Speichern kommt `profile` dazu, `moodleAdresse` und `port`
   /// bleiben für ältere Versionen stehen.

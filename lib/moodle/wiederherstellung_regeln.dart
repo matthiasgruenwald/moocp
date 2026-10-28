@@ -143,10 +143,10 @@ class ArchivBefund {
   final String? typ;
   final List<ArchivAktivitaet> aktivitaeten;
 
-  /// Fragen je Quiz (Ordnername wie quiz_21), aus quiz.xml und questions.xml (Issue #20).
+  /// Fragen je Quiz (Ordnername wie quiz_21), aus quiz.xml und questions.xml.
   final Map<String, List<QuizFrage>> quizFragen;
 
-  /// Quizze, deren quiz.xml oder questions.xml nicht lesbar ist (Befund 7): kein Abbruch
+  /// Quizze, deren quiz.xml oder questions.xml nicht lesbar ist: kein Abbruch
   /// des Archivs, sondern eine Prüflücke bei der Herkunft.
   final Set<String> quizUnlesbar;
 
@@ -280,7 +280,7 @@ Future<ArchivBefund> archivPruefen(
         a.getElement('directory')!.innerText.trim().split('/').last: a.getElement('title')?.innerText.trim() ?? '',
   };
 
-  // Fragen der Quizze (Issue #20). Lesbar nur, wenn beide Dateien es sind.
+  // Fragen der Quizze. Lesbar nur, wenn beide Dateien es sind.
   final fragenXml = dateien['questions.xml'] == null ? null : utf8.decode(dateien['questions.xml']!, allowMalformed: true);
   final quizFragen = <String, List<QuizFrage>>{};
   final quizUnlesbar = <String>{};
@@ -366,7 +366,7 @@ String? _text1(XmlDocument doc, String name) {
   return e?.innerText.trim();
 }
 
-/// Die fünf Zielwege einer Wiederherstellung (E9-Ablauf, Issue #9). [moodle] ist
+/// Die fünf Zielwege einer Wiederherstellung (E9-Ablauf). [moodle] ist
 /// Moodles Wert für `target`. Löschende Wege (0, 3) entfernen vorhandene Inhalte
 /// des Zielkurses, bevor sie wiederherstellen; nur mit `loeschend: true`.
 enum Zielweg {
@@ -533,7 +533,7 @@ bool _sperrt(DoppelstartEintrag e, int kurs) => switch (e.stand) {
       null => false,
     };
 
-/// Befund 8: Typen außerhalb der Positivliste (nicht schreibbar) werden nicht
+/// Typen außerhalb der Positivliste (nicht schreibbar) werden nicht
 /// verifiziert. Liefert den Prüflücke-Text oder null, wenn alle schreibbar sind.
 String? nichtSchreibbarePruefluecke(Iterable<String> moduln) {
   final nein = {for (final m in moduln) if (!MoodleZugang.schreibbareModule.contains(m)) m}.toList()..sort();

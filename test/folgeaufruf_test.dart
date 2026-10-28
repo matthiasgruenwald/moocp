@@ -1,4 +1,4 @@
-// Befund 9 (Review, Ticket #18): Zeitlimit- und Startantworten nennen die
+// Befund 9 (Review): Zeitlimit- und Startantworten nennen die
 // Vorgangsnummer und genau einen Folgeaufruf; die Übersicht nennt ihn ebenfalls.
 // Der Stillstandstext behauptet nicht „Moodle meldet ...", wenn nur Angaben fehlen.
 import 'dart:io';

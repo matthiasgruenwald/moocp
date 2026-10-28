@@ -1,4 +1,4 @@
-// Tests der Übertragung in einem Auftrag (Issue #10): Prüfung der Ziele,
+// Tests der Übertragung in einem Auftrag Prüfung der Ziele,
 // Wiederholungsschutz, Protokoll uebertragungen.json und der Ablauf je Ziel.
 // Moodle wird durch Fakes ersetzt. Nur erfundene Daten (A11): Kurse 12, 34, 56.
 

@@ -41,6 +41,7 @@ import 'elemente.dart';
 import 'formeln.dart';
 import 'formular.dart';
 import 'formular_lesen.dart';
+import 'gruppierung.dart';
 import 'kurs.dart';
 import 'lernlandkarte_entwurf.dart';
 import 'moodle_zugang.dart';
@@ -71,6 +72,8 @@ String typName(String? typ) => switch (typ) {
   'url' => 'Link',
   'resource' => 'Datei',
   'forum' => 'Forum',
+  'collabora' => 'Collabora',
+  'choicegroup' => 'Gruppenwahl',
   _ => typ ?? '?',
 };
 
@@ -657,14 +660,13 @@ Future<Probe> zuruecklesen(
     );
   }
   for (final s in einstellungen) {
-    final w =
-        g.einstellungen
-            .where((e) => e.schluessel == s.schluessel)
-            .firstOrNull
-            ?.wert ??
-        '';
+    final gelesen = g.einstellungen.where((e) => e.schluessel == s.schluessel).firstOrNull;
+    final w = gelesen?.wert ?? '';
     probe.pruefe(
-      s.erwartet.every((t) => w.toLowerCase().contains(t.toLowerCase())),
+      s.auswahlwert != null
+          ? gelesen?.auswahlwert == s.auswahlwert
+          : gelesen?.optionen != null ? w == s.nachher
+          : s.erwartet.every((t) => w.toLowerCase().contains(t.toLowerCase())),
       'Einstellung ${s.label} (erwartet ${s.nachher}, gelesen $w)',
     );
   }
@@ -738,6 +740,7 @@ Future<(Map<String, String>, List<Gesetzt>)> formularFuellen(
   String? name,
   String was = 'Formular',
 }) async {
+  gruppierungPruefen(f.form, einstellungen['groupingid'], f.kurs);
   final gesetzt = einstellungenSetzen(f.form, f.felder, einstellungen);
   if (name != null) nameSetzen(f.form, f.felder, name);
   final geschrieben = <String, String>{};
@@ -1045,6 +1048,42 @@ Future<String> aktivitaetAnlegen(
 // aendern: jedes gelesene Formular zurückschreiben
 // ---------------------------------------------------------------------------
 
+/// Die Namen der Felder, deren Werte sich zwischen zwei Lesungen desselben
+/// Formulars unterscheiden -- ohne die Gruppenfelder und ohne das, was Moodle
+/// bei jedem Laden neu vergibt (Sitzung, Entwurfsnummern, aufgeklappte
+/// Bereiche) oder bei ausgeschalteten Datumsfeldern mit der Uhrzeit füllt.
+List<String> uebrigeFelderAbweichung(Felder vorher, Felder nachher) {
+  bool fluechtig(String k) =>
+      MoodleZugang.gruppenFelder.contains(k) ||
+      k == 'sesskey' ||
+      k.startsWith('_qf__') ||
+      k.startsWith('mform_isexpanded') ||
+      k.contains('[itemid]') ||
+      RegExp(r'\[(day|month|year|hour|minute)\]$').hasMatch(k);
+  Map<String, List<String>> gruppiert(Felder f) {
+    final m = <String, List<String>>{};
+    for (final e in f) {
+      if (!fluechtig(e.key)) (m[e.key] ??= []).add(e.value);
+    }
+    return m;
+  }
+
+  final a = gruppiert(vorher);
+  final b = gruppiert(nachher);
+  return [
+    for (final k in {...a.keys, ...b.keys})
+      if (a[k]?.join('\u0000') != b[k]?.join('\u0000')) k,
+  ]..sort();
+}
+
+/// Das Hauptformular aus dem gespeicherten Stand (`.stand`-Ordner); null, wenn es fehlt.
+dom.Element? _gespeichertesFormular(String stand) {
+  final datei = File(p.join(stand, 'formular.html'));
+  return datei.existsSync()
+      ? hauptformular(html_parser.parse(datei.readAsStringSync()))
+      : null;
+}
+
 /// Prüft ein frisch geholtes Formular gegen den Stand beim Lesen. Wirft,
 /// wenn Moodle seither geändert wurde -- dann wird nichts überschrieben.
 void _pruefeStand(
@@ -1053,10 +1092,31 @@ void _pruefeStand(
   String stand,
   Map<String, String> standFelder,
   Iterable<String> bereiche,
-  Iterable<String> einstellungen,
-) {
+  Iterable<String> einstellungen, {
+  bool nurGruppeneinstellungen = false,
+}) {
+  final vorher = _gespeichertesFormular(stand);
+  final werte = vorher == null ? <MapEntry<String, String>>[] : formularFelder(vorher);
+  final vorherModul = wertIn(werte, 'modulename');
+  final nurGruppen = MoodleZugang.nurGruppenModule;
+  final nurGruppenAenderung = nurGruppen.contains(f.modul) && vorherModul == f.modul &&
+      nurGruppeneinstellungen && einstellungen.isNotEmpty &&
+      einstellungen.every(MoodleZugang.gruppenFelder.contains);
+  if ((nurGruppen.contains(f.modul) || nurGruppen.contains(vorherModul)) && !nurGruppenAenderung) {
+    throw MoodleFehler(
+      '${typName(nurGruppen.contains(f.modul) ? f.modul : vorherModul)}: Nur Gruppenmodus (groupmode) und Gruppierung (groupingid) bestehender Aktivitäten können geändert werden; keine Texte, Dateien oder anderen Einstellungen. Bei geänderter Aktivitätsart neu lesen.',
+    );
+  }
+  if (nurGruppenAenderung && (wertIn(werte, 'name') != f.name ||
+      wertIn(werte, 'course') != '${f.kurs}' ||
+      wertIn(f.felder, 'update') != '${ziel.id}')) {
+    throw MoodleFehler(
+      '${typName(f.modul)}: Name, Kurs oder Aktivitätsart stimmen nicht mehr mit dem gelesenen Stand überein. Nichts geändert.',
+    );
+  }
   if (ziel.art == Zielart.aktivitaet &&
-      !MoodleZugang.schreibbareModule.contains(f.modul)) {
+      !MoodleZugang.schreibbareModule.contains(f.modul) &&
+      !nurGruppenAenderung) {
     throw MoodleFehler(
       'Ändern geht bisher für ${MoodleZugang.schreibbareModule.map(typName).join(", ")}; '
       '${ziel.bezeichnung} ist ${typName(f.modul)}.',
@@ -1142,6 +1202,8 @@ class _Aenderung {
     required this.bereiche,
     required this.einstellungen,
     required this.vorab,
+    required this.gruppenStand,
+    required this.gruppenWahl,
     required this.wo,
     required this.einzelheiten,
     required this.vergleich,
@@ -1158,6 +1220,11 @@ class _Aenderung {
   final List<BereichAenderung> bereiche;
   final Map<String, Object?> einstellungen;
   final Formular vorab;
+  /// Gruppeneinstellungen, wie Moodle sie beim Planen zeigte (vor der Änderung).
+  final Map<String, String> gruppenStand;
+
+  /// Gruppeneinstellungen, wie sie nach der Änderung stehen sollen (Rücklesung).
+  final Map<String, String> gruppenWahl;
 
   /// ", Kurs 12 „…"" oder leer.
   final String wo;
@@ -1298,10 +1365,25 @@ Future<_Aenderung?> _vorbereiten(
     alt,
     bereiche.map((b) => b.feld),
     einstellungen.keys,
+    nurGruppeneinstellungen:
+        zuSchreiben.isEmpty &&
+        bereiche.isEmpty &&
+        neu.isEmpty &&
+        geaendert.isEmpty &&
+        nichtMehr.isEmpty &&
+        !neuSpeichern,
   );
-  final probeSetzen = einstellungenSetzen(vorab.form, [
-    ...vorab.felder,
-  ], einstellungen);
+  final gruppenStand = <String, String>{
+    if (MoodleZugang.nurGruppenModule.contains(vorab.modul))
+      for (final k in MoodleZugang.gruppenFelder) k: wertIn(vorab.felder, k) ?? '',
+  };
+  gruppierungPruefen(vorab.form, einstellungen['groupingid'], vorab.kurs);
+  final probeFelder = [...vorab.felder];
+  final probeSetzen = einstellungenSetzen(vorab.form, probeFelder, einstellungen);
+  final gruppenWahl = <String, String>{
+    if (MoodleZugang.nurGruppenModule.contains(vorab.modul))
+      for (final k in MoodleZugang.gruppenFelder) k: wertIn(probeFelder, k) ?? '',
+  };
   final kurs = vorab.kurs;
   final wo = kurs == null ? '' : ', ${await kursBezeichnung(moodle, kurs)}';
 
@@ -1387,6 +1469,8 @@ Future<_Aenderung?> _vorbereiten(
     bereiche: bereiche,
     einstellungen: einstellungen,
     vorab: vorab,
+    gruppenStand: gruppenStand,
+    gruppenWahl: gruppenWahl,
     wo: wo,
     einzelheiten: einzelheiten,
     vergleich: vergleich,
@@ -1420,8 +1504,22 @@ Future<(String, bool)> _schreibenOhneSperre(
       alt,
       a.bereiche.map((b) => b.feld),
       a.einstellungen.keys,
+      nurGruppeneinstellungen:
+          MoodleZugang.nurGruppenModule.contains(a.vorab.modul) &&
+          a.zuSchreiben.isEmpty &&
+          a.bereiche.isEmpty &&
+          a.neu.isEmpty &&
+          a.geaendert.isEmpty,
     );
+    // Vor der Mutation: Moodle zeigt noch den Stand von der Planung.
+    if (a.gruppenStand.entries.any((e) => wertIn(f.felder, e.key) != e.value)) {
+      throw MoodleFehler('${typName(a.vorab.modul)}: Die Gruppeneinstellungen haben sich seit dem Planen geändert. Nichts gespeichert; neu lesen und planen.');
+    }
     final gesetzt = einstellungenSetzen(f.form, f.felder, a.einstellungen);
+    // Nach der Mutation: der Name ist jetzt auf eine ID aufgelöst; passt sie nicht zur geplanten, wird nichts gespeichert.
+    if (a.gruppenWahl.entries.any((e) => wertIn(f.felder, e.key) != e.value)) {
+      throw MoodleFehler('${typName(a.vorab.modul)}: Die freigegebene Gruppenwahl hat sich seit der Freigabe geändert. Nichts gespeichert; neu lesen und planen.');
+    }
     final geschrieben = <String, String>{};
     for (final k in a.zuSchreiben) {
       geschrieben[k] = await feldSetzen(moodle, f, k, a.lokal[k]!, a.quelle, {
@@ -1462,6 +1560,19 @@ Future<(String, bool)> _schreibenOhneSperre(
     bereiche: {for (final b in a.bereiche) b.feld: b.lokal},
     einstellungen: gesetzt,
   );
+  if (a.gruppenWahl.isNotEmpty) {
+    final rueckForm = _gespeichertesFormular(p.join(g.ordner, '.stand'));
+    final rueckWerte = rueckForm == null ? <MapEntry<String, String>>[] : formularFelder(rueckForm);
+    probe.pruefe(g.modul == a.vorab.modul && g.kurs == a.vorab.kurs && g.name == a.vorab.name,
+        '${typName(a.vorab.modul)}: Aktivitätsart, Kurs und Name');
+    for (final e in a.gruppenWahl.entries) {
+      probe.pruefe(wertIn(rueckWerte, e.key) == e.value, '${typName(a.vorab.modul)}: exakter Wert ${e.key}');
+    }
+    // Alles andere muss unverändert sein: Der Typ ist nur für diese zwei Felder gemessen.
+    final anders = uebrigeFelderAbweichung(a.vorab.felder, rueckWerte);
+    probe.pruefe(anders.isEmpty,
+        '${typName(a.vorab.modul)}: übrige Felder unverändert${anders.isEmpty ? '' : ' (abweichend: ${anders.join(', ')})'}');
+  }
   final text = [
     'Gespeichert: ${_was(a.ziel, a.vorab)} „${g.name}" (${zurueck.bezeichnung}${a.wo}).',
     if (a.zuSchreiben.isNotEmpty) 'Felder: ${a.zuSchreiben.join(", ")}.',
@@ -1479,7 +1590,7 @@ Future<(String, bool)> _schreibenOhneSperre(
 /// auch ohne Änderung einmal über das Formular speichern (CodeRunner prüft
 /// seine Musterlösung nur dort).
 /// Die Sperre des Ordners umfasst das Prüfen des Stands (.stand) bis zum Schreiben
-/// (Befund 6): Parallel gelesen oder geschrieben wird dieser Ordner dann nicht.
+/// Parallel gelesen oder geschrieben wird dieser Ordner dann nicht.
 /// Sie gilt auch während der Freigabe; das wartet auf die Lehrkraft (höchstens die Frist).
 Future<String> aendern(
   MoodleZugang moodle,

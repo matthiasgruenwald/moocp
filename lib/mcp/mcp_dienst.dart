@@ -33,6 +33,7 @@ import '../moodle/formular_lesen.dart';
 import '../moodle/formular_schreiben.dart';
 import '../moodle/fortschrittsliste.dart';
 import '../moodle/fragen.dart';
+import '../moodle/gruppierung.dart';
 import '../moodle/kurs.dart';
 import '../moodle/kurs_aendern.dart';
 import '../moodle/kursfilter.dart';
@@ -528,7 +529,11 @@ class McpDienst {
           'bereiche/<feld>/ (hinzufügen, ersetzen, entfernen) und Einstellungen als Parameter. '
           'Prüft zuerst, dass Moodle noch den Stand vom Lesen zeigt, zeigt der Lehrkraft in der '
           'App eine Änderungsübersicht mit Zeilenvergleich und schreibt nur nach ihrer Freigabe. '
-          'Danach Rückleseprobe (verified). Sichtbarkeit: sichtbarkeit_setzen.',
+          'Danach Rückleseprobe (verified). Sichtbarkeit: sichtbarkeit_setzen. '
+          '${MoodleZugang.nurGruppenModule.map(typName).join(", ")}: nur groupmode und groupingid '
+          'bestehender Aktivitäten, keine Texte, Dateien, anderen Einstellungen oder unverändertes '
+          'Neuspeichern; Optionen frisch aus dem Formular lesen. Gibt es die gewünschte Gruppierung '
+          'im Kurs nicht, bricht das Werkzeug mit einer Rückfrage ab (gruppierung_anlegen).',
       parameter: {
         'ordner': JsonSchema.string(
           description: 'Der gelesene Ordner im Arbeitsordner, absolut oder relativ dazu, etwa cm-815',
@@ -1041,7 +1046,8 @@ class McpDienst {
       titel: 'Wiederherstellung prüfen',
       beschreibung:
           'Zeigt den Stand einer Wiederherstellung (anstehend, hochgeladen, laufend, fertig, '
-          'fehlgeschlagen, unklar) und fragt eine laufende bei Moodle nach. Startet nie neu. Ein Vorgang, der nie bei '
+          'fehlgeschlagen, unklar). Während einer aktiven Operation zeigt es die gespeicherte Phase, Zeitpunkt und '
+          'Fortschritt einschließlich Stillstand; sonst fragt es offene Vorgänge bei Moodle nach. Startet nie neu. Ein Vorgang, der nie bei '
           'Moodle begonnen hat, wird als fehlgeschlagen vermerkt. Nur Vorgänge dieses Profils; ungebundene Altvorgänge '
           'werden nicht bei Moodle fortgesetzt. Die tatsächliche Moodle-Adresse einschließlich Installationspfad '
           'muss mit der gespeicherten Instanzbindung übereinstimmen. Nach der normalen Antwortfrist von einer Minute '
@@ -1147,7 +1153,7 @@ class McpDienst {
       },
     );
 
-    // ---- Übertragung in einem Auftrag (Issue #10): dieser Instanz sichern, dann je Ziel wiederherstellen
+    // ---- Übertragung in einem Auftrag: dieser Instanz sichern, dann je Ziel wiederherstellen
     _aufrufe.registrieren(
       server,
       'uebertragen',
@@ -1874,6 +1880,51 @@ class McpDienst {
 
     _aufrufe.registrieren(
       server,
+      'gruppierungen_lesen',
+      titel: 'Gruppierungen eines Kurses',
+      beschreibung:
+          'Zeigt die Gruppierungen eines Kurses mit den Namen ihrer Gruppen -- nur Namen, nie Mitglieder. '
+          'Gruppen und Gruppierungen werden bei Sicherung und Wiederherstellung nicht mitgenommen; im Quellkurs '
+          'zeigt dieses Werkzeug, was im Zielkurs gebraucht wird. Gruppennamen können Namen von Lernenden enthalten; nicht weitergeben. Eine Aktivität zeigt ihre Gruppierung in '
+          'aktivitaet_lesen (Einstellung groupingid). Nur lesen.',
+      parameter: {'kurs': _kurs},
+      pflicht: ['kurs'],
+      nurLesen: true,
+      ausfuehren: (a) => gruppierungenLesenText(moodle, _zahl(a, 'kurs')),
+    );
+
+    _aufrufe.registrieren(
+      server,
+      'gruppierung_anlegen',
+      titel: 'Gruppierung anlegen',
+      beschreibung:
+          'Legt in einem Kurs eine neue Gruppierung an, legt die genannten Gruppen an, soweit es sie im Kurs '
+          'noch nicht gibt, und ordnet sie der Gruppierung zu. Ohne Mitglieder. Erst aufrufen, wenn die '
+          'Lehrkraft gefragt wurde und zugestimmt hat -- aendern bricht bei einer fehlenden Gruppierung mit '
+          'genau dieser Rückfrage ab. Die Gruppen der Quelle zeigt gruppierungen_lesen im Quellkurs. '
+          'Gibt es die Gruppierung schon, ergänzt das Werkzeug nur fehlende Gruppen -- es entfernt und benennt nichts um --, '
+          'so lässt sich ein abgebrochener Aufruf wiederholen. Danach groupingid mit aendern setzen. '
+          'Nach Freigabe in der App; zurückgelesen wird die Gruppierung mit ihren Gruppen (verified).',
+      parameter: {
+        'kurs': _kurs,
+        'name': JsonSchema.string(description: 'Name der Gruppierung, genau wie in der Quelle'),
+        'gruppen': JsonSchema.array(
+          items: JsonSchema.string(),
+          description: 'Namen der Gruppen in der Gruppierung, genau wie in der Quelle',
+        ),
+      },
+      pflicht: ['kurs', 'name'],
+      ausfuehren: (a) => gruppierungAnlegen(
+        moodle,
+        freigaben,
+        kurs: _zahl(a, 'kurs'),
+        name: _text(a, 'name'),
+        gruppen: [for (final g in (a['gruppen'] as List? ?? const [])) '$g'],
+      ),
+    );
+
+    _aufrufe.registrieren(
+      server,
       'bildschirmfoto',
       titel: 'Bildschirmfoto',
       beschreibung:
@@ -2196,7 +2247,7 @@ class McpDienst {
       ),
     );
 
-    // ---- Übertragung (Issue #5): Rollen und Projektkontext, nur in der App gespeichert
+    // ---- Übertragung: Rollen und Projektkontext, nur in der App gespeichert
     _aufrufe.registrieren(
       server,
       'uebertragung_rolle_setzen',

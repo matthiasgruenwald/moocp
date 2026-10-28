@@ -66,6 +66,7 @@ Einstellungen gehen als Parameter `einstellungen` mit, Schlüssel wie in
 |---|---|
 | ein Steuerelement | der Wert als Text, wie er angezeigt wird: `"Nein"`, `"20"`, `"ja"` |
 | Datum | `"JJJJ-MM-TT SS:MM"` oder `"aus"` |
+| Optionsfelder mit demselben Namen | Beschriftung oder eindeutiger Wert aus `optionen`; deaktivierte Optionen sind nicht wählbar |
 | mehrere Steuerelemente in einer Zeile | `{ "Beschriftung": "Wert" }` |
 
 Unbekannte Schlüssel oder Werte brechen ab, **bevor** etwas geschrieben wird,
@@ -99,6 +100,32 @@ Datum nach der Frist.
 
 Fristen an bestehenden Aufgaben zu ändern trifft Lernende unmittelbar; die
 Freigabe zeigt es, sag es trotzdem vorher im Chat.
+
+### Collabora (`collabora`) und Gruppenwahl (`choicegroup`)
+
+Bei bestehenden Collabora-Aktivitäten und Gruppenwahlen ändert `aendern` ausschließlich Gruppenmodus
+und Gruppierung. Lies die Aktivität frisch und verwende die angebotenen Optionen
+aus dem Formular; eine Gruppierungsnummer aus einem anderen Kurs ist kein Beleg.
+Texte, Dateien, Name, andere Einstellungen und unverändertes Neuspeichern bleiben
+gesperrt. Dokumentinhalte werden damit nicht bearbeitet. Meldet das Zurücklesen `verified: false` mit „übrige Felder unverändert“, hat Moodle beim Speichern noch etwas anderes verändert: Sag es der Lehrkraft und lies die Aktivität neu, statt es zu überspielen.
+
+### Gruppierungen nach der Wiederherstellung
+
+Sicherungen ohne Nutzerdaten nehmen keine Gruppen und Gruppierungen mit. Auch
+vorhandene Gruppen und „Getrennte Gruppen“ ersetzen die gewählte Gruppierung
+nicht. Wer eine Aktivität mit Gruppierung wiederherstellt, ordnet sie danach zu:
+
+1. Im Quellkurs `gruppierungen_lesen` und die Gruppierung der Aktivität
+   (`aktivitaet_lesen`, Einstellung `groupingid`).
+2. Im Zielkurs `aendern` mit `groupingid` auf den Namen aus der Quelle.
+3. Meldet `aendern` eine **Rückfrage**, weil es die Gruppierung im Zielkurs nicht
+   gibt: Stelle sie der Lehrkraft in diesen Worten -- „Soll die Gruppierung
+   ‚…‘ mit den Gruppen … angelegt werden?" --, nenne die Gruppen aus der Quelle,
+   und rufe erst nach ihrem Ja `gruppierung_anlegen` auf, danach `aendern` noch
+   einmal. Ohne Ja bleibt die Aktivität ohne Gruppierung; sag ausdrücklich,
+   dass sie fehlt. Lass sie nie stillschweigend weg.
+
+Bestätige das Rückleseergebnis (`verified`), statt eine Übernahme zu behaupten.
 
 ### Wiki (`wiki`)
 

@@ -96,6 +96,12 @@ Vorbelegung als Frist meldet, meldet ein Datum, das nirgends gilt. Der
 `schluessel` ist genau das, was `aendern` und `aktivitaet_anlegen` als
 Einstellung annehmen (Schreibweise in `references/bearbeiten.md`).
 
+Optionsfelder mit demselben Namen bilden eine Auswahl. Ihr `wert` ist die
+Beschriftung der gewählten Option, `auswahlwert` deren technischen Wert;
+`optionen` enthält die angebotenen Werte
+und Beschriftungen sowie gegebenenfalls `deaktiviert: true`. Verwende diese
+Angaben beim Setzen, statt die Auswahl als `ja` oder `nein` zu behandeln.
+
 Einträge mit `"verborgen": true` sind Felder, die Moodle nicht anzeigt (etwa
 Voraussetzungen als JSON). Gib sie nicht ungefragt aus.
 

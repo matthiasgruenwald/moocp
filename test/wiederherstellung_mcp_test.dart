@@ -38,6 +38,7 @@ class _Moodle {
   bool sichtbar = false;
   int verbergen = 0;
   bool rollenSeite = false;
+  bool startFehlerseite = false;
   String? rollenSonderfall;
   bool uploadFormularFehlt = false;
   int rollenBestaetigt = 0;
@@ -186,7 +187,9 @@ class _Moodle {
           } else if (f.containsKey('_qf__restore_review_form')) {
             starts++;
             if (completeOnStart) completed = true;
-            answer = page('Gestartet');
+            answer = startFehlerseite
+                ? '${page('<div class="alert alert-danger">Nicht protokollieren</div>')}${form({'restore': restore, 'stage': '32', 'substage': '1'})}'
+                : page('Gestartet');
           } else if (f.containsKey('_qf__restore_schema_form')) {
             answer = form({'_qf__restore_review_form': '1', 'stage': '16', 'restore': restore});
           } else if (f.containsKey('_qf__restore_settings_form')) {
@@ -265,7 +268,7 @@ void main() {
           '<moodle_backup><information><format>moodle2</format><type>activity</type></information><activities><activity><modulename>${external.modul}</modulename><title>${external.title}</title><directory>activities/${external.modul}_7</directory></activity></activities></moodle_backup>',
       'activities/${external.modul}_7/inforef.xml': image ? '<inforef><file><id>1</id></file></inforef>' : '<inforef/>',
       'files.xml': image
-          ? '<files><file><id>1</id><component>mod_page</component><filename>bild.png</filename><contenthash>0000000000000000000000000000000000000000</contenthash></file></files>'
+          ? '<files><file id="1"><component>mod_page</component><filename>bild.png</filename><contenthash>0000000000000000000000000000000000000000</contenthash></file></files>'
           : '<files/>',
       if (quiz) 'activities/quiz_7/quiz.xml': '<activity contextid="5"><quiz><question_instance><question_reference><questionbankentryid>1</questionbankentryid><version>1</version></question_reference></question_instance></quiz></activity>',
       if (quiz) 'questions.xml': '<questions>${lokal || geteilt ? '<question_category id="1"><contextid>${geteilt ? 6 : 5}</contextid></question_category>' : ''}<question_bank_entry id="1">${lokal || geteilt ? '<questioncategoryid>1</questioncategoryid>' : ''}<idnumber>ZZ-1</idnumber><question_version><question_versions><version>1</version><questions><question><name>ZZ Frage</name></question></questions></question_versions></question_version></question_bank_entry></questions>',
@@ -337,6 +340,49 @@ void main() {
     expect(tool['annotations']['readOnlyHint'], false);
     expect(tool['annotations']['destructiveHint'], true);
   });
+
+  test('Startfehler mit weiterer Unterseite wird unklar statt endlos gepollt; bleibt gesperrt', () async {
+    external.startFehlerseite = true;
+    final result = await client.tool('wiederherstellen_datei', arguments);
+    expect(result, contains('Assistent'));
+    expect(result, isNot(contains('Nicht protokollieren')));
+    expect(external.progressReads, 0);
+    final store = Vorgaenge(folder.path, profilKennung: profile.kennung);
+    final v = (await store.alle()).single;
+    expect(v.wiederherstellung, WiederherstellungStand.unklar);
+    expect(v.text, contains('Assistent'));
+    await client.tool('wiederherstellen_datei', arguments);
+    expect(external.starts, 1);
+  });
+
+  for (final mitFortschritt in [true, false]) {
+  test('aktive Abfrage nennt Phase und Stillstand, Fortschritt bekannt: $mitFortschritt', () async {
+    external.hold = Completer<void>();
+    final result = await client.tool('wiederherstellen_datei', arguments);
+    final number = RegExp(r'Nummer ([a-z0-9]+)').firstMatch(result)!.group(1)!;
+    final store = Vorgaenge(folder.path, profilKennung: profile.kennung);
+    final v = (await store.finde(number))!;
+    if (mitFortschritt) {
+      await store.aktualisieren(v, fortschritt: 0, fortschrittSeit: DateTime.now());
+    }
+    final spaeter = DateTime.now().add(const Duration(minutes: 16));
+    jetzt = () => spaeter;
+    addTearDown(() => jetzt = DateTime.now);
+    final reads = external.progressReads;
+    final status = await client.tool('wiederherstellung_status', {'id': number});
+    expect(status, contains('Phase:'));
+    expect(status, contains('Stillstand'));
+    expect(status, contains(mitFortschritt ? '0 %' : 'unbekannt'));
+    expect(status, contains('gespeichert'));
+    expect(external.progressReads, reads);
+    jetzt = DateTime.now;
+    external.progress = {'unexpected': true};
+    external.hold!.complete();
+    external.hold = null;
+    await client.waitStatus('wiederherstellung_status', number, (t) => t.contains('Unklar') || t.contains('unklar'));
+    expect(external.starts, 1);
+  });
+  }
 
   test('fehlendes Upload-Formular wird vor dem Hochladen mit Feldnamen gemeldet', () async {
     external.uploadFormularFehlt = true;
@@ -528,7 +574,7 @@ void main() {
     });
 
     test('b) beendet, aber unvollständig: nennt das Fehlende, Optionen, nichts wiederholt, Sperre bleibt', () async {
-      final (number, result) = await fehlerLauf({'error': 'failed', 'progress': 0.2, 'status': 800},
+      final (number, result) = await fehlerLauf({'error': 'failed', 'progress': 0.2, 'status': 900},
           imKurs: true, weitere: ['ZZ Fremdes Quiz']);
       expect(result, contains('weicht ab'));
       expect(result, contains('ZZ Fremdes Quiz'));
@@ -569,7 +615,7 @@ void main() {
     });
 
     test('fehlgeschlagen nur mit Beleg: Prozess beendet und nichts Neues im Kurs; Wiederholung frei', () async {
-      final (number, result) = await fehlerLauf({'error': 'failed', 'progress': 0.2, 'status': 800});
+      final (number, result) = await fehlerLauf({'error': 'failed', 'progress': 0.2, 'status': 900});
       expect(result, contains('fehlgeschlagen'));
       expect(result, contains('nichts Neues'));
       final store = Vorgaenge(folder.path, profilKennung: profile.kennung);

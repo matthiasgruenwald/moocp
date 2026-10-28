@@ -1,4 +1,4 @@
-// Tests der Übertragung (Issue #5): Richtung, Rückfragen, Zusammenfassung und
+// Tests der Übertragung Richtung, Rückfragen, Zusammenfassung und
 // das Speichern von Rolle und Projektkontext. Nur erfundene Daten (A11):
 // Adressen mit .example, Kursnummern 12 und 34.
 

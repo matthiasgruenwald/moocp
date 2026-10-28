@@ -1,4 +1,4 @@
-// Übertragung von Kursen zwischen Instanzprofilen (Issue #5): der Projektkontext
+// Übertragung von Kursen zwischen Instanzprofilen (Projektkontext): der Projektkontext
 // (Quellkurs und Durchführungskurse), die Richtung eines Auftrags und die
 // Zusammenfassung vor dem ersten Schreibschritt.
 //
@@ -115,7 +115,7 @@ class Rueckfrage extends Richtungsentscheidung {
 }
 
 /// Bestimmt die Richtung eines Auftrags aus den Profilrollen und dem
-/// Projektkontext (Issue #5). Keine Netz- und keine Moodle-Anfrage.
+/// Projektkontext. Keine Netz- und keine Moodle-Anfrage.
 ///
 /// Prüfungen, in dieser Reihenfolge; die erste, die greift, gibt eine
 /// Rückfrage zurück:
@@ -213,9 +213,9 @@ String richtungText(Richtungsentscheidung e) => switch (e) {
       Rueckfrage(:final text) => 'Rückfrage: $text',
     };
 
-/// Der Text vor dem ersten Schreibschritt (Issue #5, Punkt 4). Nennt die
+/// Der Text vor dem ersten Schreibschritt (Punkt 4). Nennt die
 /// Quellinstanz, den Quellkurs, die Inhaltsauswahl, alle Zielkurse mit
-/// Instanz und den Wiederherstellungsweg. #8 bis #10 zeigen ihn in der
+/// Instanz und den Wiederherstellungsweg. Die Wege zeigen ihn in der
 /// Freigabe.
 ///
 /// [kursnamen] muss jeden Endpunkt der [plan] enthalten; der Name kommt aus

@@ -11,6 +11,9 @@ Ein konkretes Element in einem Moodle-Kurs, etwa eine bestimmte Textseite, Aufga
 Die Art einer Aktivität, etwa Textseite, Aufgabe oder Test.
 _Vermeiden_: Aktivitätstyp
 
+**Gruppierung**:
+Eine benannte Zusammenstellung von Gruppen eines Kurses. Eine Aktivität kann auf eine Gruppierung beschränkt sein. Sicherungen ohne Nutzerdaten enthalten weder Gruppen noch Gruppierungen; die App liest nur Namen, nie Mitglieder.
+
 **Sichern**:
 Ausgewählte Kursinhalte über Moodles Sicherungsfunktion in eine Sicherungsdatei ausgeben. „Exportieren“ ist dafür eine verständliche Formulierung im Gespräch.
 
