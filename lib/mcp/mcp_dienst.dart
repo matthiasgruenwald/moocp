@@ -1046,7 +1046,8 @@ class McpDienst {
       titel: 'Wiederherstellung prüfen',
       beschreibung:
           'Zeigt den Stand einer Wiederherstellung (anstehend, hochgeladen, laufend, fertig, '
-          'fehlgeschlagen, unklar) und fragt eine laufende bei Moodle nach. Startet nie neu. Ein Vorgang, der nie bei '
+          'fehlgeschlagen, unklar). Während einer aktiven Operation zeigt es die gespeicherte Phase, Zeitpunkt und '
+          'Fortschritt einschließlich Stillstand; sonst fragt es offene Vorgänge bei Moodle nach. Startet nie neu. Ein Vorgang, der nie bei '
           'Moodle begonnen hat, wird als fehlgeschlagen vermerkt. Nur Vorgänge dieses Profils; ungebundene Altvorgänge '
           'werden nicht bei Moodle fortgesetzt. Die tatsächliche Moodle-Adresse einschließlich Installationspfad '
           'muss mit der gespeicherten Instanzbindung übereinstimmen. Nach der normalen Antwortfrist von einer Minute '

@@ -66,6 +66,7 @@ Einstellungen gehen als Parameter `einstellungen` mit, Schlüssel wie in
 |---|---|
 | ein Steuerelement | der Wert als Text, wie er angezeigt wird: `"Nein"`, `"20"`, `"ja"` |
 | Datum | `"JJJJ-MM-TT SS:MM"` oder `"aus"` |
+| Optionsfelder mit demselben Namen | Beschriftung oder eindeutiger Wert aus `optionen`; deaktivierte Optionen sind nicht wählbar |
 | mehrere Steuerelemente in einer Zeile | `{ "Beschriftung": "Wert" }` |
 
 Unbekannte Schlüssel oder Werte brechen ab, **bevor** etwas geschrieben wird,

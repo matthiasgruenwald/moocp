@@ -1,6 +1,9 @@
 # Changelog
 
 ## 0.9.23
+- Wiederherstellung: Bilder und Anhänge werden anhand der tatsächlichen Moodle-Dateiliste geprüft und nicht mehr fälschlich als fremd gemeldet.
+- Wiederherstellung: Fehlerseiten des Assistenten und Stillstand werden sichtbar; Statusmeldungen nennen Phase und letzten Fortschritt, laufende Prozesse bleiben vor Wiederholungen geschützt.
+- Formulare: Abschlussverfolgung und andere Optionsfelder lassen sich als eindeutige Auswahl lesen und setzen.
 - Unterrichtsverteilung: Wechselnde Entwurfsadressen im Kartenhintergrund lösen keinen falschen Änderungsabbruch mehr aus.
 - Wiederherstellung: Die Dateiprüfung berücksichtigt Inhaltsfelder statt Logos, Editorressourcen und Profilbildern der Seitenhülle.
 - Collabora: Gruppenmodus und Gruppierung bestehender Aktivitäten lassen sich begrenzt ändern und zurücklesen; die Gruppierungsübernahme bleibt ausdrücklich ungeprüft.

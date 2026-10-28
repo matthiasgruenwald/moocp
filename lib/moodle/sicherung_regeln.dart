@@ -418,17 +418,18 @@ SicherungStand bewerteFortschritt(Object? antwort, String backupid) {
   if (eintrag['error'] != null || eintrag['errorcode'] != null) return SicherungStand.fehlgeschlagen;
   final p = eintrag['progress'];
   final s = eintrag['status'];
+  if (s == 900) return SicherungStand.fehlgeschlagen;
   if (p is num && s is num && p >= 1 && s == 1000) return SicherungStand.fertig;
   if (p is num && p < 1) return SicherungStand.laufend;
   return SicherungStand.unklar;
 }
 
-/// Ob Moodle den Vorgang als beendet mit Fehler führt (Status 800, `backup::STATUS_FINISHED_ERR`;
+/// Ob Moodle den Vorgang als beendet mit Fehler führt (Status 900, `backup::STATUS_FINISHED_ERR`;
 /// ungemessen). Ein Fehlerfeld allein belegt das Ende nicht: Ohne diesen Status kann der
 /// Hintergrundauftrag noch laufen oder hängen.
 bool fehlerBeendet(Object? antwort, String backupid) {
   final s = _eintrag(antwort, backupid)?['status'];
-  return s is num && s == 800;
+  return s is num && s == 900;
 }
 
 /// Die Art des gemeldeten Fehlers, nur als kurzer Bezeichner (Fehlercode, sonst das Fehlerfeld,

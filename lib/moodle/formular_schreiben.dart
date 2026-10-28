@@ -660,14 +660,13 @@ Future<Probe> zuruecklesen(
     );
   }
   for (final s in einstellungen) {
-    final w =
-        g.einstellungen
-            .where((e) => e.schluessel == s.schluessel)
-            .firstOrNull
-            ?.wert ??
-        '';
+    final gelesen = g.einstellungen.where((e) => e.schluessel == s.schluessel).firstOrNull;
+    final w = gelesen?.wert ?? '';
     probe.pruefe(
-      s.erwartet.every((t) => w.toLowerCase().contains(t.toLowerCase())),
+      s.auswahlwert != null
+          ? gelesen?.auswahlwert == s.auswahlwert
+          : gelesen?.optionen != null ? w == s.nachher
+          : s.erwartet.every((t) => w.toLowerCase().contains(t.toLowerCase())),
       'Einstellung ${s.label} (erwartet ${s.nachher}, gelesen $w)',
     );
   }

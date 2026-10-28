@@ -101,6 +101,10 @@ verifiziert weiter.
 Bei einem Stillstand (kein Fortschritt seit 15 Minuten) gilt dasselbe wie bei der
 Sicherung: nicht belegt, nicht neu starten; die Administration prüft Cron und
 Ad-hoc-Aufgaben.
+Bei noch aktiver Abfrage nennt der Status den gespeicherten Stand mit Phase,
+Zeitpunkt und Fortschritt; dieser Aufruf fragt Moodle nicht zusätzlich ab.
+Gib diese Unterscheidung weiter. Meldet der Restore-Assistent einen Fehler
+oder weitere Angaben, bleibt der Ausgang unklar und der Vorgang gesperrt.
 Startet es nie neu: Steht „fehlgeschlagen" da, sag das so, und frag die
 Lehrkraft, bevor du etwas erneut versuchst.
 

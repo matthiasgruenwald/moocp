@@ -29,6 +29,7 @@ class _Moodle extends MoodleZugang {
     if (name == 'core_courseformat_get_state') return {'cm': <Object?>[], 'section': <Object?>[]};
     final i = abfragen < antworten.length ? abfragen : antworten.length - 1;
     abfragen++;
+    if (antworten[i] is Exception || antworten[i] is Error) throw antworten[i]!;
     return antworten[i];
   }
 
@@ -209,6 +210,33 @@ void main() {
     expect(text, contains('gesperrt'));
     expect(text, isNot(contains('fehlgeschlagen')));
     expect((await vg.finde(v.id))!.wiederherstellung, WiederherstellungStand.unklar);
+  });
+
+  test('Wiederherstellung: Stillstand wird auch während derselben Abfrageschleife erkannt', () async {
+    final vg = Vorgaenge(ordner.path);
+    final v = await laufendeWiederherstellung(vg, seit: const Duration(minutes: 14));
+    final moodle = _Moodle([_fortschritt(0.5, id: 'r-1', status: 700)]);
+    final anfang = nun;
+    final text = await wiederherstellungStatus(moodle, vg, id: v.id);
+    expect(text, contains('Stillstand'));
+    expect(nun.difference(anfang), const Duration(minutes: 1));
+    expect((await vg.finde(v.id))!.wiederherstellung, WiederherstellungStand.laufend);
+  });
+
+  test('Wiederherstellung: unerwartete Hintergrundexception bleibt mit Phase gespeichert', () async {
+    final vg = Vorgaenge(ordner.path);
+    final v = await laufendeWiederherstellung(vg, seit: const Duration(minutes: 1));
+    await expectLater(wiederherstellungStatus(_Moodle([StateError('nicht speichern')]), vg, id: v.id),
+        throwsA(isA<StateError>()));
+    final gelesen = (await Vorgaenge(ordner.path).finde(v.id))!;
+    expect(gelesen.wiederherstellung, WiederherstellungStand.unklar);
+    expect(gelesen.text, contains('Phase: Moodle-Fortschritt'));
+    expect(gelesen.text, contains('StateError'));
+    expect(gelesen.text, isNot(contains('nicht speichern')));
+    // Die aktive Markierung wurde entfernt: eine neue reine Abfrage erreicht Moodle.
+    final erneut = _Moodle(['unbekannt']);
+    await wiederherstellungStatus(erneut, vg, id: v.id);
+    expect(erneut.abfragen, 1);
   });
 
   test('erste Beobachtung setzt den Zeitpunkt auch ohne Fortschrittswert', () {

@@ -36,11 +36,11 @@ Uint8List _archiv({required List<int> bild, bool mitNutzerdatei = false}) {
   const backup = '<moodle_backup><activities><activity><modulename>page</modulename>'
       '<title>Infoblatt</title><directory>activities/page_7</directory></activity></activities></moodle_backup>';
   final files = StringBuffer('<files>'
-      '<file><id>1</id><contenthash>${_sha(bild)}</contenthash><filename>bild.png</filename>'
+      '<file id="1"><contenthash>${_sha(bild)}</contenthash><filename>bild.png</filename>'
       '<filepath>/</filepath><component>mod_page</component><filearea>content</filearea></file>'
-      '<file><id>2</id><contenthash>${_sha(const [1])}</contenthash><filename>eigen.png</filename>'
+      '<file id="2"><contenthash>${_sha(const [1])}</contenthash><filename>eigen.png</filename>'
       '<filepath>/</filepath><component>user</component><filearea>draft</filearea></file>'
-      '<file><id>3</id><contenthash>x</contenthash><filename>.</filename>'
+      '<file id="3"><contenthash>x</contenthash><filename>.</filename>'
       '<filepath>/</filepath><component>mod_page</component><filearea>content</filearea></file>'
       '</files>');
   return _mbz({
@@ -128,7 +128,7 @@ void main() {
         'moodle_backup.xml': utf8.encode('<moodle_backup><activities><activity><modulename>resource</modulename>'
             '<title>Blatt</title><directory>activities/resource_3</directory></activity></activities></moodle_backup>'),
         'activities/resource_3/inforef.xml': utf8.encode('<inforef><fileref><file><id>1</id></file></fileref></inforef>'),
-        'files.xml': utf8.encode('<files><file><id>1</id><contenthash>abc</contenthash><filename>blatt.pdf</filename>'
+        'files.xml': utf8.encode('<files><file id="1"><contenthash>abc</contenthash><filename>blatt.pdf</filename>'
             '<component>mod_resource</component><filearea>content</filearea></file></files>'),
       });
       expect(quelldateienAus(mbz, modul: 'resource', titel: 'Blatt'),

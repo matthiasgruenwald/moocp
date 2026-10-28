@@ -79,7 +79,7 @@ void setze(Felder f, String name, String wert) {
 // ---------------------------------------------------------------------------
 
 class Einstellung {
-  Einstellung(this.schluessel, this.label, this.wert, {this.verborgen = false});
+  Einstellung(this.schluessel, this.label, this.wert, {this.verborgen = false, this.optionen, this.auswahlwert});
 
   /// Name der Zeile im Formular, etwa duedate, submissionplugins, visible.
   final String schluessel;
@@ -88,9 +88,12 @@ class Einstellung {
 
   /// Zeile ist im Formular ausgeblendet (d-none), etwa Voraussetzungen als JSON.
   final bool verborgen;
+  final List<Map<String, Object>>? optionen;
+  final String? auswahlwert;
 
   Map<String, Object?> toJson() =>
-      {'schluessel': schluessel, 'label': label, 'wert': wert, if (verborgen) 'verborgen': true};
+      {'schluessel': schluessel, 'label': label, 'wert': wert, if (verborgen) 'verborgen': true,
+        if (optionen != null) 'optionen': optionen, if (auswahlwert != null) 'auswahlwert': auswahlwert};
 }
 
 class _Zeile {
@@ -127,6 +130,19 @@ List<_Zeile> _zeilen(dom.Element form) {
           e
     ];
     if (steuer.isEmpty) continue;
+    // Moodle kann jede Option als eigene fitem-Zeile rendern; der Name bindet die Gruppe.
+    if (steuer.every(_istRadio) && steuer.map((s) => s.attributes['name']).toSet().length == 1) {
+      final name = steuer.first.attributes['name']!;
+      if (!gesehen.add(name)) continue;
+      final gruppe = _radios(form, name);
+      dom.Element? eltern = zeile.parent;
+      while (eltern != null && eltern.localName != 'fieldset') {
+        eltern = eltern.parent;
+      }
+      final label = _text(eltern?.querySelector('legend'));
+      aus.add(_Zeile(name, label.isEmpty ? name : label, 'radio', gruppe, _hat(zeile, 'd-none')));
+      continue;
+    }
     final schluessel = zeile.attributes['data-groupname'] ??
         (zeile.id.isNotEmpty
             ? zeile.id.replaceFirst(RegExp(r'^(fitem_fgroup_id_|fitem_id_|fgroup_id_)'), '')
@@ -200,6 +216,10 @@ String _datum(List<dom.Element> steuer) {
 
 String _zeilenwert(_Zeile z, dom.Element form) {
   if (z.istDatum) return _datum(z.steuer);
+  if (z.typ == 'radio') {
+    final s = z.steuer.where((s) => s.attributes.containsKey('checked')).firstOrNull;
+    return s == null ? '–' : _radioLabel(s, form);
+  }
   if (z.schluessel == 'availabilityconditionsjson') {
     final j = z.steuer.single.text.trim();
     return j.isEmpty || RegExp(r'"c"\s*:\s*\[\s*\]').hasMatch(j) ? 'keine' : j;
@@ -215,7 +235,13 @@ String _zeilenwert(_Zeile z, dom.Element form) {
 /// Knöpfe und reine Anzeigen.
 List<Einstellung> einstellungenLesen(dom.Element form) => [
       for (final z in _zeilen(form))
-        Einstellung(z.schluessel, z.label, _zeilenwert(z, form), verborgen: z.verborgen)
+        Einstellung(z.schluessel, z.label, _zeilenwert(z, form), verborgen: z.verborgen,
+          auswahlwert: z.typ != 'radio' ? null : z.steuer.where((s) => s.attributes.containsKey('checked'))
+              .map((s) => s.attributes['value'] ?? 'on').firstOrNull,
+          optionen: z.typ != 'radio' ? null : [for (final s in z.steuer) {
+            'wert': s.attributes['value'] ?? 'on', 'label': _radioLabel(s, form),
+            if (s.attributes.containsKey('disabled')) 'deaktiviert': true,
+          }])
     ];
 
 // ---------------------------------------------------------------------------
@@ -225,7 +251,7 @@ List<Einstellung> einstellungenLesen(dom.Element form) => [
 /// Eine gesetzte Einstellung: was vorher dastand, was jetzt, und woran die
 /// Rückleseprobe erkennt, dass es angekommen ist.
 class Gesetzt {
-  Gesetzt(this.schluessel, this.label, this.vorher, this.nachher, this.erwartet);
+  Gesetzt(this.schluessel, this.label, this.vorher, this.nachher, this.erwartet, {this.auswahlwert});
   final String schluessel;
   final String label;
   final String vorher;
@@ -233,6 +259,7 @@ class Gesetzt {
 
   /// Teiltexte, die der zurückgelesene Wert enthalten muss.
   final List<String> erwartet;
+  final String? auswahlwert;
 
   /// So steht es in der Freigabe: ein leerer Wert als „(leer)", sonst sähe
   /// die Lehrkraft hinter dem Pfeil nichts und wüsste nicht, ob etwas fehlt.
@@ -244,6 +271,16 @@ class Gesetzt {
 
 bool _gleich(String a, String b) =>
     a.replaceAll(RegExp(r'\s+'), ' ').trim().toLowerCase() == b.replaceAll(RegExp(r'\s+'), ' ').trim().toLowerCase();
+
+bool _istRadio(dom.Element e) => e.localName == 'input' && (e.attributes['type'] ?? '').toLowerCase() == 'radio';
+
+List<dom.Element> _radios(dom.Element form, String name) =>
+    form.querySelectorAll('input').where((e) => _istRadio(e) && e.attributes['name'] == name).toList();
+
+String _radioLabel(dom.Element e, dom.Element form) {
+  final label = beschriftung(e, form);
+  return label.isEmpty ? e.attributes['value'] ?? 'on' : label;
+}
 
 bool? _jaNein(Object? w) {
   if (w is bool) return w;
@@ -278,7 +315,18 @@ String steuerSetzen(dom.Element form, Felder f, dom.Element e, Object? wert, Str
       return '$wert';
     default:
       final typ = (e.attributes['type'] ?? 'text').toLowerCase();
-      if (typ == 'radio') throw MoodleFehler('$wo: Optionsfelder werden nicht unterstützt.');
+      if (typ == 'radio') {
+        final optionen = _radios(form, name);
+        final treffer = optionen.where((o) => (o.attributes['value'] ?? 'on') == '$wert' ||
+            _gleich(_radioLabel(o, form), '$wert')).toList();
+        if (treffer.length != 1 || treffer.single.attributes.containsKey('disabled')) {
+          throw MoodleFehler('$wo: „$wert“ ist keine eindeutige, aktivierte Auswahl. Möglichkeiten: '
+              '${optionen.where((o) => !o.attributes.containsKey('disabled')).map((o) => _radioLabel(o, form)).join(' | ')}');
+        }
+        f.removeWhere((x) => x.key == name);
+        f.add(MapEntry(name, treffer.single.attributes['value'] ?? 'on'));
+        return _radioLabel(treffer.single, form);
+      }
       if (typ == 'checkbox') {
         final an = _jaNein(wert);
         if (an == null) throw MoodleFehler('$wo: ja oder nein erwartet, nicht „$wert".');
@@ -349,9 +397,10 @@ List<Gesetzt> einstellungenSetzen(dom.Element form, Felder f, Map<String, Object
     if (z.istDatum) {
       final n = _setzeDatum(f, z, a.value);
       aus.add(Gesetzt(z.schluessel, z.label, vorher, n, [n]));
-    } else if (z.steuer.length == 1) {
-      final n = steuerSetzen(form, f, z.steuer.single, a.value, z.label);
-      aus.add(Gesetzt(z.schluessel, z.label, vorher, n, [n]));
+    } else if (z.steuer.length == 1 || z.typ == 'radio') {
+      final n = steuerSetzen(form, f, z.steuer.first, a.value, z.label);
+      aus.add(Gesetzt(z.schluessel, z.label, vorher, n, [n],
+          auswahlwert: z.typ == 'radio' ? f.lastWhere((e) => e.key == z.schluessel).value : null));
     } else {
       final werte = a.value;
       if (werte is! Map) {

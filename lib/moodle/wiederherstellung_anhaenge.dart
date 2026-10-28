@@ -104,7 +104,8 @@ List<QuellDatei>? quelldateienAus(Uint8List mbz, {required String modul, require
     };
     final liste = <QuellDatei>[];
     for (final f in XmlDocument.parse(utf8.decode(filesXml, allowMalformed: true)).findAllElements('file')) {
-      if (!ids.contains(_text(f, 'id'))) continue;
+      // files.xml trägt die ID als Attribut; inforef.xml referenziert sie als Kindelement.
+      if (!ids.contains(f.getAttribute('id'))) continue;
       if ((_text(f, 'component') ?? '').startsWith('user')) continue; // A1: Nutzerdateien nie
       final name = _text(f, 'filename') ?? '';
       if (name.isEmpty || name == '.') continue; // Verzeichniseinträge
