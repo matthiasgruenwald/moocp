@@ -100,7 +100,7 @@ Die Aktivitäten in dieser Tabelle kann die KI lesen, anlegen und ändern – Te
 | Link | `url` | |
 | Unterabschnitt | `subsection` | mit allem, was darin liegt, sichtbar schalten |
 | Buch | `book` | Kapitel anlegen, ändern, verschieben, löschen |
-| Test | `quiz` | Fragen und Zufallsfragen einfügen; Punkte, Reihenfolge, Seiten, Fragen mischen, Beste Bewertung |
+| Test | `quiz` | Fragen und Zufallsfragen einfügen, eine Frage gegen eine neue tauschen; Punkte, Reihenfolge, Seiten, Fragen mischen, Beste Bewertung |
 | Fragensammlung | `qbank` | Kategorien anlegen; Fragen siehe unten. Moodle legt sie immer im allgemeinen Abschnitt an; verbergen, verschieben und duplizieren gehen bei ihr nicht |
 | Fortschrittsliste\* | `checklist` | Einträge anlegen, ändern, ordnen, einrücken, löschen |
 | Wiki | `wiki` | Seiten schreiben und löschen – nur gemeinsame Wikis ohne Gruppenmodus |
@@ -342,6 +342,7 @@ Eine Ausnahme: Was die KI gerade selbst verborgen angelegt hat, ist noch nichts 
 | `buchkapitel_verschieben`, `buch_ordnen` | Verschieben ein Kapitel schrittweise bzw. bringen die Hauptkapitel eines Buchs in eine Reihenfolge. | **ja** |
 | `buchkapitel_loeschen` | Löscht ein Kapitel, ein Hauptkapitel samt Unterkapiteln. | **ja** |
 | `fragen_loeschen` | Löscht Fragen endgültig, jede mit allen Versionen. Steckt eine in einem Test, verbirgt Moodle sie nur. | **ja** |
+| `frage_ersetzen` | Tauscht eine Frage gegen eine neue aus einer XML-Datei: importiert sie in die Kategorie der alten, setzt sie in den genannten Tests auf den Platz der alten (dieselbe Seite, Stelle und Punkte) und löscht die alte auf Wunsch mit allen Versionen. Für Umbauten, die das Formular nicht kann. Besteht die neue Frage ihre Prüfung nicht, kommt sie in keinen Test. | **ja**, eine für alles |
 | `fortschrittsliste_aendern` | Legt Einträge an, auf Wunsch gleich als Überschrift oder optional; ändert, löscht, ordnet und rückt sie ein. | **ja**, außer bei gerade verborgen Angelegtem |
 | `board_aendern` | Legt Spalten an, benennt sie um, verschiebt, sperrt und löscht sie (nur leere, außer es ist ausdrücklich verlangt); eigene Notizen. | **ja**, außer bei gerade verborgen Angelegtem |
 | `kanban_aendern` | Spalten und Karten des gemeinsamen Boards: anlegen, ändern, verschieben, löschen (nur leere Spalten, außer es ist ausdrücklich verlangt). | **ja**, außer bei gerade verborgen Angelegtem |

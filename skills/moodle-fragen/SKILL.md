@@ -24,7 +24,7 @@ diesen.
 | Kategorien | `kategorie_anlegen` — die Gliederung *innerhalb* einer Sammlung |
 | Fragen lesen | `fragen_lesen`, `frage_lesen` |
 | Fragen anlegen | `fragen_importieren`, dazu die Bauhilfen `stack_xml`, `coderunner_xml` |
-| Fragen ändern | `frage_lesen`, dann `aendern` |
+| Fragen ändern | `frage_lesen`, dann `aendern`; Umbauten und Fragen, deren Formular abgewiesen wird: `frage_ersetzen` |
 | Fragen löschen | `fragen_lesen`, dann `fragen_loeschen` |
 | STACK | `stack_cas`, `stack_testen`, `stack_varianten` |
 | Tests | `test_lesen`, `test_aendern`; anlegen und Einstellungen über `aktivitaet_anlegen`, `aktivitaet_lesen`, `aendern` |
@@ -186,6 +186,8 @@ geht:
 | „Gesperrt: … steht nicht auf der Positivliste" | ein Weg, den kein Werkzeug vorsieht |
 | „Das Kursformat dieses Kurses kennt die Aktion … nicht" | das Kursformat (ein Plugin) kann es nicht — keine Lücke der App |
 
+**Fehlt nur eine Angabe**, ist das keine Lücke: Nimmt ein Werkzeug eine Nummer, die der Auftrag nicht enthält (ein Link auf eine Unterseite statt auf die Aktivität, kein Kurs genannt), frag danach, bevor du anfängst, und sag, wo der Nutzer sie findet. Ersetze sie nicht durch eine Annahme und arbeite nicht ohne sie los.
+
 **Bemerkst du sie vorher** — der Auftrag verlangt etwas, wofür es kein
 Werkzeug gibt, etwa „sortiere die Wikiseiten alphabetisch", „bewerte nach
 Kriterium X" —, dann **anhalten und fragen**:
@@ -195,7 +197,8 @@ Kriterium X" —, dann **anhalten und fragen**:
 
 | Lage | Verhalten |
 |---|---|
-| **nur lesen** | weitermachen, so gut es mit den Werkzeugen geht; die Lücke trotzdem melden |
+| **lesen**, und der Auftrag baut darauf auf | anhalten und fragen, bevor du irgendetwas anderes tust — ein Ergebnis ohne die Quelle, die der Nutzer genannt hat, ist wertlos und sieht trotzdem fertig aus |
+| **lesen**, und das Fehlende ist nebensächlich | weitermachen, gleich zu Beginn sagen, was fehlt; die Lücke trotzdem melden |
 | **schreiben** ohne Werkzeug | anhalten, (a) oder (b) fragen, auf die Antwort warten |
 | **löschen** oder sonst Unumkehrbares ohne Werkzeug | nur (b) — ohne Rückleseprobe weiß niemand, was wirklich weg ist |
 
@@ -792,12 +795,22 @@ Testplatz. Eine Änderung an der Frage wirkt deshalb **sofort in jedem Test**,
 der sie benutzt. Gibt es dort bereits Versuche, verschiebt das rückwirkend
 Bewertungen. Vorher fragen; `test_lesen` meldet vorhandene Versuche.
 
-**In der Kopie eines Tests** (Abschnitt „Bestehendes überarbeiten") stehen keine eigenen Fragen: Ein duplizierter Test verweist auf dieselben Fragen der Fragensammlung wie das Original. Eine Frage zu ändern ändert sie deshalb auch im Original — und dort womöglich rückwirkend Bewertungen. Soll eine Frage nur im neuen Test anders sein, legst du eine neue an und tauschst sie im Test gegen die alte aus. Welcher Weg für welche Frage gilt, steht im Plan.
+**In der Kopie eines Tests** (Abschnitt „Bestehendes überarbeiten") stehen keine eigenen Fragen: Ein duplizierter Test verweist auf dieselben Fragen der Fragensammlung wie das Original. Eine Frage zu ändern ändert sie deshalb auch im Original — und dort womöglich rückwirkend Bewertungen. Soll eine Frage nur im neuen Test anders sein, tauschst du sie mit `frage_ersetzen` nur in diesem Test aus, mit `loeschen: false`. Welcher Weg für welche Frage gilt, steht im Plan.
 
 **Struktur ändert man so nicht.** Eine zusätzliche Antwort, ein weiterer
 Knoten im Rückmeldebaum oder ein zusätzliches Eingabefeld entstehen im
 Formular erst über eigene Knöpfe. Für solche Umbauten ist eine neue Frage der
-ehrlichere Weg.
+ehrlichere Weg — mit `frage_ersetzen`, nicht in Einzelschritten.
+
+### Eine Frage ersetzen: `frage_ersetzen`
+
+Wo `aendern` nicht reicht, tauscht `frage_ersetzen` die alte Frage gegen eine neue aus einer XML-Datei, in einem Aufruf und nach einer Freigabe: Es importiert die neue in die Kategorie der alten, lässt die Nachweise laufen wie `fragen_importieren`, setzt sie in jedem genannten Test genau auf den Platz der alten — dieselbe Seite, dieselbe Stelle, dieselben Punkte, auch bei von Hand gesetzten Seitenumbrüchen — und löscht danach auf Wunsch die alte mit allen Versionen. Bau den Austausch nicht selbst aus `fragen_importieren`, `test_aendern` und `fragen_loeschen` zusammen: Das kostet viele Aufrufe, und jede Zwischenstufe ist ein halber Zustand, den niemand freigegeben hat.
+
+Anlässe sind ein geänderter Aufbau (Abschnitt oben), ein geänderter STACK-Testfall (`references/stack.md`) und Fragen, deren Formular ein Schutzdienst abweist (`references/html.md`): Der Import kommt dort durch, das Formular nicht. Das ist die eine Ausnahme von der Regel, solche Objekte stehen zu lassen. Für alles, was das Formular kann, bleibt `aendern` der bessere Weg — die Frage behält ihre Geschichte, und Versuche bleiben bei ihrer Version.
+
+Was im Plan steht, weil es die Lehrkraft entscheidet: in welchen Tests getauscht wird (`test_lesen` zeigt die Plätze; das Werkzeug sucht nicht selbst, wo die Frage noch steckt) und ob die alte gelöscht wird (`loeschen`, ohne Vorgabe). Gibt es in einem der Tests schon Versuche, verschiebt der Tausch Bewertungen — vorher fragen. Trägt die neue Frage die Sachnummer der alten, setzt die App sie nach dem Löschen an die neue; bleibt die alte, behält sie ihre. Das Setzen geht über das Formular der neuen Frage. Weist ein Schutzdienst Formulare dieser Instanz ab, kommt die neue deshalb ohne Sachnummer an, und die Antwort sagt es; schlag dann im Plan vor, ob sie ohne oder mit einer eigenen, neuen Sachnummer kommt.
+
+Bricht das Werkzeug vor der Freigabe ab, ist nichts geschehen. Besteht ein Nachweis nicht, liegt die neue Frage in der Kategorie, aber in keinem Test, und die alte ist unberührt. Danach prüft die Antwort jeden Platz selbst; nach `verified: true` liest du nicht nach.
 
 ## STACK: berechnete Fragen mit Rückmeldebaum
 

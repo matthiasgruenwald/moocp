@@ -20,6 +20,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:html/dom.dart' as dom;
 import 'package:html/parser.dart' as html_parser;
 import 'package:path/path.dart' as p;
 
@@ -60,7 +61,7 @@ Future<List<Kategorie>> kategorienLesen(MoodleZugang moodle, int sammlung) async
   ];
 }
 
-Kategorie _kategorie(List<Kategorie> alle, String? wunsch) {
+Kategorie kategorieWaehlen(List<Kategorie> alle, String? wunsch) {
   if (wunsch == null || wunsch.isEmpty) return alle.first;
   final k = alle.where((k) => k.wert == wunsch || '${k.id}' == wunsch || k.name == wunsch).toList();
   if (k.length != 1) {
@@ -107,7 +108,7 @@ Future<String> fragenLesen(MoodleZugang moodle, String arbeitsordner,
   for (final k in kats) {
     b.writeln('  ${'  ' * k.tiefe}${k.id} „${k.name}" (${k.anzahl})');
   }
-  final ziel = alle ? kats.where((k) => k.anzahl > 0).toList() : [_kategorie(kats, kategorie)];
+  final ziel = alle ? kats.where((k) => k.anzahl > 0).toList() : [kategorieWaehlen(kats, kategorie)];
   final treffer = <(Kategorie, FrageKurz)>[];
   for (final k in ziel) {
     if (k.anzahl == 0) {
@@ -202,9 +203,10 @@ Future<String> frageLesen(MoodleZugang moodle, String arbeitsordner, {required i
 
 /// Ergebnis eines Imports, für die Nachweise danach (STACK, CodeRunner).
 class Importiert {
-  Importiert(this.text, this.neu);
+  Importiert(this.text, this.neu, this.ok);
   final String text;
   final List<FrageKurz> neu;
+  final bool ok;
 }
 
 Future<Importiert> fragenImportieren(MoodleZugang moodle, Freigaben freigaben, String arbeitsordner,
@@ -216,7 +218,7 @@ Future<Importiert> fragenImportieren(MoodleZugang moodle, Freigaben freigaben, S
       fragenXmlPruefen(await f0.readAsString(encoding: utf8), dateiordner: p.join(p.dirname(pfad), 'dateien'));
 
   final kats = await kategorienLesen(moodle, sammlung);
-  final k = _kategorie(kats, kategorie);
+  final k = kategorieWaehlen(kats, kategorie);
 
   // Eine Freigabe für die ganze Datei, nicht je Frage: Der Import ist ein
   // Vorgang, und er bricht beim ersten Fehler als Ganzes ab. Erst bei
@@ -239,14 +241,20 @@ Future<Importiert> fragenImportieren(MoodleZugang moodle, Freigaben freigaben, S
     throw MoodleFehler('Der Import wurde in der App abgelehnt oder nicht innerhalb von '
         '${freigaben.frist.inMinutes} Minuten freigegeben. Nichts angelegt.');
   }
+  return importAusfuehren(moodle, sammlung, k, p.basename(pfad), xml, fragen.length);
+}
 
+/// Der Import selbst, nach der Freigabe: hochladen, absenden, nachzählen.
+/// Auch für frage_ersetzen, das die Freigabe selbst einholt.
+Future<Importiert> importAusfuehren(
+    MoodleZugang moodle, int sammlung, Kategorie k, String dateiname, String xml, int erwartet) async {
   final vorherIds = k.anzahl == 0 ? <int>{} : {for (final f in fragenAusXml(await exportieren(moodle, sammlung, k))) f.id};
 
   Future<String> versuch() async {
     final f = await formularHolen(moodle, '/question/bank/importquestions/import.php?cmid=$sammlung');
     final itemid = wertIn(f.felder, 'newfile');
     if (itemid == null) throw MoodleFehler('Im Importformular fehlt der Entwurfsbereich (newfile).');
-    await hochladen(moodle, f, itemid, '/', p.basename(pfad), utf8.encode(xml));
+    await hochladen(moodle, f, itemid, '/', dateiname, utf8.encode(xml));
     setze(f.felder, 'format', 'xml');
     setze(f.felder, 'category', k.wert);
     // Kategorie aus dem Formular, nicht aus der Datei; bei unpassenden
@@ -273,13 +281,13 @@ Future<Importiert> fragenImportieren(MoodleZugang moodle, Freigaben freigaben, S
   // Nachzählen ist der eigentliche Nachweis: Moodle meldet Erfolge, die keine sind.
   final nachher = fragenAusXml(await exportieren(moodle, sammlung, k));
   final neu = nachher.where((f) => !vorherIds.contains(f.id)).toList();
-  final ok = neu.length == fragen.length && probleme.isEmpty;
+  final ok = neu.length == erwartet && probleme.isEmpty;
   final b = StringBuffer()
-    ..writeln('${ok ? 'Importiert' : 'Import UNVOLLSTÄNDIG'}: ${neu.length} von ${fragen.length} Fragen in '
+    ..writeln('${ok ? 'Importiert' : 'Import UNVOLLSTÄNDIG'}: ${neu.length} von $erwartet Fragen in '
         '„${k.name}" (Sammlung cmid $sammlung). verified: $ok')
     ..writeln([for (final f in neu) '  ${f.zeile()}'].join('\n'));
   if (probleme.isNotEmpty) b.writeln('Moodle meldet: $probleme');
-  return Importiert(b.toString(), neu);
+  return Importiert(b.toString(), neu, ok);
 }
 
 // ---------------------------------------------------------------------------
@@ -296,7 +304,7 @@ Future<String> kategorieAnlegen(MoodleZugang moodle, Freigaben freigaben,
     {required int sammlung, required String name, String? eltern, String? beschreibung}) async {
   final kats = await kategorienLesen(moodle, sammlung);
   final kontext = kats.first.kontext;
-  final elternK = eltern == null ? null : _kategorie(kats, eltern);
+  final elternK = eltern == null ? null : kategorieWaehlen(kats, eltern);
   if (kats.any((k) => k.name == name)) {
     throw MoodleFehler('Eine Kategorie „$name" gibt es in dieser Sammlung schon.');
   }
@@ -428,24 +436,36 @@ Future<String> xmlBauen(MoodleZugang moodle, String arbeitsordner,
 /// Formular speichern -- nur dort schickt Moodle die Musterlösung durch die
 /// Sandbox (gemessen am 10.09.2026: Der Import nahm eine falsche Musterlösung
 /// klaglos an, erst das Speichern meldete „Erwartet 5, Erhalten -1").
-Future<String> importNachweise(MoodleZugang moodle, int sammlung, List<FrageKurz> neu,
-    Future<String> Function(int frage) stackTesten) async {
+///
+/// [ok] heißt: jeder Nachweis bestanden. [neueIds]: Das Speichern einer
+/// CodeRunner-Frage legt eine neue Version an; hier steht, welche Nummer
+/// danach gilt (alte -> neue).
+Future<({String text, bool ok, Map<int, int> neueIds})> importNachweise(MoodleZugang moodle, int sammlung,
+    List<FrageKurz> neu, Future<String> Function(int frage) stackTesten) async {
   final b = StringBuffer();
+  var ok = true;
+  final neueIds = <int, int>{};
   for (final f in neu.where((f) => f.typ == 'stack' && f.id != null)) {
-    b.writeln('\nNachweis STACK „${f.name}":\n${await stackTesten(f.id!)}');
+    final bericht = await stackTesten(f.id!);
+    // Die Zeile „verified: …" setzt stackTestBericht (stack.dart).
+    if (!bericht.contains('verified: true')) ok = false;
+    b.writeln('\nNachweis STACK „${f.name}":\n$bericht');
   }
   for (final f in neu.where((f) => f.typ == 'coderunner' && f.id != null)) {
     try {
       final form = await formularHolen(moodle, '/question/bank/editquestion/question.php?cmid=$sammlung&id=${f.id}');
-      await absenden(moodle, form, knoepfe: const ['submitbutton']);
+      final antwort = await absenden(moodle, form, knoepfe: const ['submitbutton']);
+      final id = int.tryParse(moodle.umleitungsziel(antwort)?.queryParameters['lastchanged'] ?? '');
+      if (id != null) neueIds[f.id!] = id;
       b.writeln('\nNachweis CodeRunner „${f.name}": Musterlösung besteht alle Testfälle (über das Formular '
-          'gespeichert, neue Version). geprueft: true');
+          'gespeichert, neue Version${id == null ? '' : ' $id'}). geprueft: true');
     } on MoodleFehler catch (x) {
+      ok = false;
       b.writeln('\nNachweis CodeRunner „${f.name}": NICHT bestanden -- ${x.meldung}. geprueft: false. '
           'Musterlösung oder erwartete Ausgabe nachbessern (frage_lesen, aendern).');
     }
   }
-  return b.toString();
+  return (text: b.toString(), ok: ok, neueIds: neueIds);
 }
 
 // ---------------------------------------------------------------------------
@@ -488,10 +508,35 @@ const _frageFehlt = {'invalidrecord', 'invalidrecordunknown', 'questiondoesnotex
 /// den genannten geprüft -- eine vertauschte Nummer löscht so nichts.
 Future<String> fragenLoeschen(MoodleZugang moodle, Freigaben freigaben, String arbeitsordner,
     {required int sammlung, required List<(int, String)> fragen}) async {
+  final gefunden = await loeschenPruefen(moodle, sammlung, fragen);
+  final r = await _loeschRueckfrage(moodle, arbeitsordner, sammlung, gefunden);
+
+  final ja = await freigaben.anfragen(FreigabeAnfrage(
+    titel: fragen.length == 1 ? 'Frage endgültig löschen?' : '${fragen.length} Fragen endgültig löschen?',
+    punkte: [
+      'Aus der Fragensammlung cmid $sammlung, jeweils mit allen Versionen:',
+      for (final f in gefunden) '„${f.name}" (${f.typ}, questionid ${f.id}${f.idnummer == null ? '' : ', ${f.idnummer}'})',
+      'Steckt eine Frage in einem Test, löscht Moodle sie nicht, sondern verbirgt sie nur.',
+      if (r.hinweis != null && r.hinweis!.isNotEmpty) 'Moodle fragt: ${r.hinweis}',
+    ],
+    vergleich: const [],
+    knopf: 'Löschen',
+  ));
+  if (!ja) {
+    return 'Nicht gelöscht: in der App abgelehnt oder nicht rechtzeitig freigegeben. '
+        'Die Rückfrage von Moodle liegt unter ${r.seite}.';
+  }
+  final (b, alleWeg) = await _loeschAbsenden(moodle, sammlung, gefunden, r);
+  return '${alleWeg ? 'Gelöscht' : 'Nicht alles gelöscht'}: ${fragen.length} Frage(n) aus Sammlung $sammlung. '
+      'verified: $alleWeg\n$b';
+}
+
+/// Exportiert jede genannte Frage einzeln und prüft ihren Namen; schreibt
+/// nichts. Gibt die gefundenen Fragen in der genannten Reihenfolge.
+Future<List<FrageKurz>> loeschenPruefen(MoodleZugang moodle, int sammlung, List<(int, String)> fragen) async {
   if (fragen.isEmpty) throw MoodleFehler('Keine Fragen genannt.');
   final ids = [for (final (id, _) in fragen) id];
   if (ids.toSet().length != ids.length) throw MoodleFehler('Eine Frage ist doppelt genannt.');
-
   final gefunden = <FrageKurz>[];
   for (final (id, name) in fragen) {
     final e = await _frageExport(moodle, sammlung, id);
@@ -503,9 +548,18 @@ Future<String> fragenLoeschen(MoodleZugang moodle, Freigaben freigaben, String a
     nameBestaetigen(name, f.name, 'Frage $id');
     gefunden.add(f);
   }
+  return gefunden;
+}
 
-  // Die Rückfrage ändert nichts; sie liegt danach im Arbeitsordner, damit
-  // sich nachsehen lässt, was Moodle gefragt hat.
+/// Moodles Rückfrage zum Löschen: ihr Formular oder ihr Bestätigungslink und
+/// was sie zur Auswahl sagt. Die Rückfrage ändert nichts.
+typedef _Rueckfrage = ({Uri adresse, dom.Element? form, Uri? link, String? hinweis, String seite});
+
+Future<_Rueckfrage> _loeschRueckfrage(
+    MoodleZugang moodle, String arbeitsordner, int sammlung, List<FrageKurz> fragen) async {
+  final ids = [for (final f in fragen) f.id!];
+  // Die Rückfrage liegt danach im Arbeitsordner, damit sich nachsehen lässt,
+  // was Moodle gefragt hat.
   final ordner = _sammlungsOrdner(arbeitsordner, sammlung);
   await Directory(ordner).create(recursive: true);
   // Die Auswahl wie das Formular der Sammlung: q<id>=1 je Frage. returnurl
@@ -545,25 +599,16 @@ Future<String> fragenLoeschen(MoodleZugang moodle, Freigaben freigaben, String a
       ?.text
       .replaceAll(RegExp(r'\s+'), ' ')
       .trim();
+  return (adresse: r.adresse, form: form, link: link, hinweis: hinweis, seite: seite.path);
+}
 
-  final ja = await freigaben.anfragen(FreigabeAnfrage(
-    titel: fragen.length == 1 ? 'Frage endgültig löschen?' : '${fragen.length} Fragen endgültig löschen?',
-    punkte: [
-      'Aus der Fragensammlung cmid $sammlung, jeweils mit allen Versionen:',
-      for (final f in gefunden) '„${f.name}" (${f.typ}, questionid ${f.id}${f.idnummer == null ? '' : ', ${f.idnummer}'})',
-      'Steckt eine Frage in einem Test, löscht Moodle sie nicht, sondern verbirgt sie nur.',
-      if (hinweis != null && hinweis.isNotEmpty) 'Moodle fragt: $hinweis',
-    ],
-    vergleich: const [],
-    knopf: 'Löschen',
-  ));
-  if (!ja) {
-    return 'Nicht gelöscht: in der App abgelehnt oder nicht rechtzeitig freigegeben. '
-        'Die Rückfrage von Moodle liegt unter ${seite.path}.';
-  }
-
+/// Sendet die Rückfrage ab und liest jede Frage nach. Gibt je Frage eine
+/// Zeile und ob alle wirklich weg sind.
+Future<(String, bool)> _loeschAbsenden(
+    MoodleZugang moodle, int sammlung, List<FrageKurz> fragen, _Rueckfrage r) async {
   // Absenden, wie Moodle es anbietet. Der Umleitung danach (auf die
   // Fragenübersicht, die Klarnamen zeigt) folgt die App nicht.
+  final form = r.form;
   if (form != null) {
     final felder = <MapEntry<String, String>>[
       for (final i in form.querySelectorAll('input[type="hidden"]'))
@@ -576,12 +621,12 @@ Future<String> fragenLoeschen(MoodleZugang moodle, Freigaben freigaben, String a
       await moodle.aufrufen(ziel.replace(queryParameters: {for (final e in felder) e.key: e.value}).toString());
     }
   } else {
-    await moodle.aufrufen('${link!.path}?${link.query}');
+    await moodle.aufrufen('${r.link!.path}?${r.link!.query}');
   }
 
   final b = StringBuffer();
   var alleWeg = true;
-  for (final f in gefunden) {
+  for (final f in fragen) {
     final e = await _frageExport(moodle, sammlung, f.id!);
     if (e.xml == null && _frageFehlt.contains(e.fehlercode)) {
       b.writeln('  gelöscht: „${f.name}" (${f.id})');
@@ -594,6 +639,12 @@ Future<String> fragenLoeschen(MoodleZugang moodle, Freigaben freigaben, String a
           '${e.meldung.isEmpty ? '' : ' (${e.meldung})'}');
     }
   }
-  return '${alleWeg ? 'Gelöscht' : 'Nicht alles gelöscht'}: ${fragen.length} Frage(n) aus Sammlung $sammlung. '
-      'verified: $alleWeg\n$b';
+  return (b.toString(), alleWeg);
 }
+
+/// Löscht bereits geprüfte Fragen ohne eigene Freigabe -- für frage_ersetzen,
+/// dessen Freigabe das Löschen schon zeigt. Moodles Rückfrage wird erst jetzt
+/// geholt, weil sie davon abhängt, ob die Frage noch in einem Test steckt.
+Future<(String, bool)> loeschenOhneFreigabe(
+        MoodleZugang moodle, String arbeitsordner, int sammlung, List<FrageKurz> fragen) async =>
+    _loeschAbsenden(moodle, sammlung, fragen, await _loeschRueckfrage(moodle, arbeitsordner, sammlung, fragen));

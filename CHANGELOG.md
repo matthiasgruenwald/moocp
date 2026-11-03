@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.32
+- Fragen: Muss eine Frage neu angelegt werden, etwa weil sich ihr Aufbau ändert, tauscht die KI sie in einem Schritt und mit einer Freigabe aus – die neue steht im Test an derselben Stelle mit denselben Punkten, und die alte wird auf Wunsch gelöscht.
+- Aufträge mit Quelle: Kann die KI eine genannte Seite nicht lesen, etwa über den Link auf eine einzelne Wikiseite, fragt sie nach, statt ohne die Quelle weiterzuarbeiten.
+
 ## 0.9.30
 - Boards, Kanban-Boards, Fortschrittslisten und Tests: Die App bestätigt nach dem Ändern selbst, dass alles angekommen ist, und die KI liest nach dem Schreiben nicht mehr eigens nach – das spart Zeit und Kontext.
 

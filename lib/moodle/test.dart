@@ -240,16 +240,68 @@ TestAbschnitt _testabschnitt(Map a, TestAufbau t) {
       (throw MoodleFehler('Testabschnitt $id gibt es nicht; vorhanden: ${t.abschnitte.map((x) => x.id).join(', ')}.'));
 }
 
-Future<String> testAendern(MoodleZugang moodle, Freigaben freigaben,
-    {required int cmid, required String name, required List<Map<String, Object?>> aktionen}) async {
-  var t = await testLesen(moodle, cmid);
-  final kurs = t.kurs;
-  final struktur = kurs == null ? null : await kursLesen(moodle, kurs);
+/// Den Test lesen und seinen Namen gegen den genannten prüfen, wie er in der
+/// Kursstruktur steht; passt er nicht, bricht es ab, bevor etwas geschieht.
+Future<(TestAufbau, KursAktivitaet)> testMitNamen(MoodleZugang moodle, int cmid, String name) async {
+  final t = await testLesen(moodle, cmid);
+  final struktur = t.kurs == null ? null : await kursLesen(moodle, t.kurs!);
   final c = struktur?.nachCmid[cmid];
   if (c == null) throw MoodleFehler('Test cmid $cmid nicht in der Kursstruktur gefunden.');
   if (c.name.replaceAll(RegExp(r'\s+'), ' ').trim() != name.replaceAll(RegExp(r'\s+'), ' ').trim()) {
     throw MoodleFehler('Abgebrochen, nichts geändert: cmid $cmid heißt „${c.name}", nicht „$name".');
   }
+  return (t, c);
+}
+
+/// Setzt die Frage [neu] an die Stelle des Platzes [alt]: dieselbe Seite,
+/// dieselbe Stelle, dieselben Punkte; der alte Platz geht. Ohne Umsortieren
+/// des ganzen Tests, so bleibt auch eine von Hand gesetzte Seitenaufteilung:
+/// einfügen auf der Seite des alten Platzes, direkt hinter ihn schieben, dann
+/// den alten entfernen. Die Punkte kommen vom alten Platz, nicht von der
+/// neuen Frage -- sie sind das, was der Test bisher gezählt hat.
+/// Gibt den neuen Stand, eine Zeile Bericht und ob alles stimmt.
+Future<(TestAufbau, String, bool)> platzErsetzen(MoodleZugang moodle, TestAufbau t, Platz alt, int neu) async {
+  final cmid = t.cmid;
+  final stelle = t.plaetze.indexWhere((x) => x.slotid == alt.slotid);
+  final s = await moodle.sesskey();
+  await moodle.aufrufen('/mod/quiz/edit.php?cmid=$cmid&addquestion=$neu&addonpage=${alt.seite ?? 0}&sesskey=$s');
+  var n = await testLesen(moodle, cmid);
+  final vorher = {for (final x in t.plaetze) x.slotid};
+  final dazu = n.plaetze.where((x) => !vorher.contains(x.slotid)).toList();
+  if (dazu.length != 1) {
+    return (n, '„${alt.name}" (Platz ${alt.slotid}): Frage $neu NICHT eingefügt (${dazu.length} neue Plätze)', false);
+  }
+  final platz = dazu.single.slotid;
+  await _rest(moodle, n,
+      {'class': 'resource', 'field': 'move', 'id': '$platz', 'previousid': '${alt.slotid}', 'page': '${alt.seite ?? 1}'});
+  if (alt.punkte != null && (dazu.single.punkte == null || (dazu.single.punkte! - alt.punkte!).abs() >= 0.005)) {
+    await _rest(moodle, n, {'class': 'resource', 'field': 'updatemaxmark', 'id': '$platz', 'maxmark': '${alt.punkte}'});
+  }
+  await _rest(moodle, n, {'class': 'resource', 'action': 'DELETE', 'id': '${alt.slotid}'});
+  n = await testLesen(moodle, cmid);
+  final jetzt = n.plaetze.where((x) => x.slotid == platz).firstOrNull;
+  final abweichend = [
+    if (jetzt == null) 'neuer Platz fehlt',
+    if (n.plaetze.any((x) => x.slotid == alt.slotid)) 'alter Platz noch da',
+    if (n.plaetze.length != t.plaetze.length) 'Zahl der Plätze ${n.plaetze.length} statt ${t.plaetze.length}',
+    if (jetzt != null && n.plaetze.indexOf(jetzt) != stelle) 'Stelle ${n.plaetze.indexOf(jetzt) + 1} statt ${stelle + 1}',
+    if (jetzt != null && jetzt.seite != alt.seite) 'Seite ${jetzt.seite} statt ${alt.seite}',
+    if (jetzt != null && alt.punkte != null && (jetzt.punkte == null || (jetzt.punkte! - alt.punkte!).abs() >= 0.005))
+      '${_z(jetzt.punkte)} statt ${_z(alt.punkte)} Punkte',
+    if (jetzt != null && jetzt.frage != neu) 'Platz zeigt Frage ${jetzt.frage} statt $neu',
+  ];
+  return (
+    n,
+    '„${alt.name}" (Platz ${alt.slotid}, S.${alt.seite ?? '?'}, Stelle ${stelle + 1}, ${_z(alt.punkte)} P.) -> '
+        'Frage $neu auf Platz $platz: ${abweichend.isEmpty ? 'ok' : 'ABWEICHEND (${abweichend.join('; ')})'}',
+    abweichend.isEmpty,
+  );
+}
+
+Future<String> testAendern(MoodleZugang moodle, Freigaben freigaben,
+    {required int cmid, required String name, required List<Map<String, Object?>> aktionen}) async {
+  var (t, c) = await testMitNamen(moodle, cmid, name);
+  final kurs = t.kurs;
   if (aktionen.isEmpty) throw MoodleFehler('Keine aktionen angegeben.');
   final beschreibung = [for (final a in aktionen) _aktionText(a, t)];
   for (final a in aktionen.where((a) => a['art'] == 'reihenfolge')) {
