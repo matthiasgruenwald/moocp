@@ -16,6 +16,7 @@ die KI von Hand: Das ist mechanisch, spart das Lesen und Bearbeiten jeder
 Seite, und die App sichert zu, dass sich am sichtbaren Text nichts ändert.
 Der Plan im Chat (A5) bleibt davor; eine Planungsebene im Code gibt es nicht.
 Wie viele dieser Dialoge kommen, stellt die Lehrkraft ein (E20).
+Der Dialog nimmt Return, Leertaste und Enter nicht an; entschieden wird mit der Maus. Die Knöpfe nehmen erst nach 1,5 Sekunden Klicks an (Sperrzeit), damit ein Klick, der einem anderen Fenster galt, nicht den Dialog trifft, der darüber aufgeht. Übernommen aus topse/moocp 0.9.26 (Entscheidung in Ticket #61).
 
 ## Verworfen
 

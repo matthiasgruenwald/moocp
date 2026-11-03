@@ -57,6 +57,9 @@ void main() {
 
   test('STACK bauen verweigert: ohne Tests, ohne Platzhalter, Knoten 0', () {
     expect(() => stackXml({..._stackFrage(), 'tests': []}, version: '1'), throwsA(isA<MoodleFehler>()));
+    final zufall = {..._stackFrage(), 'variablen': 'k : rand([2,3,5]); R : 100*k;'};
+    expect(() => stackXml(zufall, version: '1'), throwsA(isA<MoodleFehler>()), reason: 'rand() ohne hinweis');
+    expect(stackXml({...zufall, 'hinweis': 'k={@k@}'}, version: '1'), contains('k={@k@}'));
     expect(() => stackXml({..._stackFrage(), 'fragetext': '<p>ohne Feld</p>'}, version: '1'),
         throwsA(predicate((e) => e is MoodleFehler && e.meldung.contains('[[input:ans1]]'))));
     final f = _stackFrage();

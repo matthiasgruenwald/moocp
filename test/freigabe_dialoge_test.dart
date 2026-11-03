@@ -4,7 +4,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moocp/freigabe.dart';
-import 'package:moocp/main.dart' show FreigabeDialoge;
+import 'package:moocp/main.dart' show FreigabeDialoge, Sperrzeit;
 import 'package:moocp/protokoll.dart';
 
 FreigabeAnfrage _anfrage(String titel) =>
@@ -39,6 +39,7 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.textContaining('ZZ Vertiefung'), findsOneWidget);
         expect(find.textContaining('Gleicher Lerngegenstand'), findsOneWidget);
+        await tester.pump(Sperrzeit.dauerVorgabe);
         await tester.tap(find.text(ja ? 'Speichern' : 'Abbrechen'));
         await tester.pumpAndSettle();
         expect(await antwort, ja);
@@ -56,6 +57,7 @@ void main() {
     final antwort = freigaben.imTest(() => freigaben.anfragen(anfrage), pruefen: () async => false);
     await tester.pumpAndSettle();
     expect(find.text('ZZ Bild?'), findsOneWidget);
+    await tester.pump(Sperrzeit.dauerVorgabe);
     await tester.tap(find.text('Abbrechen'));
     await tester.pumpAndSettle();
     expect(await antwort, isFalse);
@@ -80,8 +82,10 @@ void main() {
       expect(find.text('ZZ Änderung?'), findsOneWidget);
       switch (fall) {
         case 'Zustimmung':
+          await tester.pump(Sperrzeit.dauerVorgabe);
           await tester.tap(find.text('Speichern'));
         case 'Ablehnung':
+          await tester.pump(Sperrzeit.dauerVorgabe);
           await tester.tap(find.text('Abbrechen'));
         case 'Fristablauf':
           await tester.pump(const Duration(seconds: 3));

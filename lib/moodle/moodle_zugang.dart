@@ -862,27 +862,23 @@ class MoodleZugang {
                     const {'0', '1'}.contains(wertIn(f, 'newshuffle'))));
       },
     ),
+    // Das Formular der Testseite: mehrere zufällige oder genau eine
+    // Variante, je nach Knopf (stack.dart, stackVarianten).
     Erlaubt(
       'GET',
       r'^/question/type/stack/deploy\.php$',
       'STACK: Varianten einsetzen',
       parameter: (q) =>
-          q.length == 4 &&
           _zahl(q['questionid']) &&
           _zahl(q['cmid']) &&
-          _zahl(q['deploymany']) &&
-          _gesetzt(q['sesskey']),
-    ),
-    Erlaubt(
-      'POST',
-      r'^/question/type/stack/deploy\.php$',
-      'STACK: eine Variante einsetzen',
-      parameter: (q) => q.isEmpty,
-      formular: (f) =>
-          f.length == 4 &&
-          _zahl(wertIn(f, 'questionid')) &&
-          _zahl(wertIn(f, 'cmid')) &&
-          _zahl(wertIn(f, 'deploy')),
+          _gesetzt(q['sesskey']) &&
+          ((q.length == 5 &&
+                  _zahl(q['deploy']) &&
+                  q['deploysinglebtn'] == '1') ||
+              (q.length == 6 &&
+                  _zahl(q['deploymany']) &&
+                  q['deploymanybtn'] == '1' &&
+                  q['deployhalt'] == 'on')),
     ),
     // Der Notizblock rechnet nur. Mit questionid hat sein Formular auch
     // „Speichern" (action = savechat), das Variablen und Feedback ohne neue

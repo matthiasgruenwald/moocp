@@ -39,17 +39,17 @@ List<String> _zellen(dom.Element tr) => [
 
 /// Nächstliegende Überschrift oberhalb -- ordnet Tabellen ihrem Testfall zu,
 /// ohne auf deutsche Beschriftungen zu bauen.
-String _ueberschrift(dom.Element el) {
+dom.Element? _ueberschrift(dom.Element el) {
   dom.Element? n = el;
   while (n != null) {
     var s = n.previousElementSibling;
     while (s != null) {
-      if (RegExp(r'^h[1-6]$').hasMatch(s.localName ?? '')) return _text(s);
+      if (RegExp(r'^h[1-6]$').hasMatch(s.localName ?? '')) return s;
       s = s.previousElementSibling;
     }
     n = n.parent;
   }
-  return '';
+  return null;
 }
 
 bool _pass(dom.Element e) => e.classes.contains('pass');
@@ -72,12 +72,17 @@ String stackTestBericht(String html, {required int frage, int? seed}) {
   var verworfen = false;
   final verdacht = <String, List<String>>{};
   final gerechnet = <String>{};
-  // Hat die Frage keinen einzigen Fragetest, zeigt STACK zwischen zwei <hr>
-  // ein Beispiel („If you add the test, its output will look like this"): die
-  // Musterantworten eingesetzt, mit Überschrift „Testfall Beispiel". Das ist
-  // kein Test der Frage; gezählt, hieß es „NICHT bestanden" statt „KEINE
-  // Testfälle", denn ein Gesamtergebnis gibt es dann nicht (questiontestrun.php).
-  // Die Elemente kommen in Dokumentreihenfolge, jedes <hr> schaltet um.
+  // Hat die Frage keinen einzigen Fragetest, zeigt STACK ein Beispiel („If
+  // you add the test, its output will look like this"): die Musterantworten
+  // eingesetzt, mit Überschrift „Testfall Beispiel". Das ist kein Test der
+  // Frage; gezählt, hieß es „NICHT bestanden" statt „KEINE Testfälle", denn
+  // ein Gesamtergebnis gibt es dann nicht (questiontestrun.php).
+  // Erkannt wird es an der Kennung der Überschrift: testcase-<Nummer>-<Frage>
+  // bei echten Testfällen, testcase-Beispiel-<Frage> (übersetzt) beim
+  // Beispiel. Ein <hr> steht vor jedem Testfall, nicht nur um das Beispiel
+  // (gemessen); daran umzuschalten, verlor jeden zweiten Testfall. Nur wo
+  // keine Überschrift eine solche Kennung trägt (ältere STACK-Versionen),
+  // gilt noch: Das Beispiel steht zwischen zwei <hr>, jedes schaltet um.
   var imBeispiel = false;
   bool? beispielBestanden;
   for (final tab in haupt.querySelectorAll('hr, table.stacktestsuite')) {
@@ -86,14 +91,18 @@ String stackTestBericht(String html, {required int frage, int? seed}) {
       continue;
     }
     final spalten = tab.querySelectorAll('thead th').length;
-    if (imBeispiel) {
+    final kopf = _ueberschrift(tab);
+    final kennung = kopf?.id ?? '';
+    final beispiel =
+        kennung.startsWith('testcase-') ? !RegExp(r'^testcase-\d+-').hasMatch(kennung) : imBeispiel;
+    if (beispiel) {
       if (spalten >= 7) {
         final zeilen = tab.querySelectorAll('tbody tr');
         beispielBestanden = (beispielBestanden ?? true) && zeilen.isNotEmpty && zeilen.every(_pass);
       }
       continue;
     }
-    final titel = _ueberschrift(tab);
+    final titel = _text(kopf);
     // Sechs Spalten: die Eingaben des Testfalls -- Name, Wert aus dem
     // Testfall, übernommener Wert, Anzeige, Status, Fehler. Ist der
     // übernommene Wert leer, hat STACK den Testwert verworfen und rechnet
@@ -191,21 +200,20 @@ Future<String> stackVarianten(MoodleZugang moodle, Freigaben freigaben,
     knopf: 'Einsetzen',
   ));
   if (!ja) return 'Nichts eingesetzt: in der App abgelehnt oder nicht rechtzeitig freigegeben.';
+  // Das Einsetzen ist auf der Testseite ein einziges GET-Formular; welche
+  // Aktion gemeint ist, sagt der Name des Knopfs. Ohne ihn leitet deploy.php
+  // nur zurück und setzt nichts ein (gemessen). deployhalt ist dort
+  // vorgewählt: Scheitert ein Testfall an einer Variante, hört STACK auf,
+  // statt sie einzusetzen.
   final s = await moodle.sesskey();
-  if (seed != null) {
-    await moodle.senden('${_stack}deploy.php', [
-      MapEntry('questionid', '$frage'),
-      MapEntry('cmid', '$sammlung'),
-      MapEntry('deploy', '$seed'),
-      MapEntry('sesskey', s),
-    ]);
-  } else {
-    await moodle.aufrufen('${_stack}deploy.php?questionid=$frage&cmid=$sammlung&sesskey=$s&deploymany=$anzahl');
-  }
+  await moodle.aufrufen('${_stack}deploy.php?questionid=$frage&cmid=$sammlung&sesskey=$s'
+      '${seed != null ? '&deploy=$seed&deploysinglebtn=1' : '&deploymany=$anzahl&deploymanybtn=1&deployhalt=on'}');
   final (nachher, _) = await _varianten(moodle, sammlung, frage);
   final ok = nachher.length > vorher.length;
   return 'Varianten vorher ${vorher.length}, jetzt ${nachher.length}. verified: $ok\n${liste(nachher)}\n'
-      '${ok ? 'Jetzt die Aufgabenhinweise ansehen: Zufallszahlen erzeugen gern Brüche wie 7/2, die im Unterricht unschön sind.' : 'Keine Variante dazugekommen -- sind die Aufgabenvariablen zufällig (rand)?'}';
+      '${ok ? 'Jetzt die Aufgabenhinweise ansehen: Zufallszahlen erzeugen gern Brüche wie 7/2, die im Unterricht unschön sind.' : 'Keine Variante dazugekommen. Ohne rand() gibt es nur eine. Sonst unterscheidet STACK Varianten am '
+          'Aufgabenhinweis -- nennt er nicht alle gewürfelten Werte, findet es keine neue --, und es hört auf, sobald '
+          'ein Testfall an einer Variante scheitert: stack_testen mit seed zeigt es.'}';
 }
 
 /// Maxima-Code im CAS-Notizblock ausprobieren, bevor er in eine Frage kommt.

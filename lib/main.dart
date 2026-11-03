@@ -1719,135 +1719,191 @@ class FreigabeDialog extends StatelessWidget {
     }
 
     final gross = anfrage.vergleich.isNotEmpty || anfrage.bilder.isNotEmpty;
-    return AlertDialog(
-      title: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(anfrage.titel),
-          Text(
-            '$profilname ($mcpName)',
-            style: Theme.of(context).textTheme.titleSmall,
-          ),
-        ],
-      ),
-      // Der kleine Dialog braucht Platz für eine volle Liste, den Satz zur
-      // Frist und den Zähler darunter, auch bei 125 % Schriftgröße
-      // (freigabe_test.dart); die großen fangen den Zähler im Zeilenvergleich
-      // oder in den Bildern auf.
-      content: SizedBox(
-        width: gross ? 900 : 620,
-        height: anfrage.bilder.isNotEmpty
-            ? 680
-            : gross
-            ? 560
-            : 264,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+    // Der Dialog kommt nach vorn, oft während die Lehrkraft woanders schreibt:
+    // Ein Return oder Leerzeichen, das gerade unterwegs ist, löste sonst den
+    // Knopf mit dem Fokus aus -- eine Freigabe, die niemand gegeben hat.
+    // Entschieden wird deshalb nur mit der Maus.
+    return Shortcuts(
+      shortcuts: const {
+        SingleActivator(LogicalKeyboardKey.enter): DoNothingAndStopPropagationIntent(),
+        SingleActivator(LogicalKeyboardKey.numpadEnter): DoNothingAndStopPropagationIntent(),
+        SingleActivator(LogicalKeyboardKey.space): DoNothingAndStopPropagationIntent(),
+      },
+      child: AlertDialog(
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            if (anfrage.grund != null) ...[
-              Text.rich(
-                TextSpan(
-                  children: [
-                    const TextSpan(
-                      text: 'Wozu: ',
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    TextSpan(text: anfrage.grund),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 8),
-            ],
-            // Bei einer Sammelfreigabe viele Punkte: Sie scrollen für sich,
-            // damit der Zeilenvergleich darunter sichtbar bleibt.
-            ConstrainedBox(
-              constraints: BoxConstraints(maxHeight: gross ? 200 : 180),
-              child: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [for (final p in anfrage.punkte) Text('•  $p')],
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            if (anfrage.vergleich.isNotEmpty) ...[
-              Text(
-                'Quelltext, vorher (−) und nachher (+):',
-                style: Theme.of(context).textTheme.titleSmall,
-              ),
-              const SizedBox(height: 4),
-              Expanded(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.black12),
-                  ),
-                  child: SelectionArea(
-                    child: ListView(
-                      children: [for (final z in anfrage.vergleich) zeile(z)],
-                    ),
-                  ),
-                ),
-              ),
-            ] else if (anfrage.bilder.isNotEmpty) ...[
-              Text(
-                'Genau diese Bilder gehen weiter:',
-                style: Theme.of(context).textTheme.titleSmall,
-              ),
-              const SizedBox(height: 4),
-              Expanded(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.black12),
-                  ),
-                  child: ListView(
-                    children: [
-                      for (final b in anfrage.bilder)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: Image.memory(b, fit: BoxFit.fitWidth),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-            ] else
-              const Spacer(),
-            const SizedBox(height: 8),
+            Text(anfrage.titel),
             Text(
-              'Ohne Entscheidung innerhalb von ${_restfrist()} ${anfrage.ohneEntscheidung}.',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-            // Nach der Entscheidung kommt der nächste Dialog -- die Lehrkraft
-            // soll das vorher wissen, nicht erst überrascht werden.
-            ListenableBuilder(
-              listenable: freigaben,
-              builder: (context, _) => switch (freigaben.wartend) {
-                0 => const SizedBox.shrink(),
-                final n => Text(
-                  n == 1
-                      ? '1 weitere Anfrage wartet.'
-                      : '$n weitere Anfragen warten.',
-                  style: Theme.of(context).textTheme.bodySmall
-                      ?.copyWith(fontWeight: FontWeight.bold),
-                ),
-              },
+              '$profilname ($mcpName)',
+              style: Theme.of(context).textTheme.titleSmall,
             ),
           ],
         ),
-      ),
-      actions: [
-        OutlinedButton(
-          onPressed: () => Navigator.of(context).pop(false),
-          child: Text(anfrage.ablehnen),
+        // Der kleine Dialog braucht Platz für eine volle Liste, den Satz zur
+        // Frist und den Zähler darunter, auch bei 125 % Schriftgröße
+        // (freigabe_test.dart); die großen fangen den Zähler im Zeilenvergleich
+        // oder in den Bildern auf.
+        content: SizedBox(
+          width: gross ? 900 : 620,
+          height: anfrage.bilder.isNotEmpty
+              ? 680
+              : gross
+              ? 560
+              : 264,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (anfrage.grund != null) ...[
+                Text.rich(
+                  TextSpan(
+                    children: [
+                      const TextSpan(
+                        text: 'Wozu: ',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      TextSpan(text: anfrage.grund),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 8),
+              ],
+              // Bei einer Sammelfreigabe viele Punkte: Sie scrollen für sich,
+              // damit der Zeilenvergleich darunter sichtbar bleibt.
+              ConstrainedBox(
+                constraints: BoxConstraints(maxHeight: gross ? 200 : 180),
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [for (final p in anfrage.punkte) Text('•  $p')],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              if (anfrage.vergleich.isNotEmpty) ...[
+                Text(
+                  'Quelltext, vorher (−) und nachher (+):',
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+                const SizedBox(height: 4),
+                Expanded(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.black12),
+                    ),
+                    child: SelectionArea(
+                      child: ListView(
+                        children: [for (final z in anfrage.vergleich) zeile(z)],
+                      ),
+                    ),
+                  ),
+                ),
+              ] else if (anfrage.bilder.isNotEmpty) ...[
+                Text(
+                  'Genau diese Bilder gehen weiter:',
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+                const SizedBox(height: 4),
+                Expanded(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.black12),
+                    ),
+                    child: ListView(
+                      children: [
+                        for (final b in anfrage.bilder)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: Image.memory(b, fit: BoxFit.fitWidth),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              ] else
+                const Spacer(),
+              const SizedBox(height: 8),
+              Text(
+                'Ohne Entscheidung innerhalb von ${_restfrist()} ${anfrage.ohneEntscheidung}.',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              // Nach der Entscheidung kommt der nächste Dialog -- die Lehrkraft
+              // soll das vorher wissen, nicht erst überrascht werden.
+              ListenableBuilder(
+                listenable: freigaben,
+                builder: (context, _) => switch (freigaben.wartend) {
+                  0 => const SizedBox.shrink(),
+                  final n => Text(
+                    n == 1
+                        ? '1 weitere Anfrage wartet.'
+                        : '$n weitere Anfragen warten.',
+                    style: Theme.of(context).textTheme.bodySmall
+                        ?.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                },
+              ),
+            ],
+          ),
         ),
-        FilledButton(
-          onPressed: () => Navigator.of(context).pop(true),
-          child: Text(anfrage.knopf),
-        ),
-      ],
-    );
+        actions: [
+          // Die Knöpfe nehmen erst nach der Sperrzeit etwas an (siehe Sperrzeit).
+          Sperrzeit(
+            builder: (bereit) => Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                OutlinedButton(
+                  onPressed: bereit ? () => Navigator.of(context).pop(false) : null,
+                  child: Text(anfrage.ablehnen),
+                ),
+                const SizedBox(width: 8),
+                FilledButton(
+                  onPressed: bereit ? () => Navigator.of(context).pop(true) : null,
+                  child: Text(anfrage.knopf),
+                ),
+              ],
+            ),
+          ),
+        ],
+    ));
   }
+}
+
+/// Die Knöpfe eines Dialogs, der sich nach vorn holt, nehmen erst nach
+/// [dauer] etwas an: Ein Klick, der gerade einem anderen Fenster galt, träfe
+/// sonst den Dialog, der darüber aufgeht. Ausgegraut, damit die Lehrkraft
+/// sieht, dass es kurz dauert.
+class Sperrzeit extends StatefulWidget {
+  const Sperrzeit({super.key, required this.builder, this.dauer = dauerVorgabe});
+  final Widget Function(bool bereit) builder;
+  final Duration dauer;
+
+  static const dauerVorgabe = Duration(milliseconds: 1500);
+
+  @override
+  State<Sperrzeit> createState() => _SperrzeitState();
+}
+
+class _SperrzeitState extends State<Sperrzeit> {
+  bool _bereit = false;
+  late final Timer _uhr;
+
+  @override
+  void initState() {
+    super.initState();
+    _uhr = Timer(widget.dauer, () {
+      if (mounted) setState(() => _bereit = true);
+    });
+  }
+
+  @override
+  void dispose() {
+    _uhr.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.builder(_bereit);
 }
 
 /// Das Protokoll im Fenster, der neueste Eintrag unten. Steht die Liste ganz

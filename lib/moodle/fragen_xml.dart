@@ -283,6 +283,14 @@ String stackXml(Map<String, Object?> o, {required String version, Map<String, Li
   // Ohne Testfälle ist die Frage zwar gültig, aber nicht überprüfbar -- und
   // dann fällt der ganze Vorteil von STACK weg.
   if (tests.isEmpty) throw MoodleFehler('STACK: keine tests. Ohne Testfälle keine STACK-Frage.');
+  // Mit rand() und leerem Aufgabenhinweis nimmt der Import die Frage an,
+  // markiert sie aber als beschädigt (für Lernende gesperrt), und Varianten
+  // lassen sich nicht einsetzen: STACK unterscheidet sie am Hinweis.
+  if (RegExp(r'\brand\w*\s*\(').hasMatch(_t(o, 'variablen')) && _t(o, 'hinweis').isEmpty) {
+    throw MoodleFehler('STACK „$name": Die Aufgabenvariablen benutzen rand(), aber hinweis fehlt. STACK braucht den '
+        'Aufgabenhinweis, um Varianten zu unterscheiden, und sperrt die Frage sonst; er nennt die gewürfelten Werte, '
+        'etwa "a={@a@}, b={@b@}".');
+  }
   // Ohne [[input:name]] im Fragetext zeigt Moodle kein Eingabefeld -- der
   // häufigste Anfängerfehler, fällt sonst erst in der Vorschau auf.
   final fehlt = [for (final e in eingaben) if (!fragetext.contains('[[input:${_t(e, 'name')}]]')) _t(e, 'name')];

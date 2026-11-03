@@ -121,6 +121,8 @@ const werkzeugGet = [
   '/pluginfile.php/7001/mod_assign/intro/bild.png',
   '/pluginfile.php/7449/question/questiontext/1/2/3/bild.png',
   '/question/type/stack/adminui/caschat.php?questionid=5005&cmid=5002',
+  '/question/type/stack/deploy.php?questionid=5005&cmid=5002&sesskey=abc&deploymany=5&deploymanybtn=1&deployhalt=on',
+  '/question/type/stack/deploy.php?questionid=5005&cmid=5002&sesskey=abc&deploy=667371&deploysinglebtn=1',
   '/question/bank/deletequestion/delete.php?cmid=5002&deleteselected=1&deleteall=1&returnurl=%2Fquestion%2Fedit.php%3Fcmid%3D5002&q5006=1&q5009=1',
 ];
 
@@ -152,6 +154,20 @@ void main() {
       }
     },
   );
+
+  test('STACK-Einsetzen: nur das Formular der Testseite, nicht jede Variante von deploy.php', () {
+    final z = MoodleZugang(Protokoll());
+    const basis = 'https://m.example/question/type/stack/deploy.php?questionid=5005&cmid=5002&sesskey=abc';
+    for (final a in [
+      '&deploymany=5&deploymanybtn=1',
+      '&deploymany=5&deploymanybtn=1&deployhalt=off',
+      '&deploy=667371',
+      '&deploy=667371&deploysinglebtn=0',
+      '&deploy=667371&deploysinglebtn=1&extra=1',
+    ]) {
+      expect(z.erlaubt('GET', Uri.parse('$basis$a')), isFalse, reason: a);
+    }
+  });
 
   test('Die Positivliste allein ließe Abgaben unter pluginfile.php durch -- darum die Sperrliste', () {
     final z = MoodleZugang(Protokoll());

@@ -6,8 +6,10 @@ import 'package:moocp/moodle/stack.dart';
 
 /// Ein Testfall, wie questiontestrun.php ihn zeigt: Überschrift, Tabelle der
 /// Eingaben (sechs Spalten), Tabelle der Bäume (sieben Spalten).
-String fall(String titel, {required String uebernommen, required String punkte, required String hinweis}) => '''
-<h3>$titel</h3>
+String fall(String titel,
+        {required String uebernommen, required String punkte, required String hinweis, String kennung = ''}) =>
+    '''
+<h3${kennung.isEmpty ? '' : ' id="$kennung"'}>$titel</h3>
 <table class="stacktestsuite"><thead><tr><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th></tr></thead>
 <tbody><tr><td>ans1</td><td>matrix([1,2],[3,4])</td><td>$uebernommen</td><td></td><td></td><td></td></tr></tbody></table>
 <table class="stacktestsuite"><thead><tr><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>7</th></tr></thead>
@@ -56,5 +58,32 @@ void main() {
     final b = stackTestBericht(ohneTests(punkte: '0'), frage: 995);
     expect(b, contains('KEINE Testfälle'));
     expect(b, contains('NICHT volle Punkte'));
+  });
+
+  // So zeigt die STACK-Version der Testinstanz die Testfälle (gemessen): vor
+  // jedem ein <hr>, die Überschrift mit Kennung testcase-<Nummer>-<Frage>.
+  String mitTrennern(List<String> nummern) => '<div id="region-main">${[
+        for (final n in nummern)
+          '<br><hr class="bg-dark">'
+              '${fall('Testfall $n', uebernommen: 'x', punkte: '1', hinweis: 'prt1-1-T', kennung: 'testcase-$n-7')}'
+      ].join()}<p class="overallresult pass">ok</p></div>';
+
+  test('Ein <hr> vor jedem Testfall: alle gezählt, keiner als Beispiel verworfen', () {
+    final b = stackTestBericht(mitTrennern(['1', '2', '3', '4']), frage: 7);
+    expect(b, contains('alle 4 Testfälle bestanden'));
+    for (final n in ['1', '2', '3', '4']) {
+      expect(b, contains('Testfall $n:'));
+    }
+  });
+
+  test('Beispiel mit Kennung und <hr> davor: zählt nicht als Testfall', () {
+    final b = stackTestBericht(
+        '<div id="region-main"><p class="test-pane-fail">Es fehlen Tests.</p><br><hr class="bg-dark">'
+        '${fall('Testfall Beispiel', uebernommen: 'x', punkte: '1', hinweis: 'prt1-1-T', kennung: 'testcase-Beispiel-995')}'
+        '</div>',
+        frage: 995);
+    expect(b, contains('KEINE Testfälle -- nicht überprüfbar. verified: false'));
+    expect(b, isNot(contains('Testfall Beispiel')));
+    expect(b, contains('Musterantworten eingesetzt: volle Punkte'));
   });
 }

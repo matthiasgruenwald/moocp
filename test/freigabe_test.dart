@@ -8,6 +8,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moocp/einstellungen.dart';
 import 'package:moocp/freigabe.dart';
@@ -283,11 +284,52 @@ void main() {
     expect(find.byType(FreigabeDialog), findsOneWidget, reason: 'der Dialog der ersten ist zu');
     expect(find.text('Zweite?'), findsOneWidget);
 
+    await tester.pump(Sperrzeit.dauerVorgabe);
     await tester.tap(find.text('Speichern'));
     await tester.pumpAndSettle();
     expect(await zweite, isTrue);
     expect(find.byType(FreigabeDialog), findsNothing);
     expect(vorn, [true, true, false], reason: 'nach vorn, solange ein Dialog offen ist');
+  });
+
+  testWidgets('Return, Leertaste und ein Klick gleich nach dem Aufgehen entscheiden nichts', (tester) async {
+    // Der Dialog kommt nach vorn, während die Lehrkraft woanders schreibt.
+    final f = Freigaben(Protokoll());
+    var entschieden = false;
+    final antwort = f.anfragen(anfrage())..then((_) => entschieden = true);
+    await tester.pumpWidget(MaterialApp(
+      home: Builder(
+        builder: (context) => Scaffold(
+          body: Center(
+            child: FilledButton(
+              onPressed: () => showDialog<bool>(context: context, builder: (_) => FreigabeDialog(f.aktuell!, f))
+                  .then((ja) => f.entscheiden(ja ?? false)),
+              child: const Text('öffnen'),
+            ),
+          ),
+        ),
+      ),
+    ));
+    await tester.tap(find.text('öffnen'));
+    await tester.pumpAndSettle();
+    final knopf = find.widgetWithText(FilledButton, 'Speichern');
+    // Gleich nach dem Aufgehen nimmt er auch keinen Klick an: Der galt wohl
+    // noch dem Fenster darunter.
+    await tester.tap(knopf, warnIfMissed: false);
+    await tester.pumpAndSettle();
+    expect(entschieden, isFalse, reason: 'Klick in der Sperrzeit');
+    await tester.pump(Sperrzeit.dauerVorgabe);
+    Focus.of(tester.element(find.descendant(of: knopf, matching: find.text('Speichern')))).requestFocus();
+    await tester.pump();
+    for (final taste in [LogicalKeyboardKey.enter, LogicalKeyboardKey.numpadEnter, LogicalKeyboardKey.space]) {
+      await tester.sendKeyEvent(taste);
+      await tester.pumpAndSettle();
+    }
+    expect(entschieden, isFalse);
+    expect(knopf, findsOneWidget, reason: 'der Dialog ist noch offen');
+    await tester.tap(knopf);
+    await tester.pumpAndSettle();
+    expect(await antwort, isTrue, reason: 'mit der Maus geht es');
   });
 
   testWidgets('Das Feld zeigt die Stufe, bei „keine" in Warnfarbe', (tester) async {
