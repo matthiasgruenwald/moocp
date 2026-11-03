@@ -34,6 +34,27 @@ final formular = '''<form class="mform">
 </form>''';
 
 void main() {
+  group('Schutzdienst vor der Instanz erkennen', () {
+    const moodleSeite = '<html><script>M.cfg = {"wwwroot":"x"};</script><p>Fehlendes Recht</p></html>';
+    const sperrSeite = '<html><title>Attention Required! | Cloudflare</title><p>Sorry, you have been blocked</p></html>';
+    test('Prüfung an cf-mitigated, gleich welcher Status', () {
+      expect(schutzErkennen(403, server: 'cloudflare', mitigated: 'challenge', text: sperrSeite), Schutz.pruefung);
+    });
+    test('Sperre: 403 von Cloudflare ohne Moodle-Seite', () {
+      expect(schutzErkennen(403, server: 'cloudflare', text: sperrSeite), Schutz.sperre);
+      expect(schutzErkennen(403, server: 'Cloudflare', text: ''), Schutz.sperre);
+    });
+    test('Ein 403 von Moodle, durch Cloudflare gereicht, ist keine Sperre', () {
+      expect(schutzErkennen(403, server: 'cloudflare', text: moodleSeite), isNull);
+    });
+    test('Ohne Cloudflare oder ohne 403 nichts', () {
+      expect(schutzErkennen(403, server: 'nginx', text: sperrSeite), isNull);
+      expect(schutzErkennen(403, text: sperrSeite), isNull);
+      expect(schutzErkennen(200, server: 'cloudflare', text: sperrSeite), isNull);
+      expect(schutzErkennen(303, server: 'cloudflare', text: ''), isNull);
+    });
+  });
+
   String radios({String name = 'completion', String selected = '0', String disabled = ''}) => '''<form>
     <fieldset><legend>Abschlussverfolgung</legend>
     ${['Keine', 'Manuell markieren', 'Automatisch abschließen'].asMap().entries.map((e) => '''
