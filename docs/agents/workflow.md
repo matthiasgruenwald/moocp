@@ -8,4 +8,14 @@
 - **Skills**: Ein neues oder geändertes Werkzeug zieht den Skill nach, der es
   benutzt (A8 bewahren); alles Weitere in [skills/CLAUDE.md](../../skills/CLAUDE.md).
   Größere Umbauten der Skills vorher mit dem Nutzer besprechen.
+## Agenten und Git
+
+- **Upstream** ist `topse/moocp`, in der Arbeitskopie das Remote `upstream` (einmalig `git remote add upstream https://github.com/topse/moocp.git`). `origin` ist `matthiasgruenwald/moocp`. Auf Upstream wird nie gepusht; der Weg dorthin ist ein PR.
+- **Freigaben nach A5 holt die Orchestrierung ein, bevor sie einen Implementierer startet.** Die bestätigten Entscheidungen stehen im Auftrag; der Agent fragt nicht erneut.
+- **Ist eine Git-Aktion abgelehnt, arbeitet der Agent an allem weiter, was ohne sie geht** (Änderungen, Tests, Ticket-Kommentar), lässt die Änderungen im Worktree liegen und meldet am Ende in einem Satz, was fehlt. Die Orchestrierung committet und führt zusammen.
+- **Der Commit-Trailer nennt das Modell, das den Commit tatsächlich erzeugt.**
+- **RTK darf `git` nicht umschreiben**: `exclude_commands = ["git"]` in `~/Library/Application Support/rtk/config.toml` (Abschnitt `[hooks]`). Sonst wird `git status` zu `rtk git status`, und der Worktree-Guard lehnt es für Subagents ab, weil er den Befehl nicht als Git im eigenen Worktree belegen kann. Prüfung: `rtk hook check "git status"` meldet „No rewrite".
+
+## Weitere Regeln
+
 - **Unterstützt heißt mehr als anlegbar.** Eine Aktivität oder ein Fragetyp gilt erst als unterstützt, wenn die App sie anlegen und ändern kann und der Skill Anregungen gibt, wofür sie taugt – am Gerät, auf Papier und gemischt –, eine Aktivität außerdem erst, wenn der Skill `lernsituation` sie im Entwurf verwenden kann. Sonst bleibt sie technisch möglich und ungenutzt: Ein Modell schlägt vor, was es kennt, viele Lehrkräfte kennen die Möglichkeiten selbst nicht, und eine Lernsituation, deren Entwurf eine Aktivität nicht tragen kann, plant sie nie ein. Die Anregungen sind Vorschläge, keine Vorschriften; Form und Ort in [skills/CLAUDE.md](../../skills/CLAUDE.md), „Einsatz".
