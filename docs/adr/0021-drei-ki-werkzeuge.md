@@ -16,7 +16,7 @@ Die Brücke ist ein eigenes Programm ohne Flutter und eine einzige Datei, weil B
 
 Weil Bionics Liste intern und undokumentiert ist: nur Einträge namens „moodle" anfassen, über eine Zwischendatei schreiben und im Dialog „eingetragen" sagen, nicht mehr. In allen Clients gilt: Eine Datei, die sich nicht lesen lässt, wird nie überschrieben. Skills liegen je Werkzeug in dessen eigenem Ordner (`~/.claude/skills`, `~/.codex/skills`, `~/.lmstudio/skills`). Welches Werkzeug sich verbunden hat, steht im Protokoll und in `status`.
 
-Das Zeitlimit für Werkzeugaufrufe trägt die App in Bionic mit 35 Minuten ein, länger als die Frist einer Freigabe, damit diese zuerst endet (E4).
+Das Zeitlimit für Werkzeugaufrufe trägt die App in jedem Client mit 35 Minuten ein (`clientZeitlimit` in `lib/einrichtung.dart`), länger als die Frist einer Freigabe, damit diese zuerst endet (E4): bei Claude Code als `timeout` im JSON von `claude mcp add-json`, bei Codex als `tool_timeout_sec = 2100`, bei Bionic als `connection.timeoutMs`. Ein Eintrag ohne passendes Zeitlimit gilt als veraltet und wird beim nächsten Einrichten ersetzt. Bei Claude Code und Codex prüft der Einheitentest nur die Eintragung; das Verhalten einer offenen Freigabe am Gerät ist dort noch nicht gemessen.
 
 Der Hinweis zum Datenschutz gilt für jedes Werkzeug: LM Studio kann auch Cloud-Modelle benutzen, Claude Code und Codex lassen sich auf andere Anbieter umstellen. Dialog und README sagen deshalb „an das eingestellte Modell", nie „bleibt auf dem Rechner".
 

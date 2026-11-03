@@ -151,7 +151,7 @@ Begründung, Messungen und Verworfenes stehen je Entscheidung in `docs/adr/`; vo
 | E1 | App = Werkzeugschicht (HTTP, MCP), Skills = Wissensschicht | [0001](docs/adr/0001-werkzeugschicht-und-skills.md) |
 | E2 | Schreiben über die Formulare wie ein Browser; kein Plugin, kein Token | [0002](docs/adr/0002-schreiben-ueber-formulare.md) |
 | E3 | Sperrliste und Positivliste im Code; die Positivliste ist die Grenze | [0003](docs/adr/0003-sperrliste-und-positivliste.md) |
-| E4 | Freigabe in der App (Dialog mit Zeilenvergleich), nicht im Chat; 30 Minuten | [0004](docs/adr/0004-freigabe-in-der-app.md) |
+| E4 | Freigabe in der App (Dialog mit Zeilenvergleich), nicht im Chat; 30 Minuten, das Zeitlimit des Clients liegt darüber (E21) | [0004](docs/adr/0004-freigabe-in-der-app.md) |
 | E5 | Große Ergebnisse als Dateien im festen Arbeitsordner, der geleert wird | [0005](docs/adr/0005-ergebnisse-als-dateien.md) |
 | E6 | Nur lokal: MCP auf 127.0.0.1, Bearer-Token | [0006](docs/adr/0006-nur-lokal.md) |
 | E7 | Anmeldedaten im Speicher oder (mit Haken) DPAPI; genau eine Neuanmeldung | [0007](docs/adr/0007-anmeldedaten.md) |
@@ -168,7 +168,7 @@ Begründung, Messungen und Verworfenes stehen je Entscheidung in `docs/adr/`; vo
 | E18 | Bildschirmfotos nur vom Inhalt, Grund und Freigabe je Bild, als PNG-Dateien | [0018](docs/adr/0018-bildschirmfotos.md) |
 | E19 | Updates nur nach ausdrücklichem Ja, nur von GitHub, eigene Positivliste | [0019](docs/adr/0019-updates.md) |
 | E20 | Freigabestufe stellt die Lehrkraft ein (mittel/alle/keine), nie Claude | [0020](docs/adr/0020-freigabestufen.md) |
-| E21 | Drei KI-Werkzeuge (Claude Code, Codex, LM Studio/Bionic über Brücke) | [0021](docs/adr/0021-drei-ki-werkzeuge.md) |
+| E21 | Drei KI-Werkzeuge (Claude Code, Codex, LM Studio/Bionic über Brücke); Zeitlimit 35 Minuten je Client (Claude Code `timeout`, Codex `tool_timeout_sec = 2100`, Bionic `timeoutMs`); ein Eintrag ohne passendes Zeitlimit gilt als veraltet | [0021](docs/adr/0021-drei-ki-werkzeuge.md) |
 | E22 | Interaktive Elemente nur als Datei im abgeschotteten Rahmen | [0022](docs/adr/0022-interaktive-elemente.md) |
 | E23 | Kein Moodle-Plugin, kein Web-Service-Token; Formulare mit der Sitzung der Lehrkraft | [0023](docs/adr/0023-kein-moodle-plugin.md) |
 | E24 | Windows wird ausgeliefert, macOS läuft aus dem Entwicklungsbau; Lösungen für den Mac stehen in der ADR | [0024](docs/adr/0024-plattformen.md) |

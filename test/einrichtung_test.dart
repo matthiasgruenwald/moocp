@@ -84,12 +84,13 @@ void main() {
     expect(versionVergleichen([2, 1], [2, 1, 0]), 0);
   });
 
-  Map eintrag(String url, String schluessel, {String? typ = 'http'}) => {
+  Map eintrag(String url, String schluessel, {String? typ = 'http', int? timeout}) => {
         'mcpServers': {
           'moodle': {
             'type': ?typ,
             'url': url,
             'headers': {'Authorization': 'Bearer $schluessel'},
+            'timeout': timeout ?? clientZeitlimit.inMilliseconds,
           },
         },
       };
@@ -112,11 +113,24 @@ void main() {
       expect(claude().verbindung(47811, 'abc'), Verbindung.unlesbar);
     }, skip: Platform.isMacOS ? 'Werkzeugsuche unter macOS: findet echte Programme auf dem Rechner (/opt/homebrew/bin); braucht injizierbare Suchordner, siehe TODO.md' : null);
 
-    test('der Header geht als ein Argument an claude mcp add', () {
-      final a = claude().addArgumente(47811, 'abc');
-      expect(a, containsAllInOrder(['mcp', 'add', '--scope', 'user', 'moodle', 'http://127.0.0.1:47811/mcp']));
-      expect(a.last, 'Authorization: Bearer abc');
+    test('ohne Zeitlimit veraltet: Claude Code bräche jede Freigabe nach 60 Sekunden ab', () {
+      final e = eintrag('http://127.0.0.1:47811/mcp', 'abc');
+      (e['mcpServers']['moodle'] as Map).remove('timeout');
+      konfig(e);
+      expect(claude().verbindung(47811, 'abc'), Verbindung.veraltet);
+      konfig(eintrag('http://127.0.0.1:47811/mcp', 'abc', timeout: 60000));
+      expect(claude().verbindung(47811, 'abc'), Verbindung.veraltet);
     }, skip: Platform.isMacOS ? 'Werkzeugsuche unter macOS: findet echte Programme auf dem Rechner (/opt/homebrew/bin); braucht injizierbare Suchordner, siehe TODO.md' : null);
+
+    test('der Eintrag geht als ein JSON-Argument an claude mcp add-json', () {
+      final a = claude().addArgumente(47811, 'abc');
+      expect(a.sublist(0, a.length - 1), ['mcp', 'add-json', '--scope', 'user', 'moodle']);
+      expect(jsonDecode(a.last), (eintrag('http://127.0.0.1:47811/mcp', 'abc')['mcpServers'] as Map)['moodle']);
+    }, skip: Platform.isMacOS ? 'Werkzeugsuche unter macOS: findet echte Programme auf dem Rechner (/opt/homebrew/bin); braucht injizierbare Suchordner, siehe TODO.md' : null);
+
+    test('Zeitlimit: länger als die Frist einer Freigabe', () {
+      expect(clientZeitlimit, greaterThan(Freigaben.fristVorgabe));
+    });
 
     test('CLAUDE_CONFIG_DIR verlegt Einstellungen und Skills', () {
       final o = ClaudeCode({'USERPROFILE': 'C:\\Users\\x', 'CLAUDE_CONFIG_DIR': 'D:\\claude'});
@@ -131,7 +145,8 @@ void main() {
   group('Codex CLI: der Block in config.toml', () {
     const url = 'http://127.0.0.1:47811/mcp';
     const kopf = 'Bearer abc';
-    const unser = '[mcp_servers.moodle]\nurl = "$url"\nhttp_headers = { Authorization = "$kopf" }\n';
+    const unser =
+        '[mcp_servers.moodle]\nurl = "$url"\nhttp_headers = { Authorization = "$kopf" }\ntool_timeout_sec = 2100\n';
 
     test('in eine leere oder fehlende Datei', () {
       expect(tomlBlockSetzen('', 'moodle', url, kopf), unser);
@@ -190,9 +205,17 @@ void main() {
       expect(codex.verbindung(47811, 'neu'), Verbindung.veraltet);
       expect(codex.verbindung(47812, 'abc'), Verbindung.veraltet);
 
-      codex.konfiguration.writeAsStringSync(
-          '[mcp_servers.moodle]\nurl = "$url"\n[mcp_servers.moodle.http_headers]\nAuthorization = "$kopf"\n');
+      codex.konfiguration.writeAsStringSync('[mcp_servers.moodle]\nurl = "$url"\ntool_timeout_sec = 2100.0\n'
+          '[mcp_servers.moodle.http_headers]\nAuthorization = "$kopf"\n');
       expect(codex.verbindung(47811, 'abc'), Verbindung.aktuell);
+
+      // Ohne Zeitlimit bräche Codex jede Freigabe nach 60 Sekunden ab.
+      codex.konfiguration.writeAsStringSync('[mcp_servers.moodle]\nurl = "$url"\nhttp_headers = { Authorization = "$kopf" }\n');
+      expect(codex.verbindung(47811, 'abc'), Verbindung.veraltet);
+      codex.konfiguration.writeAsStringSync(unser.replaceAll('2100', '60'));
+      expect(codex.verbindung(47811, 'abc'), Verbindung.veraltet);
+      codex.konfiguration.writeAsStringSync(unser.replaceAll('2100', '21000'));
+      expect(codex.verbindung(47811, 'abc'), Verbindung.veraltet);
 
       codex.konfiguration.writeAsStringSync('[mcp_servers.moodle]\ntoken_url = "$url"\n');
       expect(codex.verbindung(47811, 'abc'), Verbindung.veraltet);
@@ -215,7 +238,7 @@ void main() {
     const pfad = '.lmstudio/apps/bionic/.internal/ng-mcp.json';
     File liste(List<Map<String, Object?>> server, {Map<String, Object?> mehr = const {}}) =>
         datei(pfad, jsonEncode({'servers': server, ...mehr}));
-    final zeitlimit = bionicZeitlimit.inMilliseconds;
+    final zeitlimit = clientZeitlimit.inMilliseconds;
     Map<String, Object?> server(String befehl, List<String> args,
             {String name = 'moodle', String id = 'x', Object? timeoutMs = 'wie eingetragen'}) =>
         {
@@ -282,10 +305,6 @@ void main() {
       expect((jsonDecode(File(p.join(tmp.path, pfad)).readAsStringSync()) as Map)['version'], 3);
       expect(lm().verbindung(0, ''), Verbindung.aktuell);
     }, skip: Platform.isMacOS ? 'Werkzeugsuche unter macOS: findet echte Programme auf dem Rechner (/opt/homebrew/bin); braucht injizierbare Suchordner, siehe TODO.md' : null);
-
-    test('Bionics Zeitlimit: länger als die Frist einer Freigabe', () {
-      expect(bionicZeitlimit, greaterThan(Freigaben.fristVorgabe));
-    }, skip: 'Windows-Annahme: claude.exe, MSIX, VS Code, Bionic gibt es unter macOS nicht');
 
     test('ohne Brücke neben der App: nichts eintragen, sondern es sagen', () async {
       final ohne = LmStudio({'USERPROFILE': tmp.path}, bruecke: p.join(tmp.path, 'weg', 'moocp-bruecke.exe'));
@@ -479,7 +498,7 @@ void main() {
               'type': 'stdio',
               'command': exe,
               'args': [],
-              'timeoutMs': bionicZeitlimit.inMilliseconds,
+              'timeoutMs': clientZeitlimit.inMilliseconds,
             },
           },
         ],

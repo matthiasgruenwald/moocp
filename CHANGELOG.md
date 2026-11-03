@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.24
+- Freigaben: Claude Code und Codex bekommen für Werkzeugaufrufe ein Zeitlimit von 35 Minuten, damit eine offene Freigabe nicht vor ihrer 30-Minuten-Frist abbricht. Bei Codex ist das am Gerät noch nicht geprüft.
+- Einrichtung: Ein Werkzeug, dessen Eintrag ein altes oder fehlendes Zeitlimit hat, wird beim nächsten Einrichten ersetzt.
+
 ## 0.9.23
 - Wiederherstellung: Bilder und Anhänge werden anhand der tatsächlichen Moodle-Dateiliste geprüft und nicht mehr fälschlich als fremd gemeldet.
 - Wiederherstellung: Fehlerseiten des Assistenten und Stillstand werden sichtbar; Statusmeldungen nennen Phase und letzten Fortschritt, laufende Prozesse bleiben vor Wiederholungen geschützt.

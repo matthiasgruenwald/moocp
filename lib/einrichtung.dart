@@ -76,6 +76,17 @@ String mcpAdresse(int port) => 'http://127.0.0.1:$port/mcp';
 
 String mcpKopf(String schluessel) => 'Bearer $schluessel';
 
+/// Das Zeitlimit je Werkzeugaufruf, das die App in jedes KI-Werkzeug
+/// einträgt. Jedes hat ein eigenes, ab dem Aufruf gemessenes, und bricht
+/// danach ab, auch während eine Freigabe offen ist: Claude Code und Codex
+/// nach 60 Sekunden, Bionic ebenso (Einzelheiten je Werkzeug unten). Lesen
+/// und Schreiben eines größeren Abschnitts brauchen schon je fast so lange.
+/// Länger als die Frist einer Freigabe (`Freigaben.fristVorgabe`), die wie
+/// das Zeitlimit ab der Anfrage läuft, auch hinter einer anderen: So endet
+/// die Freigabe zuerst und meldet das selbst, und nach einer späten Freigabe
+/// bleibt Zeit zum Schreiben und Zurücklesen.
+const clientZeitlimit = Duration(minutes: 35);
+
 // ---------------------------------------------------------------------------
 // Ein KI-Werkzeug
 // ---------------------------------------------------------------------------
@@ -275,7 +286,10 @@ class ClaudeCode extends KiWerkzeug {
       final e = (server is Map) ? server[name] : null;
       if (e is! Map) return Verbindung.fehlt;
       final kopf = e['headers'] is Map ? (e['headers'] as Map)['Authorization'] : null;
-      final passt = e['type'] == 'http' && e['url'] == mcpAdresse(port) && kopf == mcpKopf(schluessel);
+      final passt = e['type'] == 'http' &&
+          e['url'] == mcpAdresse(port) &&
+          kopf == mcpKopf(schluessel) &&
+          e['timeout'] == clientZeitlimit.inMilliseconds;
       return passt ? Verbindung.aktuell : Verbindung.veraltet;
     } catch (_) {
       // Auch ein halb geschriebener Stand, wenn Claude Code gerade speichert.
@@ -283,11 +297,23 @@ class ClaudeCode extends KiWerkzeug {
     }
   }
 
-  /// Die Argumente für `claude mcp add`. Der Schlüssel steht darin -- sie
-  /// gehen an die claude.exe, nie in Protokoll oder Anzeige.
+  /// Die Argumente für `claude mcp add-json`. Der Schlüssel steht darin --
+  /// sie gehen an die claude.exe, nie in Protokoll oder Anzeige.
+  ///
+  /// add-json statt add, weil nur der JSON-Eintrag `timeout` kennt: Ohne
+  /// bricht Claude Code jede Anfrage an einen HTTP-Server ab, die nach 60
+  /// Sekunden noch keine Antwort hat, und die App antwortet erst, wenn das
+  /// Werkzeug fertig ist (enableJsonResponse, mcp_dienst.dart). `timeout`
+  /// gilt für den ganzen Werkzeugaufruf, Fortschrittsmeldungen verlängern ihn
+  /// nicht ([clientZeitlimit]).
   List<String> addArgumente(int port, String schluessel, [String name = mcpName]) => [
-        'mcp', 'add', '--scope', 'user', '--transport', 'http', name, mcpAdresse(port), //
-        '--header', 'Authorization: ${mcpKopf(schluessel)}',
+        'mcp', 'add-json', '--scope', 'user', name, //
+        jsonEncode({
+          'type': 'http',
+          'url': mcpAdresse(port),
+          'headers': {'Authorization': mcpKopf(schluessel)},
+          'timeout': clientZeitlimit.inMilliseconds,
+        }),
       ];
 
   @override
@@ -399,7 +425,11 @@ class CodexCli extends KiWerkzeug {
     final url = _tomlWert(block, 'url');
     final kopf = _tomlWert(block, 'Authorization');
     if (url == null || kopf == null) return Verbindung.veraltet;
-    return url == mcpAdresse(port) && kopf == mcpKopf(schluessel) ? Verbindung.aktuell : Verbindung.veraltet;
+    return url == mcpAdresse(port) &&
+            kopf == mcpKopf(schluessel) &&
+            _tomlZahl(block, 'tool_timeout_sec') == clientZeitlimit.inSeconds
+        ? Verbindung.aktuell
+        : Verbindung.veraltet;
   }
 
   @override
@@ -476,6 +506,14 @@ String? tomlBlock(String text, String name) {
 String? _tomlWert(String block, String schluessel) =>
     RegExp(r'(?<![\w-])' + RegExp.escape(schluessel) + r'[ \t]*=[ \t]*"([^"]*)"').firstMatch(block)?.group(1);
 
+/// Eine Zahl aus einem Blocktext wie `tool_timeout_sec = 2100`, auch als
+/// `2100.0`; null, wenn sie fehlt oder keine ganze Zahl ist.
+num? _tomlZahl(String block, String schluessel) {
+  final m = RegExp(r'(?<![\w-])' + RegExp.escape(schluessel) + r'[ \t]*=[ \t]*([0-9]+(\.0+)?)(?![\w.])')
+      .firstMatch(block);
+  return m == null ? null : num.parse(m.group(1)!);
+}
+
 /// Wendet [aendern] auf die Zeilen an und behält die Zeilenenden der Datei:
 /// Wer CRLF hat, bekommt CRLF zurück.
 String _zeilenweise(String text, List<String> Function(List<String> zeilen) aendern) {
@@ -484,11 +522,18 @@ String _zeilenweise(String text, List<String> Function(List<String> zeilen) aend
   return crlf ? neu.replaceAll('\n', '\r\n') : neu;
 }
 
-/// Setzt den Block `[mcp_servers.<name>]` auf Adresse und Kopf dieser App und
-/// lässt alles andere unberührt. Einen vorhandenen Block ersetzt er samt
-/// Unterblöcken, sonst hängt er ihn an.
+/// Setzt den Block `[mcp_servers.<name>]` auf Adresse, Kopf und Zeitlimit
+/// dieser App und lässt alles andere unberührt. Einen vorhandenen Block
+/// ersetzt er samt Unterblöcken, sonst hängt er ihn an. Ohne
+/// `tool_timeout_sec` bricht Codex jeden Werkzeugaufruf nach 60 Sekunden ab
+/// ([clientZeitlimit]).
 String tomlBlockSetzen(String text, String name, String url, String kopf) {
-  final block = ['[mcp_servers.$name]', 'url = "$url"', 'http_headers = { Authorization = "$kopf" }'];
+  final block = [
+    '[mcp_servers.$name]',
+    'url = "$url"',
+    'http_headers = { Authorization = "$kopf" }',
+    'tool_timeout_sec = ${clientZeitlimit.inSeconds}',
+  ];
   return _zeilenweise(text, (zeilen) {
     final (von, bis) = _tomlGrenzen(zeilen, name);
     if (von >= 0) return [...zeilen.sublist(0, von), ...block, ...zeilen.sublist(bis)];
@@ -537,7 +582,7 @@ String tomlBlockEntfernen(String text, String name) => _zeilenweise(text, (zeile
 ///   „Request timeout" unter den erweiterten Optionen): fehlt es, 60
 ///   Sekunden; erlaubt ist jede positive ganze Zahl bis 2³¹−1. Danach bricht
 ///   Bionic den Werkzeugaufruf ab, auch während eine Freigabe offen ist --
-///   darum trägt die App [bionicZeitlimit] ein.
+///   darum trägt die App [clientZeitlimit] ein.
 /// - Bilder aus Werkzeugergebnissen gibt Bionic nicht ans Modell weiter,
 ///   weder als Bildinhalt noch als eingebettete Ressource (darum legt
 ///   `bildschirmfoto` Dateien ab).
@@ -555,14 +600,6 @@ String tomlBlockEntfernen(String text, String name) => _zeilenweise(text, (zeile
 /// überschrieben. Ob Bionic den Eintrag auch annimmt, sieht die App erst an
 /// der Verbindung („KI-Werkzeug verbunden" im Protokoll); der Dialog sagt
 /// deshalb „eingetragen", nicht mehr.
-/// Das Zeitlimit, das die App in ihren Eintrag in Bionic schreibt. Länger als
-/// die Frist einer Freigabe (`Freigaben.fristVorgabe`), die wie das Zeitlimit
-/// ab der Anfrage läuft, auch hinter einer anderen: So endet die Freigabe
-/// zuerst und meldet das selbst, und nach einer späten Freigabe bleibt Zeit
-/// zum Schreiben und Zurücklesen. Bionics Vorgabe von 60 Sekunden bräche
-/// fast jede Freigabe ab.
-const bionicZeitlimit = Duration(minutes: 35);
-
 class LmStudio extends KiWerkzeug {
   LmStudio(super.umgebung, {String? bruecke})
       : bruecke = bruecke ?? p.join(p.dirname(Platform.resolvedExecutable), brueckeExe);
@@ -628,7 +665,7 @@ class LmStudio extends KiWerkzeug {
   static bool _unser(Object? e) => e is Map && e['name'] == mcpName;
 
   /// Ob ein Eintrag so dasteht, wie [eintragen] ihn schreibt: ein lokaler
-  /// Befehl, eine vorhandene [brueckeExe], [bionicZeitlimit]. Welche Brücke,
+  /// Befehl, eine vorhandene [brueckeExe], [clientZeitlimit]. Welche Brücke,
   /// ist gleich -- installierte App und eigener Bau teilen Einstellungen und
   /// Port, die Brücke der einen erreicht auch die andere. Ob der Eintrag in
   /// Bionic eingeschaltet ist, entscheidet die Lehrkraft dort; eingetragen
@@ -641,7 +678,7 @@ class LmStudio extends KiWerkzeug {
         befehl is String &&
         p.basename(befehl).toLowerCase() == brueckeExe &&
         File(befehl).existsSync() &&
-        c['timeoutMs'] == bionicZeitlimit.inMilliseconds;
+        c['timeoutMs'] == clientZeitlimit.inMilliseconds;
   }
 
   @override
@@ -681,7 +718,7 @@ class LmStudio extends KiWerkzeug {
             'command': bruecke,
             'args': <String>[],
             'env': <String, String>{},
-            'timeoutMs': bionicZeitlimit.inMilliseconds,
+            'timeoutMs': clientZeitlimit.inMilliseconds,
           },
         },
       ];

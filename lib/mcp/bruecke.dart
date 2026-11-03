@@ -154,7 +154,7 @@ class Bruecke {
     required this.ausgabe,
     required this.listeHolen,
     required this.appStarten,
-    // Kürzer als Bionics Zeitlimit (einrichtung.dart): Die KI soll den Hinweis
+    // Kürzer als das Zeitlimit des Clients (einrichtung.dart): Die KI soll den Hinweis
     // „moocp ist noch nicht bereit" bekommen, nicht nur eine Zeitüberschreitung.
     this.aufAppWarten = const Duration(minutes: 5),
     HttpClient? client,
@@ -180,7 +180,7 @@ class Bruecke {
   /// gespeicherten Anmeldedaten nach wenigen Sekunden, sonst, sobald die
   /// Lehrkraft sich angemeldet hat, nach einem Update auch erst nach dem
   /// Dialog „KI-Werkzeuge einrichten". Kürzer als das Zeitlimit, das die App
-  /// in Bionic einträgt ([bionicZeitlimit]): So bekommt die KI den Hinweis,
+  /// in ein KI-Werkzeug einträgt ([clientZeitlimit]): So bekommt die KI den Hinweis,
   /// dass moocp noch nicht bereit ist, statt nur einer Zeitüberschreitung.
   final Duration aufAppWarten;
 

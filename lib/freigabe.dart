@@ -14,7 +14,7 @@
 // dabei.
 //
 // Wartet der Client nicht mehr auf das Werkzeug (MCP: notifications/
-// cancelled, etwa nach dem Zeitlimit von Bionic), verfällt die Anfrage wie
+// cancelled, etwa nach dem Zeitlimit des Clients), verfällt die Anfrage wie
 // nach der Frist: Der Dialog schließt sich, nichts wird geschrieben. Sonst
 // schriebe eine späte Freigabe, während die KI den Vorgang für gescheitert
 // hält. Den Abbruch erfährt [Freigaben.anfragen] aus der Zone des
@@ -139,8 +139,8 @@ class Freigaben extends ChangeNotifier {
   Future<T> imTest<T>(Future<T> Function() f, {required Future<bool> Function() pruefen}) =>
       runZoned(f, zoneValues: {_testfreigabe: kDebugMode ? (freigaben: this, pruefen: pruefen) : null});
 
-  /// Kürzer als das Zeitlimit, das die App in Bionic einträgt
-  /// (`bionicZeitlimit`, einrichtung.dart).
+  /// Kürzer als das Zeitlimit, das die App in ein KI-Werkzeug einträgt
+  /// (`clientZeitlimit`, einrichtung.dart).
   static const fristVorgabe = Duration(minutes: 30);
 
   final Protokoll protokoll;
@@ -185,7 +185,7 @@ class Freigaben extends ChangeNotifier {
   /// Protokoll) und ist dran, sobald die erste beantwortet ist.
   ///
   /// Die Frist läuft ab der Anfrage, auch während sie wartet. Sie soll vor dem
-  /// Zeitlimit des Clients enden (`bionicZeitlimit`, einrichtung.dart), und
+  /// Zeitlimit des Clients enden (`clientZeitlimit`, einrichtung.dart), und
   /// das läuft ab dem Werkzeugaufruf; begänne sie erst mit dem Dialog, könnte
   /// eine lange wartende Anfrage noch freigegeben werden, wenn der Client
   /// schon aufgibt, und Moodle würde geändert, während die KI den Vorgang für
