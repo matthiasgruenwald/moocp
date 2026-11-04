@@ -15,6 +15,7 @@ import 'package:logging/logging.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path/path.dart' as p;
 import 'package:window_manager/window_manager.dart';
+import 'package:zwischenablage_html/zwischenablage_html.dart';
 
 import 'anmeldedaten.dart';
 import 'anmeldung.dart';
@@ -1638,7 +1639,11 @@ class _FreigabeDialogeState extends State<FreigabeDialoge> {
       return;
     }
     _gezeigt = a;
-    widget.nachVorn(true);
+    // Eine Übergabe kommt nach vorn, bleibt aber nicht oben: Die Lehrkraft
+    // speichert dabei im Browser, und der muss über die App können.
+    widget.nachVorn(true).then((_) {
+      if (a.uebergabe && identical(_gezeigt, a)) widget.nachVorn(false);
+    });
     // Eine eigene Route statt showDialog, damit sich genau sie wieder
     // entfernen lässt; eingestellt wie bei showDialog.
     final navigator = Navigator.of(context, rootNavigator: true);
@@ -1671,12 +1676,15 @@ class _FreigabeDialogeState extends State<FreigabeDialoge> {
   Widget build(BuildContext context) => widget.child;
 }
 
-class FreigabeDialog extends StatelessWidget {
+class FreigabeDialog extends StatefulWidget {
   const FreigabeDialog(
     this.anfrage,
     this.freigaben, {
     this.profilname = 'Moodle',
     this.mcpName = 'moodle',
+    this.browser = imBrowserOeffnen,
+    this.dateimanager = imDateimanagerOeffnen,
+    this.zwischenablage = alsHtmlKopieren,
     super.key,
   });
   final FreigabeAnfrage anfrage;
@@ -1686,6 +1694,67 @@ class FreigabeDialog extends StatelessWidget {
   /// Für die Frist und den Zähler der wartenden Anfragen, der sich ändert,
   /// während der Dialog offen ist.
   final Freigaben freigaben;
+
+  /// Öffnen [FreigabeAnfrage.oeffnen] und [FreigabeAnfrage.ordner] und
+  /// kopieren; im Test ersetzt.
+  final Future<void> Function(Uri) browser;
+  final Future<void> Function(String) dateimanager;
+  final Future<void> Function(String) zwischenablage;
+
+  @override
+  State<FreigabeDialog> createState() => _FreigabeDialogState();
+}
+
+/// Die Übergabe (Knöpfe zum Öffnen und Kopieren) sieht anders aus als eine
+/// Freigabe: Sie kommt oft direkt nach „Änderung speichern?", an derselben
+/// Stelle, und ein Blick genügte sonst, um den Abschlussknopf für „Speichern"
+/// zu halten -- die App läse dann zurück, obwohl niemand gespeichert hat.
+/// Deshalb ein farbiges Band, nummerierte Schritte mit Haken, ein Knopf in
+/// eigener Farbe, und der erst, wenn jedes Feld kopiert und jede Einstellung
+/// abgehakt ist -- ohne das kann niemand im Browser den neuen Stand
+/// gespeichert haben.
+///
+/// Die Schritte gehen der Reihe nach, jeder gibt den nächsten frei: Wer erst
+/// einfügt und dann eine neue Datei hineinzieht, hat sie doppelt im Text
+/// (gemessen); hineingezogen vor dem Einfügen ersetzt das Einfügen sie.
+/// Beim zweiten Blick (schritteVerlangt aus) ist alles frei.
+class _FreigabeDialogState extends State<FreigabeDialog> {
+  FreigabeAnfrage get anfrage => widget.anfrage;
+  Freigaben get freigaben => widget.freigaben;
+  String get profilname => widget.profilname;
+  String get mcpName => widget.mcpName;
+
+  bool _geoeffnet = false;
+  bool _ordnerOffen = false;
+  final _kopiert = <String>{};
+  final _abgehakt = <int>{};
+
+  /// Die Nummern der Schritte: Formular, Ordner, Abhaken, Kopieren,
+  /// Speichern -- je nachdem, welche es gibt.
+  ({int ordner, int abhaken, int kopieren, int speichern}) get _nr {
+    final ordner = (anfrage.oeffnen != null ? 1 : 0) + 1;
+    final abhaken = ordner + (anfrage.ordner != null ? 1 : 0);
+    final kopieren = abhaken + anfrage.abhaken.length;
+    return (
+      ordner: ordner,
+      abhaken: abhaken,
+      kopieren: kopieren,
+      speichern: kopieren + anfrage.kopieren.length,
+    );
+  }
+
+  bool get _ordnerFrei =>
+      !anfrage.schritteVerlangt || anfrage.oeffnen == null || _geoeffnet;
+  bool get _abhakenFrei =>
+      _ordnerFrei &&
+      (!anfrage.schritteVerlangt || anfrage.ordner == null || _ordnerOffen);
+  bool get _kopierenFrei =>
+      _abhakenFrei &&
+      (!anfrage.schritteVerlangt || _abgehakt.length == anfrage.abhaken.length);
+  bool get _allesGetan =>
+      _kopierenFrei &&
+      (!anfrage.schritteVerlangt ||
+          anfrage.kopieren.every((k) => _kopiert.contains(k.$1)));
 
   /// Was von der Frist bleibt: Sie läuft ab der Anfrage, und wer gewartet
   /// hat, hat weniger. Ohne [FreigabeAnfrage.ablauf] (nicht über
@@ -1719,22 +1788,53 @@ class FreigabeDialog extends StatelessWidget {
     }
 
     final gross = anfrage.vergleich.isNotEmpty || anfrage.bilder.isNotEmpty;
+    final knoepfe = anfrage.uebergabe;
+    const orange = Color(0xFFE65100);
+    Widget schritt(int n, Widget inhalt, {bool? getan}) => Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 28,
+            child: getan == true
+                ? const Icon(Icons.check_circle, color: Colors.green, size: 20)
+                : Text(
+                    '$n.',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+          ),
+          Flexible(child: inhalt),
+        ],
+      ),
+    );
     // Der Dialog kommt nach vorn, oft während die Lehrkraft woanders schreibt:
     // Ein Return oder Leerzeichen, das gerade unterwegs ist, löste sonst den
     // Knopf mit dem Fokus aus -- eine Freigabe, die niemand gegeben hat.
     // Entschieden wird deshalb nur mit der Maus.
     return Shortcuts(
       shortcuts: const {
-        SingleActivator(LogicalKeyboardKey.enter): DoNothingAndStopPropagationIntent(),
-        SingleActivator(LogicalKeyboardKey.numpadEnter): DoNothingAndStopPropagationIntent(),
-        SingleActivator(LogicalKeyboardKey.space): DoNothingAndStopPropagationIntent(),
+        SingleActivator(LogicalKeyboardKey.enter):
+            DoNothingAndStopPropagationIntent(),
+        SingleActivator(LogicalKeyboardKey.numpadEnter):
+            DoNothingAndStopPropagationIntent(),
+        SingleActivator(LogicalKeyboardKey.space):
+            DoNothingAndStopPropagationIntent(),
       },
       child: AlertDialog(
+        backgroundColor: knoepfe ? const Color(0xFFFFF3E0) : null,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(anfrage.titel),
+            knoepfe
+                ? Row(
+                    children: [
+                      const Icon(Icons.front_hand, color: orange, size: 32),
+                      const SizedBox(width: 12),
+                      Expanded(child: Text(anfrage.titel)),
+                    ],
+                  )
+                : Text(anfrage.titel),
             Text(
               '$profilname ($mcpName)',
               style: Theme.of(context).textTheme.titleSmall,
@@ -1746,10 +1846,12 @@ class FreigabeDialog extends StatelessWidget {
         // (freigabe_test.dart); die großen fangen den Zähler im Zeilenvergleich
         // oder in den Bildern auf.
         content: SizedBox(
-          width: gross ? 900 : 620,
+          width: gross || knoepfe ? 900 : 620,
+          // Die Übergabe kommt nur bei geändertem Text, also immer mit
+          // Zeilenvergleich; der gibt den Schritten Platz ab.
           height: anfrage.bilder.isNotEmpty
               ? 680
-              : gross
+              : gross || knoepfe
               ? 560
               : 264,
           child: Column(
@@ -1772,7 +1874,13 @@ class FreigabeDialog extends StatelessWidget {
               // Bei einer Sammelfreigabe viele Punkte: Sie scrollen für sich,
               // damit der Zeilenvergleich darunter sichtbar bleibt.
               ConstrainedBox(
-                constraints: BoxConstraints(maxHeight: gross ? 200 : 180),
+                constraints: BoxConstraints(
+                  maxHeight: knoepfe
+                      ? 72
+                      : gross
+                      ? 200
+                      : 180,
+                ),
                 child: SingleChildScrollView(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1780,6 +1888,134 @@ class FreigabeDialog extends StatelessWidget {
                   ),
                 ),
               ),
+              if (knoepfe) ...[
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  color: orange,
+                  child: Text(
+                    'Jetzt sind Sie dran: Die App kann hier nicht selbst speichern.'
+                    '${anfrage.schritteVerlangt ? ' Der Reihe nach: Jeder Schritt gibt den nächsten frei.' : ''}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                // Die Schritte scrollen für sich, wenn der Platz nicht reicht
+                // (125 % Schrift, viele Felder); der Zeilenvergleich bleibt sichtbar.
+                Flexible(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        if (anfrage.oeffnen != null)
+                          schritt(
+                            1,
+                            getan: _geoeffnet,
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: OutlinedButton.icon(
+                                icon: const Icon(Icons.open_in_new, size: 18),
+                                label: const Text('Formular in Moodle öffnen'),
+                                onPressed: () {
+                                  widget.browser(anfrage.oeffnen!);
+                                  setState(() => _geoeffnet = true);
+                                },
+                              ),
+                            ),
+                          ),
+                        // Neue Dateien zuerst: Hineingezogen legt Moodle sie unter
+                        // ihrem Namen ab (gemessen), und der eingefügte Inhalt
+                        // findet sie danach.
+                        if (anfrage.ordner != null)
+                          schritt(
+                            _nr.ordner,
+                            getan: _ordnerOffen,
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: OutlinedButton.icon(
+                                icon: const Icon(Icons.folder_open, size: 18),
+                                label: const Text(
+                                  'Ordner mit den neuen Dateien öffnen',
+                                ),
+                                onPressed: !_ordnerFrei
+                                    ? null
+                                    : () {
+                                        widget.dateimanager(anfrage.ordner!);
+                                        setState(() => _ordnerOffen = true);
+                                      },
+                              ),
+                            ),
+                          ),
+                        for (final (i, text) in anfrage.abhaken.indexed)
+                          schritt(
+                            _nr.abhaken + i,
+                            getan: _abgehakt.contains(i),
+                            CheckboxListTile(
+                              dense: true,
+                              contentPadding: EdgeInsets.zero,
+                              controlAffinity: ListTileControlAffinity.leading,
+                              value: _abgehakt.contains(i),
+                              title: Text(text),
+                              onChanged: !_abhakenFrei
+                                  ? null
+                                  : (an) => setState(
+                                      () => an == true
+                                          ? _abgehakt.add(i)
+                                          : _abgehakt.remove(i),
+                                    ),
+                            ),
+                          ),
+                        for (final (i, (beschriftung, text))
+                            in anfrage.kopieren.indexed)
+                          schritt(
+                            _nr.kopieren + i,
+                            getan: _kopiert.contains(beschriftung),
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: OutlinedButton.icon(
+                                icon: const Icon(Icons.content_copy, size: 18),
+                                label: Text(
+                                  '„$beschriftung" kopieren, im Editor dieses Feldes alles markieren '
+                                  '($_strg+A) und einfügen ($_strg+V)'
+                                  '${anfrage.ordner != null ? ' -- das ersetzt auch das Hineingezogene' : ''}',
+                                ),
+                                onPressed: !_kopierenFrei
+                                    ? null
+                                    : () async {
+                                        try {
+                                          await widget.zwischenablage(text);
+                                        } finally {
+                                          if (mounted) {
+                                            setState(
+                                              () => _kopiert.add(beschriftung),
+                                            );
+                                          }
+                                        }
+                                      },
+                              ),
+                            ),
+                          ),
+                        schritt(
+                          _nr.speichern,
+                          const Text(
+                            'Im Browser speichern; fragt der Schutzdienst, bestätigen.',
+                          ),
+                        ),
+                        schritt(
+                          _nr.speichern + 1,
+                          Text('Erst dann hier „${anfrage.knopf}".'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
               const SizedBox(height: 12),
               if (anfrage.vergleich.isNotEmpty) ...[
                 Text(
@@ -1853,19 +2089,27 @@ class FreigabeDialog extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 OutlinedButton(
-                  onPressed: bereit ? () => Navigator.of(context).pop(false) : null,
+                  onPressed: bereit
+                      ? () => Navigator.of(context).pop(false)
+                      : null,
                   child: Text(anfrage.ablehnen),
                 ),
                 const SizedBox(width: 8),
                 FilledButton(
-                  onPressed: bereit ? () => Navigator.of(context).pop(true) : null,
+                  style: knoepfe
+                      ? FilledButton.styleFrom(backgroundColor: orange)
+                      : null,
+                  onPressed: bereit && (!knoepfe || _allesGetan)
+                      ? () => Navigator.of(context).pop(true)
+                      : null,
                   child: Text(anfrage.knopf),
                 ),
               ],
             ),
           ),
         ],
-    ));
+      ),
+    );
   }
 }
 
@@ -1874,7 +2118,11 @@ class FreigabeDialog extends StatelessWidget {
 /// sonst den Dialog, der darüber aufgeht. Ausgegraut, damit die Lehrkraft
 /// sieht, dass es kurz dauert.
 class Sperrzeit extends StatefulWidget {
-  const Sperrzeit({super.key, required this.builder, this.dauer = dauerVorgabe});
+  const Sperrzeit({
+    super.key,
+    required this.builder,
+    this.dauer = dauerVorgabe,
+  });
   final Widget Function(bool bereit) builder;
   final Duration dauer;
 
@@ -1904,6 +2152,37 @@ class _SperrzeitState extends State<Sperrzeit> {
 
   @override
   Widget build(BuildContext context) => widget.builder(_bereit);
+}
+
+/// Die Taste, die auf dieser Plattform kopiert und einfügt, für die Schritte
+/// der Übergabe.
+String get _strg => Platform.isMacOS ? 'Cmd' : 'Strg';
+
+/// Öffnet eine Seite in Moodle im Standardbrowser -- dort ist die Lehrkraft
+/// selbst angemeldet; die Sitzung der App geht nicht mit. Nur https: Die
+/// Adresse geht an die Shell des Systems, und die führte anderes auch aus.
+/// Plattformverzweigung am Rand (E29).
+Future<void> imBrowserOeffnen(Uri adresse) async {
+  if (adresse.scheme != 'https') return;
+  final (programm, argumente) = Platform.isWindows
+      ? ('rundll32', ['url.dll,FileProtocolHandler', adresse.toString()])
+      : Platform.isMacOS
+      ? ('open', [adresse.toString()])
+      : ('xdg-open', [adresse.toString()]);
+  await Process.start(programm, argumente, mode: ProcessStartMode.detached);
+}
+
+/// Öffnet einen Ordner im Dateimanager (Explorer, Finder), damit die
+/// Lehrkraft Dateien daraus in den Editor im Browser zieht. Nur ein
+/// vorhandener Ordner.
+Future<void> imDateimanagerOeffnen(String ordner) async {
+  if (!Directory(ordner).existsSync()) return;
+  final programm = Platform.isWindows
+      ? 'explorer'
+      : Platform.isMacOS
+      ? 'open'
+      : 'xdg-open';
+  await Process.start(programm, [ordner], mode: ProcessStartMode.detached);
 }
 
 /// Das Protokoll im Fenster, der neueste Eintrag unten. Steht die Liste ganz

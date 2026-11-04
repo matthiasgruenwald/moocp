@@ -13,6 +13,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:moocp/einstellungen.dart';
 import 'package:moocp/freigabe.dart';
 import 'package:moocp/main.dart';
+import 'package:moocp/moodle/zeilenvergleich.dart';
 import 'package:moocp/protokoll.dart';
 
 FreigabeAnfrage anfrage({Bestaetigungen ab = Bestaetigungen.mittel, String titel = 'Änderung speichern?'}) =>
@@ -247,6 +248,148 @@ void main() {
     f.entscheiden(false);
     f.entscheiden(false);
     expect([await erste, await zweite], [false, false]);
+  });
+
+  testWidgets('Die Übergabe kommt auf jeder Stufe, kopiert erst auf Klick und schließt erst nach allen Schritten', (tester) async {
+    // Hält ein Schutzdienst das Speichern an, speichert die Lehrkraft im
+    // Browser (formular_schreiben.dart, _uebergeben). Auch bei „keine": Sonst
+    // bliebe das Speichern still liegen. Der Abschlussknopf ist erst frei,
+    // wenn jedes Feld kopiert und jeder Schritt abgehakt ist -- sonst hielte
+    // ein schneller Blick ihn für „Speichern" des Dialogs davor.
+    // Ein Laptop mit 1366 × 768 Punkten, die kleinste übliche Arbeitsfläche.
+    tester.view.physicalSize = const Size(1366, 768);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final f = Freigaben(Protokoll(), stufe: Bestaetigungen.keine);
+    String? abgelegt;
+    final geoeffnet = <Object>[];
+    final adresse = Uri.parse('https://moodle.schule.example/question/bank/editquestion/question.php?cmid=12&id=34');
+    const ordner = r'C:\Arbeitsordner\frage-34\neue-dateien';
+    final antwort = f.anfragen(FreigabeAnfrage(
+      titel: 'Bitte selbst in Moodle speichern',
+      punkte: const ['Frage „Muster" (Frage 34, Kurs 12)', 'Der Schutzdienst hat das Speichern angehalten.'],
+      vergleich: [
+        Zeile(ZeilenArt.ausgelassen, '──── questiontext ────'),
+        for (var i = 1; i <= 30; i++) Zeile(i.isEven ? ZeilenArt.neu : ZeilenArt.weg, '<p>Zeile $i</p>'),
+      ],
+      kopieren: const [('questiontext', '<p>Neu</p>'), ('generalfeedback', '<p>Rückmeldung</p>')],
+      abhaken: const [
+        'Datei „bild.png" aus dem Ordner irgendwo in den Editor ziehen; die Stelle ist egal, das Einfügen setzt sie an ihren Platz',
+        'Im Formular „Erreichbare Punkte" auf „2" setzen',
+      ],
+      oeffnen: adresse,
+      ordner: ordner,
+      knopf: 'Im Browser gespeichert',
+      ablehnen: 'Lassen',
+      ab: Bestaetigungen.keine,
+    ));
+    expect(f.aktuell, isNotNull, reason: 'gefragt, obwohl die Stufe „keine" ist');
+    for (final skala in [1.0, 1.25]) {
+      await tester.pumpWidget(MaterialApp(
+        home: Builder(
+          builder: (context) => MediaQuery(
+            data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(skala)),
+            child: Scaffold(
+              body: FreigabeDialog(f.aktuell!, f,
+                  browser: (u) async => geoeffnet.add(u),
+                  dateimanager: (o) async => geoeffnet.add(o),
+                  zwischenablage: (t) async => abgelegt = t),
+            ),
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull, reason: 'kein Überlauf bei ${(skala * 100).round()} %');
+    }
+    await tester.pump(Sperrzeit.dauerVorgabe);
+    bool frei() => tester.widget<FilledButton>(find.widgetWithText(FilledButton, 'Im Browser gespeichert')).onPressed != null;
+    expect(frei(), isFalse, reason: 'nach der Sperrzeit noch nichts getan');
+    expect(find.textContaining('Jetzt sind Sie dran'), findsOneWidget);
+
+    // Die Schritte scrollen für sich; was unten liegt, erst ins Bild holen.
+    Future<void> tippen(Finder f) async {
+      await tester.ensureVisible(f);
+      await tester.pumpAndSettle();
+      await tester.tap(f);
+      await tester.pumpAndSettle();
+    }
+
+    // Der Reihe nach: Was noch nicht dran ist, tut nichts.
+    const ziehen = 'Datei „bild.png" aus dem Ordner irgendwo in den Editor ziehen; '
+        'die Stelle ist egal, das Einfügen setzt sie an ihren Platz';
+    await tippen(find.text('Ordner mit den neuen Dateien öffnen'));
+    expect(geoeffnet, isEmpty, reason: 'Ordner erst nach dem Formular');
+    await tippen(find.text('Formular in Moodle öffnen'));
+    await tippen(find.textContaining('„questiontext" kopieren'));
+    await tippen(find.text(ziehen));
+    expect(abgelegt, isNull, reason: 'Kopieren erst, wenn alles abgehakt ist');
+    expect(find.byIcon(Icons.check_circle), findsOneWidget, reason: 'nicht abgehakt, solange der Ordner zu ist');
+    await tippen(find.text('Ordner mit den neuen Dateien öffnen'));
+    expect(geoeffnet, [adresse, ordner]);
+
+    await tippen(find.text(ziehen));
+    await tippen(find.textContaining('„questiontext" kopieren'));
+    expect(abgelegt, isNull, reason: 'die Einstellung fehlt noch');
+    await tippen(find.text('Im Formular „Erreichbare Punkte" auf „2" setzen'));
+    expect(frei(), isFalse, reason: 'noch nichts kopiert');
+
+    await tippen(find.textContaining('„generalfeedback" kopieren'));
+    expect(abgelegt, '<p>Rückmeldung</p>');
+    expect(frei(), isFalse, reason: 'questiontext fehlt noch');
+    await tippen(find.textContaining('„questiontext" kopieren'));
+    expect(abgelegt, '<p>Neu</p>');
+    expect(frei(), isTrue);
+    expect(find.byIcon(Icons.check_circle), findsNWidgets(6), reason: 'je erledigtem Schritt ein Haken');
+    f.entscheiden(true);
+    expect(await antwort, isTrue);
+  });
+
+  testWidgets('Beim zweiten Blick („Noch einmal prüfen") sind die Schritte keine Bedingung', (tester) async {
+    tester.view.physicalSize = const Size(1366, 768);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final f = Freigaben(Protokoll());
+    final antwort = f.anfragen(FreigabeAnfrage(
+      titel: 'Moodle zeigt den neuen Stand noch nicht',
+      punkte: const [],
+      vergleich: [Zeile(ZeilenArt.neu, '<p>Neu</p>')],
+      kopieren: const [('questiontext', '<p>Neu</p>')],
+      schritteVerlangt: false,
+      knopf: 'Noch einmal prüfen',
+      ab: Bestaetigungen.keine,
+    ));
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: FreigabeDialog(f.aktuell!, f))));
+    await tester.pump(Sperrzeit.dauerVorgabe);
+    expect(tester.widget<FilledButton>(find.widgetWithText(FilledButton, 'Noch einmal prüfen')).onPressed, isNotNull);
+    f.entscheiden(true);
+    expect(await antwort, isTrue);
+  });
+
+  testWidgets('Eine Übergabe holt die App nach vorn, hält sie aber nicht oben', (tester) async {
+    // Die Lehrkraft speichert dabei im Browser; ein Fenster, das oben bleibt,
+    // verdeckte ihn.
+    tester.view.physicalSize = const Size(1366, 768);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final f = Freigaben(Protokoll());
+    final vorn = <bool>[];
+    await tester.pumpWidget(MaterialApp(
+      home: FreigabeDialoge(freigaben: f, nachVorn: (an) async => vorn.add(an), child: const Scaffold()),
+    ));
+    final antwort = f.anfragen(FreigabeAnfrage(
+      titel: 'Bitte selbst in Moodle speichern',
+      punkte: const [],
+      vergleich: [Zeile(ZeilenArt.neu, '<p>Neu</p>')],
+      kopieren: const [('questiontext', '<p>Neu</p>')],
+      knopf: 'Im Browser gespeichert',
+      ab: Bestaetigungen.keine,
+    ));
+    await tester.pumpAndSettle();
+    expect(find.byType(FreigabeDialog), findsOneWidget);
+    expect(vorn, [true, false], reason: 'nach vorn und gleich wieder losgelassen, der Dialog bleibt offen');
+    f.entscheiden(false);
+    await tester.pumpAndSettle();
+    expect(await antwort, isFalse);
   });
 
   testWidgets('Schließt die App die offene Anfrage, ist danach nur der Dialog der nächsten offen', (tester) async {

@@ -73,6 +73,11 @@ class FreigabeAnfrage {
     this.ohneEntscheidung = 'wird nichts gespeichert',
     this.bilder = const [],
     this.grund,
+    this.kopieren = const [],
+    this.abhaken = const [],
+    this.schritteVerlangt = true,
+    this.ordner,
+    this.oeffnen,
     this.ab = Bestaetigungen.mittel,
   });
 
@@ -82,7 +87,9 @@ class FreigabeAnfrage {
   /// alles, was Bestehendes anfasst oder sofort sichtbar wird. Wer nur bei
   /// „alle" fragen will (Anlegen, Duplizieren, Importieren), gibt
   /// [Bestaetigungen.alle] an; [Bestaetigungen.keine] heißt „immer fragen, auch
-  /// bei keine" gilt für Bildschirmfotos und fachliche Karten-Zuordnungen.
+  /// bei keine" gilt für Bildschirmfotos, fachliche Karten-Zuordnungen und die
+  /// Übergabe an die Lehrkraft, wenn ein Schutzdienst das Speichern anhält
+  /// ([kopieren]; E34).
   final Bestaetigungen ab;
 
   /// Wozu Claude das braucht, in Claudes eigenen Worten -- steht oben im
@@ -105,6 +112,33 @@ class FreigabeAnfrage {
   /// Zeilenvergleich des Quelltexts, vorher gegen nachher; leer, wenn es
   /// keinen Text zu vergleichen gibt (Sichtbarkeit, Löschen).
   final List<Zeile> vergleich;
+
+  /// Texte, die die Lehrkraft mit je einem Knopf in die Zwischenablage legt:
+  /// (Beschriftung, Text). Für die Übergabe, wenn die App nicht selbst
+  /// speichern kann (SchutzPruefung) -- die Lehrkraft fügt sie im Browser ein.
+  /// Erst auf ihren Klick, damit nichts verloren geht, was sie gerade selbst
+  /// kopiert hat.
+  final List<(String, String)> kopieren;
+
+  /// Schritte der Übergabe, die die Lehrkraft im Browser von Hand tut und in
+  /// der App abhakt, etwa eine Einstellung setzen. Erst wenn jeder abgehakt
+  /// und alles kopiert ist, geht der Abschlussknopf.
+  final List<String> abhaken;
+
+  /// Ob der Abschlussknopf erst nach allen Schritten geht. Nein beim zweiten
+  /// Blick („Noch einmal prüfen"): Dann sind sie meist schon getan.
+  final bool schritteVerlangt;
+
+  /// Ein Ordner mit neuen Dateien, den der Dialog im Dateimanager öffnet: Die
+  /// Lehrkraft zieht sie von dort in den Editor im Browser.
+  final String? ordner;
+
+  /// Eine Seite in Moodle, die der Dialog im Standardbrowser öffnet.
+  final Uri? oeffnen;
+
+  /// Eine Übergabe an die Lehrkraft statt einer Freigabe: Sie arbeitet dabei
+  /// im Browser, die App darf ihr Fenster also nicht oben halten.
+  bool get uebergabe => kopieren.isNotEmpty || oeffnen != null;
 
   /// Bilder (PNG), die nach der Freigabe weitergehen -- die Lehrkraft sieht
   /// genau sie (Bildschirmfotos).

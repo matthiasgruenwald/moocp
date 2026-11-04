@@ -53,6 +53,10 @@ dependencies:
   xml: ^7.0.1
   archive: ^4.3.0
   package_info_plus: ^10.2.1
+  # HTML in die Zwischenablage für die Übergabe an die Lehrkraft (E34), eigenes
+  # Plugin in diesem Repository, nur für Windows.
+  zwischenablage_html:
+    path: packages/zwischenablage_html
 
 dev_dependencies:
   flutter_test:
