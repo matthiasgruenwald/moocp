@@ -127,6 +127,14 @@ aber sie kennt den Auftrag nicht, du schon:
   Freigabe in der App. Wiederhergestellte Inhalte sind die Ausnahme: Sie behalten
   standardmäßig Sichtbarkeit und Voraussetzungen der Quelle; der Plan und die
   App-Freigabe nennen die Wahl, Verbergen wird ausdrücklich beauftragt.
+- **Nach `sichtbarkeit_setzen` den Zustand „verfügbar ohne Link" prüfen.** Bei einer
+  Aktivität war diese Einstellung nach dem Umschalten der Sichtbarkeit
+  zurückgesetzt; ob und bei welchen Umschaltungen das geschieht, ist nicht
+  gemessen. Hatte die Aktivität den Zustand (`kurs_uebersicht` zeigt ihn als
+  `[ohne Link erreichbar]`), lies sie danach noch einmal und stelle ihn,
+  wenn er fehlt, mit `aendern` nach – mit Freigabe und Rückleseprobe wie
+  jede Änderung. Bietet das Formular das Feld nicht an, ist es eine Lücke (LÜCKENBEFUND),
+  keine Gelegenheit für einen Umweg. Ist unklar, ob er gewollt war, frag die Lehrkraft.
 - **Ändern, Verschieben, Sichtbarkeit, Löschen** gehen über das
   Freigabefenster der App: Es zeigt Kurs, Namen und bei Änderungen einen
   Zeilenvergleich, und die Lehrkraft entscheidet dort. Kündige jede Freigabe im

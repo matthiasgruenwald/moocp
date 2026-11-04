@@ -77,6 +77,10 @@ aus wie verborgen, ist es aber nicht — das Verzeichnis ist über seine Adresse
 für **jeden eingeschriebenen Teilnehmer abrufbar**. `kurs_uebersicht` zeigt es
 als `[ohne Link erreichbar]`.
 
+`sichtbarkeit_setzen` kann diesen Zustand zurücksetzen (an einer Aktivität
+beobachtet, nicht gemessen). Hatte das Verzeichnis ihn, prüfe ihn danach und
+stelle ihn mit `aendern` nach, wenn er gewollt war.
+
 Für Lösungen und Erwartungshorizonte ist das ungeeignet. Stößt du beim Lesen
 eines Kurses auf einen Lösungsordner in diesem Zustand, sag es dem Nutzer —
 das ist so gut wie immer ungewollt.

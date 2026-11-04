@@ -159,6 +159,7 @@ Meldung:    Unbekannte Aktivitätsart "choicegroup" / "lightboxgallery". Coursep
   Offen: Ob Codex damit `flutter analyze` und `flutter build` tatsächlich ausführt, ist noch nicht geprüft. Dafür den Codex-Lauf wiederholen, sobald der Bildschirmfototest wieder dran ist.
 - `bildschirmfoto` ruft für eine Textseite `modedit.php?update=<cmid>` ab statt der Ansicht (`mod/page/view.php?id=<cmid>`); cmid 1101 liefert HTTP 500, cmid 1102 funktioniert. Das Werkzeug auf die Ansicht umstellen und mit Messung im Testkurs prüfen (A6).
 - `bildschirmfoto` legt das PNG im Temp-Arbeitsordner der App ab (`/private/var/folders/…/moocp_arbeitsordner/`), nicht im Arbeitsordner des Repos, wie `docs/agents/testing.md` es beschreibt. Eine der beiden Angaben angleichen.
+- Messung #45 im Testkurs: Setzt `sichtbarkeit_setzen` »verfügbar ohne Link« (stealth) zurück, bei welchen Umschaltungen (Aktivität, Abschnitt, verbergen und anzeigen) und bei welchen Einstellungen noch? Braucht einen von der Lehrkraft genannten Testkurs (A10). Danach entscheiden: Werkzeug erhält die Einstellung, oder das Ergebnis meldet sie; der Hinweis im Skill `moodle` (Sicherheitsabschnitt, `references/verzeichnisse.md`) wird dann angepasst.
 
 ## Widersprüche zwischen Plänen und ADRs
 

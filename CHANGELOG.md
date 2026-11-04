@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unveröffentlicht
+- Sichtbarkeit: Nach dem Umschalten prüft die KI, ob „verfügbar ohne Link“ noch gesetzt ist, und stellt es nach Rückfrage wieder her.
 - Übertragung: Steht ein Ziel nach einem Abbruch auf „unklar“, nennt die App die Nummer des Vorgangs, damit sich der Stand mit der Statusabfrage klären lässt.
 - Fragen: Muss eine Frage neu angelegt werden, etwa weil sich ihr Aufbau ändert, tauscht die KI sie in einem Schritt und mit einer Freigabe aus – die neue steht im Test an derselben Stelle mit denselben Punkten, und die alte wird auf Wunsch gelöscht.
 - Aufträge mit Quelle: Kann die KI eine genannte Seite nicht lesen, etwa über den Link auf eine einzelne Wikiseite, fragt sie nach, statt ohne die Quelle weiterzuarbeiten.
