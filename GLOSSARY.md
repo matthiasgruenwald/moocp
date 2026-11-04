@@ -14,6 +14,12 @@ _Vermeiden_: Aktivitätstyp
 **Gruppierung**:
 Eine benannte Zusammenstellung von Gruppen eines Kurses. Eine Aktivität kann auf eine Gruppierung beschränkt sein. Sicherungen ohne Nutzerdaten enthalten weder Gruppen noch Gruppierungen; die App liest nur Namen, nie Mitglieder.
 
+**Schutzdienst**:
+Ein Dienst vor einer Moodle-Instanz (etwa Cloudflare), der Anfragen prüft oder abweist, bevor Moodle sie sieht. Er verlangt eine Prüfung, die nur ein Mensch im Browser besteht, oder weist die Anfrage gleich ab. Die App umgeht ihn nie.
+
+**Übergabe**:
+Hält ein Schutzdienst das Speichern an, speichert die Lehrkraft selbst im Browser; die App führt sie durch die Schritte und liest danach zurück, ob Moodle den Stand zeigt. Keine Freigabe: Sie kommt auf jeder Stufe.
+
 **Sichern**:
 Ausgewählte Kursinhalte über Moodles Sicherungsfunktion in eine Sicherungsdatei ausgeben. „Exportieren“ ist dafür eine verständliche Formulierung im Gespräch.
 

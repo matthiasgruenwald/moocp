@@ -181,6 +181,7 @@ Begründung, Messungen und Verworfenes stehen je Entscheidung in `docs/adr/`; vo
 | E31 | Ein MCP-Server je Moodle-Instanz; Namen Moodle (Produktiv) und Moodle Test (Testinstanz) | [0031](docs/adr/0031-mcp-server-je-instanz.md) |
 | E32 | Ein Fenster für mehrere Instanzprofile; Anmeldung und Freigabestufe je Profil | [0032](docs/adr/0032-ein-fenster-fuer-instanzprofile.md) |
 | E33 | Gruppierungen lesen und anlegen; eine fehlende Gruppierung ist eine Rückfrage, kein stiller Abbruch | [0033](docs/adr/0033-gruppierungen.md) |
+| E34 | Hält ein Schutzdienst das Speichern an, speichert die Lehrkraft im Browser (Übergabe); die App erkennt ihn, umgeht ihn nie und liest zurück | [0034](docs/adr/0034-uebergabe-und-schutzdienst.md) |
 
 ## Arbeitsregeln für die KI
 
