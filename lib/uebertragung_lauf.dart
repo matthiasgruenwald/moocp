@@ -263,6 +263,7 @@ String? wiederholungsRueckfrage(
   required int kurs,
   String? datei,
   int? quellkurs,
+  Iterable<String> vorgangsnummern = const [],
 }) {
   final treffer = [
     for (final e in protokoll)
@@ -275,7 +276,17 @@ String? wiederholungsRueckfrage(
   ];
   if (treffer.isEmpty) return null;
   final e = treffer.last;
-  final nummer = e.vorgang == null ? '' : ' (Nummer ${e.vorgang})';
+  // Fehlt die Nummer im Protokoll (der Lauf brach ab, bevor sie dort stand), nennt die
+  // Rückfrage die Nummern der offenen Vorgänge für diesen Kurs: Ohne Nummer lässt sich
+  // wiederherstellung_status nicht aufrufen. Nur Nummern, keine Inhalte (E11, A4).
+  final bekannt = vorgangsnummern.toList();
+  final nummer = e.vorgang != null
+      ? ' (Nummer ${e.vorgang})'
+      : bekannt.isEmpty
+          ? ' (Nummer nicht protokolliert)'
+          : bekannt.length == 1
+              ? ' (vermutlich Nummer ${bekannt.single})'
+              : ' (mögliche Nummern: ${bekannt.join(', ')})';
   final karten = e.karten == null || e.karten == KartenStand.verknuepft
       ? ''
       : ' Die Lernlandkarten dieses Ziels sind „${e.karten!.text}": nicht verifiziert; Sichtbarkeit in Moodle prüfen. '
@@ -284,7 +295,7 @@ String? wiederholungsRueckfrage(
   return 'Für Kurs $kurs ist schon einmal übertragen worden: Stand „${e.stand.text}", '
       'am ${e.zeit.toIso8601String()}$nummer.$karten Nichts wird erneut importiert. Erst den Stand klären '
       '(wiederherstellung_status mit der Nummer). Will die Lehrkraft die Wiederholung trotzdem, für diesen Kurs '
-      'wiederherstellen_datei mit wiederholung_von=${e.vorgang ?? '<Nummer>'} und nach Freigabe.';
+      'wiederherstellen_datei mit wiederholung_von=${e.vorgang ?? (bekannt.length == 1 ? bekannt.single : '<Nummer>')} und nach Freigabe.';
 }
 
 /// Das Übertragungsprotokoll uebertragungen.json im Einstellungsordner. Jeder

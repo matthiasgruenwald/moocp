@@ -124,6 +124,21 @@ void main() {
       expect(r, contains('wiederherstellen_datei mit wiederholung_von=7'));
     });
 
+    test('Stand unklar ohne protokollierte Nummer nennt die Nummern offener Vorgänge', () {
+      final protokoll = [eintrag('a.mbz', 12, stand: ZielStand.unklar)];
+      final r = wiederholungsRueckfrage(protokoll,
+          profil: 'zielprofil', kurs: 12, datei: 'a.mbz', vorgangsnummern: ['abc123']);
+      expect(r, contains('Stand „unklar"'));
+      expect(r, contains('Nummer abc123'));
+      expect(r, contains('wiederholung_von=abc123'));
+      final mehrere = wiederholungsRueckfrage(protokoll,
+          profil: 'zielprofil', kurs: 12, datei: 'a.mbz', vorgangsnummern: ['a1', 'b2']);
+      expect(mehrere, contains('a1, b2'));
+      final keine = wiederholungsRueckfrage(protokoll,
+          profil: 'zielprofil', kurs: 12, datei: 'a.mbz');
+      expect(keine, contains('Nummer nicht protokolliert'));
+    });
+
     test('andere Datei: keine Rückfrage', () {
       final protokoll = [eintrag('a.mbz', 12)];
       expect(

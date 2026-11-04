@@ -88,6 +88,7 @@ extension _Uebertragung on McpDienst {
           p.join(einstellungenOrdner, 'uebertragungen.json'),
     );
     final rueckfragen = <String>[];
+    final bisherige = await vorgaenge.alleFuerDoppelstart();
     for (final z in geprueft) {
       final r = wiederholungsRueckfrage(
         protokoll.eintraege,
@@ -95,6 +96,13 @@ extension _Uebertragung on McpDienst {
         kurs: z.kurs,
         datei: angegeben,
         quellkurs: quellkurs,
+        vorgangsnummern: [
+          for (final v in bisherige)
+            if (v.kurs == z.kurs &&
+                v.wiederherstellung != null &&
+                v.wiederherstellung != WiederherstellungStand.fehlgeschlagen)
+              v.id,
+        ],
       );
       if (r != null) rueckfragen.add('Kurs ${z.kurs} („${z.name}"): $r');
     }
@@ -306,6 +314,18 @@ extension _Uebertragung on McpDienst {
           return ZielErgebnis(ZielStand.fehlgeschlagen, text: e.meldung);
         }
         text = e.meldung;
+      } catch (_) {
+        // Eine fremde Ausnahme nach dem Anlegen des Vorgangs darf die Nummer nicht
+        // verschlucken: Ohne sie lässt sich der Stand nicht mit wiederherstellung_status
+        // klären. Die Meldung kann Namen enthalten (E11) und bleibt draußen.
+        final nummer = vid;
+        if (nummer == null) rethrow;
+        return ZielErgebnis(
+          ZielStand.unklar,
+          vorgang: nummer,
+          text: 'Unerwarteter Fehler. Den Kurs in Moodle prüfen und den Stand mit '
+              'wiederherstellung_status klären, bevor es erneut versucht wird.',
+        );
       }
       final id = vid;
       if (id == null) return ZielErgebnis(ZielStand.abgelehnt, text: text);
