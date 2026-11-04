@@ -41,7 +41,7 @@ Gelten für README.md, CLAUDE.md, CHANGELOG.md und alle Dateien unter `docs/`.
    Paket). Jede gehört zu dem Ordner, in dem man arbeitet, wenn man sie
    braucht.
 8. **Offene Punkte außerhalb von Specs und deren Umsetzungstickets stehen in [TODO.md](../../TODO.md)**, nicht in README oder
-   einer CLAUDE.md: fehlende Funktionen, Fehler und Aufgaben außerhalb des Codes. Was erledigt ist, fliegt dort heraus. „Noch durchzuspielen" kommt dort möglichst gar nicht hinein: Was umgesetzt ist, wird gleich geprüft, von Hand oder mit einem Test. Was dafür zu aufwendig ist (frischer Rechner, Schulnetz, Beobachtung über viele Sitzungen), würde auch später nicht geprüft – das bleibt draußen, bis ein Nutzer ein Problem meldet.
+   einer CLAUDE.md: fehlende Funktionen, Fehler und Aufgaben außerhalb des Codes. Was erledigt ist, fliegt dort heraus. Je Punkt höchstens drei Zeilen, bei einem Ticket nur „siehe #N"; Messergebnisse und Befunde stehen als Kommentar am Quelltext oder in der ADR, nie als Bericht in der TODO.md. „Noch durchzuspielen" kommt dort möglichst gar nicht hinein: Was umgesetzt ist, wird gleich geprüft, von Hand oder mit einem Test. Was dafür zu aufwendig ist (frischer Rechner, Schulnetz, Beobachtung über viele Sitzungen), würde auch später nicht geprüft – das bleibt draußen, bis ein Nutzer ein Problem meldet.
 
 Architektur, Aufbau, Werkzeuge, Bauen und Prüfen: [README.md](../../README.md),
 Teil 4.
