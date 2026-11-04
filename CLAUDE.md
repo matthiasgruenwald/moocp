@@ -72,6 +72,7 @@ Konsole. Die KI liest nie `shared_preferences.json` oder
 - jeder Schreibvorgang liest aus Moodle zurück und meldet `verified`. Moodle
   meldet Erfolge, die keine sind; ein falsches „ok" ist schlimmer als ein
   Fehler.
+- Das Urteil fällt das Werkzeug, nicht die KI: Es vergleicht den zurückgelesenen Stand mit jeder Aktion und nennt, was abweicht; den Stand danach nur zurückzugeben und die KI vergleichen zu lassen, reicht nicht. Was sich nicht prüfen lässt, nennt die Antwort als „nicht geprüft“. Nach `verified: true` liest die KI nicht selbst nach (Skills, Gleichanteil `protokoll.md`) – das kostete Zeit und Kontext für eine Prüfung, die schon gelaufen ist.
 - In Texten heißt **„geprüft"**: auf der Instanz ausgeführt und
   zurückgelesen. **„Umgesetzt"** heißt: gebaut, als Ganzes nicht
   durchgespielt.

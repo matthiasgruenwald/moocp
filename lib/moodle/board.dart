@@ -165,7 +165,96 @@ Future<String> boardAendern(MoodleZugang moodle, Freigaben freigaben,
         await moodle.dienst('mod_board_delete_note', {'id': id});
     }
   }
-  return 'Ausgeführt. Jetzt:\n${_boardText(await _board(moodle, boardid))}';
+  final nachher = await _board(moodle, boardid);
+  return 'Ausgeführt. ${boardPruefen(aktionen, vorher, nachher).text}\nJetzt:\n${_boardText(nachher)}';
+}
+
+/// Text ohne Auszeichnung und mit einfachen Leerzeichen -- so vergleicht die
+/// Probe, was Moodle beim Speichern an HTML und Umbrüchen ändern darf.
+String _klartext(String s) => nameNormal(html_parser.parseFragment(s).text ?? '');
+
+/// Ein Klartextfeld (Name, Titel, Inhalt einer Notiz) gegen das Geschriebene:
+/// Moodle gibt es HTML-maskiert zurück (gemessen: „&amp;" für „&"), das
+/// Geschriebene ist Text, auch wenn es wie HTML aussieht.
+bool _gleich(String gelesen, Object? soll) => _klartext(gelesen) == nameNormal('$soll');
+
+/// Ob eine spätere Aktion desselben Aufrufs das Ziel von aktionen[i] wieder
+/// ändert oder löscht -- dann zählt in der Probe nur deren Ergebnis.
+/// [eintrag]: der Schlüssel der Einträge, `notiz` oder `karte`.
+bool _ueberholt(List<Map<String, Object?>> aktionen, int i, String eintrag) {
+  final a = aktionen[i];
+  String k(Map<String, Object?> x, String s) => '${x[s]}';
+  for (final b in aktionen.skip(i + 1)) {
+    if (!'${a['art']}'.endsWith('_neu') &&
+        b['art'] == a['art'] &&
+        k(b, 'spalte') == k(a, 'spalte') &&
+        k(b, eintrag) == k(a, eintrag)) {
+      return true;
+    }
+    if (b['art'] == 'spalte_loeschen' && a['spalte'] != null && k(b, 'spalte') == k(a, 'spalte')) return true;
+    if (b['art'] == '${eintrag}_loeschen' && a[eintrag] != null && k(b, eintrag) == k(a, eintrag)) return true;
+  }
+  return false;
+}
+
+/// Rückleseprobe von board_aendern: Steht nach allen Aktionen da, was sie
+/// bewirken sollten? Webservices und Formulare des Boards melden Erfolg auch,
+/// wenn nichts geschehen ist. Geprüft wird der Endstand gegen jede Aktion.
+/// `position` bei spalte_verschieben ist die Stelle von 0 an (gemessen
+/// 29.10.2026: 0 = ganz vorn, 2 = dritte Spalte).
+Probe boardPruefen(
+    List<Map<String, Object?>> aktionen, List<BoardSpalte> vorher, List<BoardSpalte> nachher) {
+  final probe = Probe();
+  BoardSpalte? spalte(Object? id) => nachher.where((s) => '${s.id}' == '$id').firstOrNull;
+  final notizen = {for (final s in nachher) for (final n in s.eigene) '${n.$1}': n};
+  final neueSpalten = nachher.where((s) => !vorher.any((v) => v.id == s.id)).toList();
+  final alt = {for (final s in vorher) for (final n in s.eigene) n.$1};
+  final neueNotizen = [for (final s in nachher) for (final n in s.eigene) if (!alt.contains(n.$1)) (s.id, n)];
+  for (var i = 0; i < aktionen.length; i++) {
+    final a = aktionen[i];
+    if (_ueberholt(aktionen, i, 'notiz')) continue;
+    final s = spalte(a['spalte']);
+    switch (a['art']) {
+      case 'spalte_neu':
+        final n = neueSpalten.where((x) => _gleich(x.name, a['name'])).firstOrNull;
+        if (n != null) neueSpalten.remove(n);
+        probe.pruefe(n != null, 'neue Spalte „${a['name']}" fehlt');
+      case 'spalte_umbenennen':
+        probe.pruefe(s != null && _gleich(s.name, a['name']),
+            'Spalte ${a['spalte']} heißt „${s?.name}", nicht „${a['name']}"');
+      case 'spalte_loeschen':
+        probe.pruefe(s == null, 'Spalte ${a['spalte']} ist noch da');
+      case 'spalte_verschieben':
+        final i = nachher.indexWhere((x) => '${x.id}' == '${a['spalte']}');
+        probe.pruefe(i == ((a['position'] as num?)?.toInt() ?? 0),
+            'Spalte ${a['spalte']} ${i < 0 ? 'fehlt' : 'steht an Stelle $i, nicht ${a['position'] ?? 0}'}');
+      case 'spalte_sperren':
+        probe.pruefe(s != null && s.gesperrt == (a['gesperrt'] != false),
+            'Spalte ${a['spalte']} ist ${s?.gesperrt == true ? 'gesperrt' : 'nicht gesperrt'}');
+      case 'notiz_neu':
+        final n = neueNotizen
+            .where((x) =>
+                '${x.$1}' == '${a['spalte']}' &&
+                _gleich(x.$2.$2, a['titel'] ?? '') &&
+                _gleich(x.$2.$3, a['inhalt'] ?? ''))
+            .firstOrNull;
+        if (n != null) neueNotizen.remove(n);
+        // Abweichend: nennen, was gelesen wurde -- nur eigene Notizen.
+        final da = [for (final x in neueNotizen) if ('${x.$1}' == '${a['spalte']}') '„${x.$2.$2}": „${x.$2.$3}"'];
+        probe.pruefe(n != null,
+            'neue Notiz „${a['titel'] ?? ''}" fehlt in Spalte ${a['spalte']}${da.isEmpty ? '' : ' (neu gelesen: ${da.join(', ')})'}');
+      case 'notiz_aendern':
+        final n = notizen['${a['notiz']}'];
+        probe.pruefe(
+            n != null &&
+                (a['titel'] == null || _gleich(n.$2, a['titel'])) &&
+                (a['inhalt'] == null || _gleich(n.$3, a['inhalt'])),
+            'Notiz ${a['notiz']} ${n == null ? 'fehlt' : 'zeigt nicht den neuen Text'}');
+      case 'notiz_loeschen':
+        probe.pruefe(!notizen.containsKey('${a['notiz']}'), 'Notiz ${a['notiz']} ist noch da');
+    }
+  }
+  return probe;
 }
 
 // ---------------------------------------------------------------------------
@@ -331,5 +420,71 @@ Future<String> kanbanAendern(MoodleZugang moodle, Freigaben freigaben,
         await aktion('move_card', {'cardid': zahl(a['karte']), 'columnid': zahl(a['spalte']), 'aftercard': zahl(a['nach'])});
     }
   }
-  return 'Ausgeführt. Jetzt:\n${_kanbanText(await _kanban(moodle, cmid, b))}';
+  final nachher = await _kanban(moodle, cmid, b);
+  return 'Ausgeführt. ${kanbanPruefen(aktionen, vorher, nachher).text}\nJetzt:\n${_kanbanText(nachher)}';
+}
+
+/// Rückleseprobe von kanban_aendern, wie [boardPruefen]: der Endstand gegen
+/// jede Aktion. Positionen prüft sie, wo die Aktion eine nennt (`nach`, die
+/// Spalte oder Karte davor; 0 = an den Anfang, gemessen 29.10.2026 auch für
+/// Karten). Löscht eine spätere Aktion das `nach`-Ziel, bleibt nur zu prüfen,
+/// ob die Karte in der Spalte steht.
+Probe kanbanPruefen(List<Map<String, Object?>> aktionen, List<(int, String, List<KanbanKarte>)> vorher,
+    List<(int, String, List<KanbanKarte>)> nachher) {
+  final probe = Probe();
+  final ids = [for (final s in nachher) '${s.$1}'];
+  (int, String, List<KanbanKarte>)? spalte(Object? id) => nachher.where((s) => '${s.$1}' == '$id').firstOrNull;
+  final karten = {for (final s in nachher) for (final k in s.$3) '${k.id}': k};
+  final neueSpalten = nachher.where((s) => !vorher.any((v) => v.$1 == s.$1)).toList();
+  final alt = {for (final s in vorher) for (final k in s.$3) k.id};
+  final neueKarten = [for (final s in nachher) for (final k in s.$3) if (!alt.contains(k.id)) k];
+  bool beschreibungGleich(KanbanKarte k, Object? soll) => soll == null || _klartext(k.beschreibung) == _klartext('$soll');
+  for (var i = 0; i < aktionen.length; i++) {
+    final a = aktionen[i];
+    if (_ueberholt(aktionen, i, 'karte')) continue;
+    final s = spalte(a['spalte']);
+    final nach = (a['nach'] as num?)?.toInt() ?? 0;
+    final nachWeg = nach != 0 &&
+        aktionen.skip(i + 1).any((b) =>
+            '${b['art']}'.endsWith('_loeschen') && '${b[a['art'] == 'karte_verschieben' ? 'karte' : 'spalte']}' == '$nach');
+    switch (a['art']) {
+      case 'spalte_neu':
+        final n = neueSpalten.where((x) => _gleich(x.$2, a['titel'])).firstOrNull;
+        if (n != null) neueSpalten.remove(n);
+        probe.pruefe(n != null, 'neue Spalte „${a['titel']}" fehlt');
+      case 'spalte_umbenennen':
+        probe.pruefe(s != null && _gleich(s.$2, a['titel']),
+            'Spalte ${a['spalte']} heißt „${s?.$2}", nicht „${a['titel']}"');
+      case 'spalte_loeschen':
+        probe.pruefe(s == null, 'Spalte ${a['spalte']} ist noch da');
+      case 'spalte_verschieben':
+        final i = ids.indexOf('${a['spalte']}');
+        probe.pruefe(i >= 0 && (nachWeg || (nach == 0 ? i == 0 : i > 0 && ids[i - 1] == '$nach')),
+            'Spalte ${a['spalte']} steht nicht ${nach == 0 ? 'am Anfang' : 'hinter Spalte $nach'}');
+      case 'karte_neu':
+        final n = neueKarten
+            .where((k) =>
+                '${k.spalte}' == '${a['spalte']}' &&
+                _gleich(k.titel, a['titel']) &&
+                beschreibungGleich(k, a['beschreibung']))
+            .firstOrNull;
+        if (n != null) neueKarten.remove(n);
+        probe.pruefe(n != null, 'neue Karte „${a['titel']}" fehlt in Spalte ${a['spalte']} oder weicht ab');
+      case 'karte_aendern':
+        final k = karten['${a['karte']}'];
+        probe.pruefe(
+            k != null &&
+                (a['titel'] == null || _gleich(k.titel, a['titel'])) &&
+                beschreibungGleich(k, a['beschreibung']),
+            'Karte ${a['karte']} ${k == null ? 'fehlt' : 'zeigt nicht den neuen Text'}');
+      case 'karte_loeschen':
+        probe.pruefe(!karten.containsKey('${a['karte']}'), 'Karte ${a['karte']} ist noch da');
+      case 'karte_verschieben':
+        final folge = [for (final k in s?.$3 ?? const <KanbanKarte>[]) '${k.id}'];
+        final i = folge.indexOf('${a['karte']}');
+        probe.pruefe(i >= 0 && (nachWeg || (nach == 0 ? i == 0 : i > 0 && folge[i - 1] == '$nach')),
+            'Karte ${a['karte']} steht nicht in Spalte ${a['spalte']}${nachWeg ? '' : nach == 0 ? ' oben' : ' hinter Karte $nach'}');
+    }
+  }
+  return probe;
 }

@@ -203,8 +203,7 @@ hier vorhandene Arbeit auf dem Spiel steht. Bewährtes Muster: lesen, prüfen,
 - Wirkt ein Feld unerwartet leer, halt an und klär, warum.
 - Die Freigabe zeigt der Lehrkraft einen Zeilenvergleich. Ein Vergleich, in dem
   viel mehr rot ist als geplant, ist ein Grund, abzulehnen und neu anzusetzen.
-- Nach dem Schreiben liest die App zurück (`verified`). `false` heißt: nicht
-  alles ist angekommen — die Antwort nennt, was abweicht.
+- Nach dem Schreiben liest die App zurück (`verified`) und zieht den Ordner auf den neuen Stand. `true` heißt: angekommen, kein eigenes Nachlesen nötig, auch nicht vor der nächsten Änderung. `false` heißt: Nicht alles ist angekommen, und die Antwort nennt, was abweicht.
 
 ## Mehrere Aktivitäten hintereinander
 

@@ -1161,6 +1161,7 @@ einem Klick auf den jeweiligen Knopf und einem weiteren Formulardurchlauf, weil
 das Formular sich dabei selbst neu aufbaut. Auch die STACK-Testfälle stehen
 nicht in diesem Formular, sondern auf der Testseite.
 
-Für solche Umbauten ist eine **neue Frage** der ehrlichere Weg. Die alte dann
-nicht stillschweigend entsorgen: Ob die alte Fassung weg soll, entscheidet
-der Nutzer; erst dann `fragen_loeschen`.
+Für solche Umbauten ist eine **neue Frage** der ehrlichere Weg, ausgetauscht
+mit `frage_ersetzen` (SKILL.md, „Eine Frage ersetzen"). Die alte dann nicht
+stillschweigend entsorgen: Ob die alte Fassung weg soll, entscheidet der
+Nutzer; das steht im Plan und geht als `loeschen` an das Werkzeug.

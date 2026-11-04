@@ -31,6 +31,7 @@ import '../moodle/board.dart';
 import '../moodle/buch.dart';
 import '../moodle/formular_lesen.dart';
 import '../moodle/formular_schreiben.dart';
+import '../moodle/frage_ersetzen.dart';
 import '../moodle/fortschrittsliste.dart';
 import '../moodle/fragen.dart';
 import '../moodle/gruppierung.dart';
@@ -1570,7 +1571,7 @@ class McpDienst {
           i.neu,
           (f) => stackTesten(moodle, sammlung: s, frage: f),
         );
-        return '${i.text}$n';
+        return '${i.text}${n.text}';
       },
     );
 
@@ -1646,6 +1647,82 @@ class McpDienst {
             for (final f in liste.cast<Map>())
               ((f['id'] as num).toInt(), f['name'] as String),
           ],
+        );
+      },
+    );
+
+    _aufrufe.registrieren(
+      server,
+      'frage_ersetzen',
+      titel: 'Frage ersetzen',
+      beschreibung:
+          'Ersetzt eine Frage durch eine neue aus einer Moodle-XML-Datei (genau eine Frage), nach EINER '
+          'Freigabe: importiert sie in die Kategorie der alten, lässt die Nachweise laufen wie '
+          'fragen_importieren, setzt sie in jedem genannten Test auf den Platz der alten (dieselbe Seite und '
+          'Stelle, dieselben Punkte, die Seitenaufteilung bleibt) und löscht danach auf Wunsch die alte mit '
+          'allen Versionen. Trägt die neue die Sachnummer der alten, geht sie nach dem Löschen an die neue. '
+          'Für Umbauten, die aendern nicht kann (Aufbau, STACK-Testfälle); für reine Inhaltsänderungen '
+          'frage_lesen und aendern. Prüft vorher Namen, Plätze und XML und bricht sonst ab, bevor etwas '
+          'geschieht; besteht ein Nachweis nicht, kommt die neue Frage in keinen Test.',
+      parameter: {
+        'sammlung': sammlung,
+        'kategorie': JsonSchema.string(
+          description: 'Kategorie-id oder Name der ALTEN Frage (aus fragen_lesen)',
+        ),
+        'frage': JsonSchema.integer(
+          description: 'AKTUELLE questionid der alten Frage (fragen_lesen, test_lesen)',
+        ),
+        'name': JsonSchema.string(
+          description: 'Name der alten Frage, wie er jetzt in Moodle steht',
+        ),
+        'datei': JsonSchema.string(
+          description: 'Pfad der XML-Datei mit der neuen Frage im Arbeitsordner',
+        ),
+        'tests': JsonSchema.array(
+          items: JsonSchema.object(
+            properties: {
+              'cmid': JsonSchema.integer(description: 'cmid des Tests'),
+              'name': JsonSchema.string(
+                description: 'Name des Tests wie in kurs_uebersicht',
+              ),
+            },
+            required: ['cmid', 'name'],
+          ),
+          description:
+              'Die Tests, in denen getauscht wird, je {cmid, name}; die alte Frage muss in jedem stehen',
+        ),
+        'loeschen': JsonSchema.boolean(
+          description:
+              'true: die alte Frage danach endgültig löschen; false: sie bleibt in der Sammlung',
+        ),
+      },
+      pflicht: ['sammlung', 'kategorie', 'frage', 'name', 'datei', 'tests', 'loeschen'],
+      zerstoerend: true,
+      ausfuehren: (a) {
+        final liste = a['tests'];
+        if (liste is! List ||
+            liste.any(
+              (t) => t is! Map || t['cmid'] is! num || t['name'] is! String,
+            )) {
+          throw MoodleFehler('tests: eine Liste aus {cmid, name}.');
+        }
+        if (a['loeschen'] is! bool) throw MoodleFehler('loeschen: true oder false.');
+        final s = _zahl(a, 'sammlung');
+        return frageErsetzen(
+          moodle,
+          freigaben,
+          ao,
+          sammlung: s,
+          kategorie: '${a['kategorie']}',
+          frage: _zahl(a, 'frage'),
+          name: _text(a, 'name'),
+          datei: _text(a, 'datei'),
+          tests: [
+            for (final t in liste.cast<Map>())
+              ((t['cmid'] as num).toInt(), t['name'] as String),
+          ],
+          loeschen: a['loeschen'] as bool,
+          stackTesten: (f) => stackTesten(moodle, sammlung: s, frage: f),
         );
       },
     );
@@ -2022,7 +2099,8 @@ class McpDienst {
       beschreibung:
           'Liest ein gemeinsames Wiki: alle Seiten (Ansicht) nach wiki-<cmid>/seite-<pageid>.html, dazu das '
           'Verweisnetz: tote Verweise (Seite gelöscht, führen zu HTTP 404), nie angelegte Titel, verwaiste Seiten. '
-          'Nie, wer was geschrieben hat; persönliche Wikis und Wikis im Gruppenmodus gar nicht. Nur lesen.',
+          'Nie, wer was geschrieben hat; persönliche Wikis und Wikis im Gruppenmodus gar nicht. Nur lesen. '
+          'Die pageid aus einem Seitenlink (view.php?pageid=) ist keine cmid – dann nach dem Link zum Wiki fragen.',
       parameter: {'cmid': cmidDer},
       pflicht: ['cmid'],
       nurLesen: true,

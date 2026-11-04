@@ -408,7 +408,7 @@ hier**, und es ist der Hauptgrund, warum dieser Schritt nicht optional ist.
 - **Struktur einer vorhandenen Frage ändern** — ein zusätzlicher Knoten, ein
   zusätzliches Eingabefeld, ein weiterer Testfall. Inhalte vorhandener Knoten
   und Eingaben lassen sich ändern (siehe unten), die Struktur nicht.
-- **Einen vorhandenen Testfall ändern oder löschen.** Er steht auf einer eigenen Seite, die die App nicht aufruft; in Moodle gehen beide Wege, unter den Ergebnissen jedes Testfalls auf der Seite mit den Fragetests. Über die App bleibt nur, die Frage neu anzulegen — deshalb die Testfälle vor dem Import genau nehmen.
+- **Einen vorhandenen Testfall ändern oder löschen.** Er steht auf einer eigenen Seite, die die App nicht aufruft; in Moodle gehen beide Wege, unter den Ergebnissen jedes Testfalls auf der Seite mit den Fragetests. Über die App bleibt nur, die Frage neu anzulegen und mit `frage_ersetzen` gegen die alte zu tauschen — deshalb die Testfälle vor dem Import genau nehmen.
 - **„Antworten analysieren" öffnen.** Diese Seite wertet **echte Abgaben** aus
   und ist gesperrt. Testlauf, Varianten und CAS-Notizblock arbeiten nur mit der
   Frage selbst und sind offen.

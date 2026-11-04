@@ -1,6 +1,9 @@
 # Changelog
 
 ## Unveröffentlicht
+- Fragen: Muss eine Frage neu angelegt werden, etwa weil sich ihr Aufbau ändert, tauscht die KI sie in einem Schritt und mit einer Freigabe aus – die neue steht im Test an derselben Stelle mit denselben Punkten, und die alte wird auf Wunsch gelöscht.
+- Aufträge mit Quelle: Kann die KI eine genannte Seite nicht lesen, etwa über den Link auf eine einzelne Wikiseite, fragt sie nach, statt ohne die Quelle weiterzuarbeiten.
+- Boards, Kanban-Boards, Fortschrittslisten und Tests: Die App bestätigt nach dem Ändern selbst, dass alles angekommen ist, und die KI liest nach dem Schreiben nicht mehr eigens nach – das spart Zeit und Kontext.
 - Speichern: Hält ein Schutzdienst vor Moodle das Speichern an oder weist es ab, sagt die App es klar und übergibt es an Sie, damit Sie selbst im Browser speichern – beim Ändern, bei mehreren Seiten auf einmal, beim Setzen von Links und beim Anlegen, auch mit neuen Bildern und Dateien. Die App meldet nur dann „verified", wenn Moodle danach den übergebenen Stand zeigt.
 - Speichern im Browser: Der Inhalt lässt sich unter Windows in der gewöhnlichen Editoransicht einfügen, mit Kästen, Tabellen, Bildern und Code-Blöcken; auf dem Mac liegt er als Text in der Zwischenablage. Die Schritte gehen der Reihe nach, und zeigt Moodle den neuen Stand noch nicht, lässt sich so oft neu prüfen, wie Sie wollen.
 - Anmeldung: Hält ein Schutzdienst vor Moodle die Anmeldung an, gilt das nicht als falsches Passwort; Ihre Zugangsdaten bleiben, und das Protokoll nennt die Ray-ID für den Betreiber.

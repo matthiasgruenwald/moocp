@@ -2,6 +2,7 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:moocp/moodle/frage_ersetzen.dart';
 import 'package:moocp/moodle/fragen_xml.dart';
 import 'package:moocp/moodle/moodle_zugang.dart';
 import 'package:moocp/moodle/test.dart';
@@ -301,5 +302,18 @@ void main() {
         ['501:1:1.0:5012', '502:1:0.0:null', '503:2:0.0:null']);
     expect(t.proSeite, 2);
     expect(t.befunde().join('\n'), allOf(contains('weicht'), contains('1 Frage(n) mit 0 Punkten')));
+  });
+
+  test('Ersetzen: Sachnummer nur in der Frage geleert, nicht in der Kategorie', () {
+    const xml = '<?xml version="1.0" encoding="UTF-8"?><quiz>'
+        '<question type="category"><category><text>top</text></category><idnumber>et-01</idnumber></question>'
+        '<question type="truefalse"><name><text>ZZ Ja</text></name>'
+        '<questiontext format="html"><text><![CDATA[<p>Ja?</p>]]></text></questiontext>'
+        '<idnumber>et-01</idnumber></question></quiz>';
+    final aus = ohneSachnummer(xml, 'et-01');
+    expect(fragenAusXml(aus).single.idnummer, isNull);
+    expect(aus, contains('<idnumber>et-01</idnumber></question><question type="truefalse">'));
+    expect(aus, contains('<![CDATA[<p>Ja?</p>]]>'));
+    expect(ohneSachnummer(xml, 'andere'), contains('</questiontext><idnumber>et-01</idnumber>'));
   });
 }

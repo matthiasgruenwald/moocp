@@ -510,6 +510,8 @@ geht:
 | „Gesperrt: … steht nicht auf der Positivliste" | ein Weg, den kein Werkzeug vorsieht |
 | „Das Kursformat dieses Kurses kennt die Aktion … nicht" | das Kursformat (ein Plugin) kann es nicht — keine Lücke der App |
 
+**Fehlt nur eine Angabe**, ist das keine Lücke: Nimmt ein Werkzeug eine Nummer, die der Auftrag nicht enthält (ein Link auf eine Unterseite statt auf die Aktivität, kein Kurs genannt), frag danach, bevor du anfängst, und sag, wo der Nutzer sie findet. Ersetze sie nicht durch eine Annahme und arbeite nicht ohne sie los.
+
 **Bemerkst du sie vorher** — der Auftrag verlangt etwas, wofür es kein
 Werkzeug gibt, etwa „sortiere die Wikiseiten alphabetisch", „bewerte nach
 Kriterium X" —, dann **anhalten und fragen**:
@@ -519,7 +521,8 @@ Kriterium X" —, dann **anhalten und fragen**:
 
 | Lage | Verhalten |
 |---|---|
-| **nur lesen** | weitermachen, so gut es mit den Werkzeugen geht; die Lücke trotzdem melden |
+| **lesen**, und der Auftrag baut darauf auf | anhalten und fragen, bevor du irgendetwas anderes tust — ein Ergebnis ohne die Quelle, die der Nutzer genannt hat, ist wertlos und sieht trotzdem fertig aus |
+| **lesen**, und das Fehlende ist nebensächlich | weitermachen, gleich zu Beginn sagen, was fehlt; die Lücke trotzdem melden |
 | **schreiben** ohne Werkzeug | anhalten, (a) oder (b) fragen, auf die Antwort warten |
 | **löschen** oder sonst Unumkehrbares ohne Werkzeug | nur (b) — ohne Rückleseprobe weiß niemand, was wirklich weg ist |
 

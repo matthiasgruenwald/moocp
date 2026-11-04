@@ -163,6 +163,7 @@ Future<String> fortschrittslisteAendern(MoodleZugang moodle, Freigaben freigaben
   if (!ja) return 'Nicht geändert: in der App abgelehnt oder nicht rechtzeitig freigegeben.';
 
   final erg = <String>[];
+  final probe = Probe();
   for (final a in aktionen) {
     final s = await moodle.sesskey();
     final jetzt = await eintraegeLesen(moodle, cmid);
@@ -181,6 +182,7 @@ Future<String> fortschrittslisteAendern(MoodleZugang moodle, Freigaben freigaben
         ]);
         final nach = await eintraegeLesen(moodle, cmid);
         final neu = nach.where((e) => !jetzt.any((v) => v.id == e.id)).toList();
+        probe.pruefe(neu.length == 1, 'neuer Eintrag „${a['text']}"');
         erg.add('Neu „${a['text']}": ${neu.length == 1 ? 'id ${neu.single.id}, Tiefe ${neu.single.tiefe}' : 'NICHT eindeutig angekommen'}');
         // Die Art setzt Moodle nicht beim Anlegen, sondern über dieselbe
         // Aktion wie bei einem vorhandenen Eintrag -- jetzt, wo die id
@@ -190,7 +192,9 @@ Future<String> fortschrittslisteAendern(MoodleZugang moodle, Freigaben freigaben
         if (zustand != null && neu.length == 1 && neu.single.zustand != zustand) {
           await moodle.aufrufen('/mod/checklist/edit.php?id=$cmid&sesskey=$s&itemid=${neu.single.id}'
               '&action=${listenAktionen[zustand]}');
-          erg.add('$zustand ${neu.single.id}: ${listenaktionPruefen(zustand, neu.single.id, nach, await eintraegeLesen(moodle, cmid))}');
+          final r = listenaktionPruefen(zustand, neu.single.id, nach, await eintraegeLesen(moodle, cmid));
+          probe.pruefe(r == 'ausgeführt', '$zustand ${neu.single.id}');
+          erg.add('$zustand ${neu.single.id}: $r');
         }
       case 'aendern':
         final alt = jetzt.where((e) => '${e.id}' == '${a['eintrag']}').firstOrNull;
@@ -204,15 +208,19 @@ Future<String> fortschrittslisteAendern(MoodleZugang moodle, Freigaben freigaben
           const MapEntry('updateitem', '1'),
         ]);
         final neu = (await eintraegeLesen(moodle, cmid)).where((e) => e.id == alt.id).firstOrNull;
-        erg.add('Eintrag ${alt.id}: ${neu?.text == nameNormal('${a['text']}') ? 'geändert' : 'NICHT wie gewünscht'}');
+        final ok = neu?.text == nameNormal('${a['text']}');
+        probe.pruefe(ok, 'Eintrag ${alt.id} geändert');
+        erg.add('Eintrag ${alt.id}: ${ok ? 'geändert' : 'NICHT wie gewünscht'}');
       default:
         final id = (a['eintrag'] as num).toInt();
         final alt = jetzt.where((e) => e.id == id).firstOrNull;
         if (alt == null) throw MoodleFehler('Eintrag $id gibt es nicht.');
         await moodle.aufrufen('/mod/checklist/edit.php?id=$cmid&sesskey=$s&itemid=$id&action=${listenAktionen[a['art']]}');
         final nach = await eintraegeLesen(moodle, cmid);
-        erg.add('${a['art']} $id: ${listenaktionPruefen('${a['art']}', id, jetzt, nach)}');
+        final r = listenaktionPruefen('${a['art']}', id, jetzt, nach);
+        probe.pruefe(r == 'ausgeführt' || r == 'gelöscht', '${a['art']} $id');
+        erg.add('${a['art']} $id: $r');
     }
   }
-  return '${erg.join('\n')}\n\nJetzt:\n${_liste(await eintraegeLesen(moodle, cmid))}';
+  return '${erg.join('\n')}\n${probe.text}\n\nJetzt:\n${_liste(await eintraegeLesen(moodle, cmid))}';
 }
