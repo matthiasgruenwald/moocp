@@ -3,7 +3,7 @@
 - Lernlandkarten anlegen: Der SVG-Vergleich behandelt `<g></g>` und `<g/>` jetzt als gleich (`lernlandkarteSvgVergleichswert`, Einheitentest). Umgesetzt, auf der Instanz noch nicht erneut gemessen: eine Vorlage mit einem Ort und ohne Wege muss dort `verified: true` melden.
 - Bildschirmfotos: Bei einer schmalen Inhaltsbox werden links Textanfänge abgeschnitten. Im Live-Test auf der zweiten Testinstanz mit einer eigenen ZZ-Textseite mehrfach reproduziert; der rückgelesene Quelltext ist vollständig. Inhaltskoordinaten und Layoutänderungen zwischen Messen und Aufnahme prüfen, ohne den Ausschnitt auf Kopf oder Navigation auszuweiten.
 
-Größere Folgearbeiten zur sicheren Wiederherstellung sind in [Issue #26](https://github.com/matthiasgruenwald/moocp/issues/26) zur menschlichen Klärung gesammelt. Die dortige Reihenfolge gilt nach Abschluss des aktuellen PR.
+Größere Folgearbeiten zur sicheren Wiederherstellung sind in Issue #26 im GitHub-Issue-Tracker des Repositories zur menschlichen Klärung gesammelt. Die dortige Reihenfolge gilt nach Abschluss des aktuellen PR.
 - Kompatiblität zu MacOS und Linux herstellen. Müssen einzelne Features wie auto update umgestaltet oder gar entfernt werden? Die Pfade für die Konfiguration und ablage der Skills - sind die gleich?
 - automatisches bauen und erstellen eines releases in github, mit Windows, linux und MacOS Executables (windows sogar installer) und changelog message als Release message
 - Codex CLI absichern und testen, in einer eigenen Sitzung: Eingerichtet wird es bisher nur nach Dokumentation, gelaufen ist es mit einer echten Version nie. Zu klären: Nach „Installieren" steht der Block `[mcp_servers.moodle]` in `~/.codex/config.toml` – sieht Codex die Werkzeuge, lädt es die Skills aus `~/.codex/skills` (sonst nur aus `~/.agents/skills`, dann den Ort in `CodexCli` ändern), und ab welcher Version geht HTTP ohne den alten Schalter `experimental_use_rmcp_client` (README nennt 0.77)? Öffnet Codex die Bilder von `bildschirmfoto` (PNG im Arbeitsordner) und sieht sie? Fragt Codex vor einem Werkzeugaufruf (README, „Worauf es ankommt")? Nimmt Codex `tool_timeout_sec = 2100` an (die App trägt es ein, `clientZeitlimit`), und bleibt eine Freigabe damit länger als eine Minute offen?
@@ -15,8 +15,6 @@ Größere Folgearbeiten zur sicheren Wiederherstellung sind in [Issue #26](https
 - Badges vollumfänglich unterstützen, inkl. didaktischer und pädagogischer Ideen, Hilfestellungen und Regeln, wie die gut einzusetzen sind, auch unter Regeln der Gamification
 - Optimierungsphase: MCP-Server und Skill prüfen, ob wir tokenoptimiert arbeiten, z.B. ist das MCP Interface so gestaltet, dass kein balast durchgeleitet und nur nutzdaten (werden also z.B. alle nicht benötigten HTML-Tags von der Moodle Seite rausgefiltert?)
 - Inwieweit brauchen wir python zur Laufzeit? Ersetzbar durch flutter, damit wir nicht noch eine zusätzliche runtime benötigen?
-- Board und Kanban: Rückleseprobe je Aktion mit `verified` (A3); bisher
-  zeigen sie nur den Stand danach.
 - Kleine Funktionen, die fehlen: Farbe eines Eintrags der Fortschrittsliste
   (`nextcolour`), häufig gebrauchte Kommentare der Bewertungsrichtlinie.
 - Selbstprüfung des Skills `lernsituation` ohne Python: Das Prüfskript
@@ -151,7 +149,7 @@ Meldung:    Unbekannte Aktivitätsart "choicegroup" / "lightboxgallery". Coursep
 - macOS: Der Kommentar oben in `lib/anmeldedaten.dart` beschreibt nur DPAPI und Windows-Konto; für den Mac ist er zu aktualisieren ([0026](docs/adr/0026-schluesselbund-mac.md)).
 - macOS: Ein Release-Bau braucht eine Prüfung, ob der Schlüsselbund ohne Datenschutzgruppe auch dort gilt; der Entwicklerbau hat keine Team-ID ([0026](docs/adr/0026-schluesselbund-mac.md)).
 - macOS: Der Arbeitsordner liegt im Temp-Verzeichnis (`$TMPDIR`), die Spec 0001 nennt dafür einen anderen Ort. Die Abweichung ist zu klären, bevor Sicherungen auf dem Mac entstehen (siehe unten).
-- Codex-Sandbox blockiert den Flutter-Cache: Im Modus `workspace-write` schlägt `flutter analyze` und `flutter build` mit `Operation not permitted` unter `/opt/homebrew/share/flutter/bin/cache` fehl, obwohl der Ordner für `mg` beschreibbar ist (2026-10-17 geprüft). Abhilfe in `~/.codex/config.toml` (außerhalb des Repos) eingetragen, 2026-10-17 von der Lehrkraft am Terminal:
+- Codex-Sandbox blockiert den Flutter-Cache: Im Modus `workspace-write` schlägt `flutter analyze` und `flutter build` mit `Operation not permitted` unter `/opt/homebrew/share/flutter/bin/cache` fehl, obwohl der Ordner für den Benutzer beschreibbar ist (2026-10-17 geprüft). Abhilfe in `~/.codex/config.toml` (außerhalb des Repos) eingetragen, 2026-10-17 von der Lehrkraft am Terminal:
   ```toml
   [sandbox_workspace_write]
   writable_roots = ["/opt/homebrew/share/flutter/bin/cache"]

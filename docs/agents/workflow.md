@@ -10,7 +10,7 @@
   Größere Umbauten der Skills vorher mit dem Nutzer besprechen.
 ## Agenten und Git
 
-- **Upstream** ist `topse/moocp`, in der Arbeitskopie das Remote `upstream` (einmalig `git remote add upstream https://github.com/topse/moocp.git`). `origin` ist `matthiasgruenwald/moocp`. Auf Upstream wird nie gepusht; der Weg dorthin ist ein PR.
+- **Upstream** ist `topse/moocp`, in der Arbeitskopie das Remote `upstream` (einmalig `git remote add upstream https://github.com/topse/moocp.git`). `origin` ist die eigene Kopie (Fork). Auf Upstream wird nie gepusht; der Weg dorthin ist ein PR.
 - **Freigaben nach A5 holt die Orchestrierung ein, bevor sie einen Implementierer startet.** Die bestätigten Entscheidungen stehen im Auftrag; der Agent fragt nicht erneut.
 - **Ist eine Git-Aktion abgelehnt, arbeitet der Agent an allem weiter, was ohne sie geht** (Änderungen, Tests, Ticket-Kommentar), lässt die Änderungen im Worktree liegen und meldet am Ende in einem Satz, was fehlt. Die Orchestrierung committet und führt zusammen.
 - **Der Commit-Trailer nennt das Modell, das den Commit tatsächlich erzeugt.**

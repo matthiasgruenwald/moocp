@@ -1,6 +1,6 @@
 # Issue-Tracker: GitHub
 
-Verbindliche Ablage für Specs und daraus abgeleitete Umsetzungstickets sind die [GitHub-Issues von matthiasgruenwald/moocp](https://github.com/matthiasgruenwald/moocp/issues).
+Verbindliche Ablage für Specs und daraus abgeleitete Umsetzungstickets sind die GitHub-Issues dieses Repositories.
 
 ## Specs veröffentlichen und pflegen
 
@@ -17,7 +17,7 @@ Verbindliche Ablage für Specs und daraus abgeleitete Umsetzungstickets sind die
 
 ## Zugriff und Fehler
 
-- GitHub-Connector oder `gh` mit explizitem Repository `matthiasgruenwald/moocp` verwenden. Für mehrzeilige Inhalte strukturierte Argumente oder `--body-file` verwenden. Git- und `gh`-Workflow ist autonom erlaubt (siehe `CLAUDE.md`, Kopfzeile Git).
+- GitHub-Connector oder `gh` mit explizitem Repository (`-R <Eigentümer>/moocp`) verwenden. Für mehrzeilige Inhalte strukturierte Argumente oder `--body-file` verwenden. Git- und `gh`-Workflow ist autonom erlaubt (siehe `CLAUDE.md`, Kopfzeile Git).
 - Nach einer Veröffentlichung Issue-URL und Label prüfen und der Lehrkraft nennen. Bei unklarem Ausgang vor einem erneuten Erstellen nach dem Issue suchen.
 - Ist die Veröffentlichung blockiert, den konkreten Fehler melden und den Entwurf bis zur Klärung erhalten. Einen lokalen Entwurf nicht als veröffentlicht oder als eingerichteten lokalen Tracker ausgeben.
 - Deaktivierte Issues oder fehlende Berechtigungen rechtfertigen keinen stillen Wechsel zu einem anderen Tracker.

@@ -1,3 +1,3 @@
 # moocp auf macOS: Moodle-Sicherung, Wiederherstellung und Unterrichtsverteilung
 
-Die maßgebliche Spec steht als GitHub-Issue: <https://github.com/matthiasgruenwald/moocp/issues/1>
+Die maßgebliche Spec steht als Issue Nr. 1 im GitHub-Issue-Tracker des Repositories.

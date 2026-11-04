@@ -3,86 +3,33 @@
 ## Unveröffentlicht
 - Sichtbarkeit: Nach dem Umschalten prüft die KI, ob „verfügbar ohne Link“ noch gesetzt ist, und stellt es nach Rückfrage wieder her.
 - Übertragung: Steht ein Ziel nach einem Abbruch auf „unklar“, nennt die App die Nummer des Vorgangs, damit sich der Stand mit der Statusabfrage klären lässt.
-- Fragen: Muss eine Frage neu angelegt werden, etwa weil sich ihr Aufbau ändert, tauscht die KI sie in einem Schritt und mit einer Freigabe aus – die neue steht im Test an derselben Stelle mit denselben Punkten, und die alte wird auf Wunsch gelöscht.
-- Aufträge mit Quelle: Kann die KI eine genannte Seite nicht lesen, etwa über den Link auf eine einzelne Wikiseite, fragt sie nach, statt ohne die Quelle weiterzuarbeiten.
-- Boards, Kanban-Boards, Fortschrittslisten und Tests: Die App bestätigt nach dem Ändern selbst, dass alles angekommen ist, und die KI liest nach dem Schreiben nicht mehr eigens nach – das spart Zeit und Kontext.
 - Speichern: Hält ein Schutzdienst vor Moodle das Speichern an oder weist es ab, sagt die App es klar und übergibt es an Sie, damit Sie selbst im Browser speichern – beim Ändern, bei mehreren Seiten auf einmal, beim Setzen von Links und beim Anlegen, auch mit neuen Bildern und Dateien. Die App meldet nur dann „verified", wenn Moodle danach den übergebenen Stand zeigt.
 - Speichern im Browser: Der Inhalt lässt sich unter Windows in der gewöhnlichen Editoransicht einfügen, mit Kästen, Tabellen, Bildern und Code-Blöcken; auf dem Mac liegt er als Text in der Zwischenablage. Die Schritte gehen der Reihe nach, und zeigt Moodle den neuen Stand noch nicht, lässt sich so oft neu prüfen, wie Sie wollen.
 - Anmeldung: Hält ein Schutzdienst vor Moodle die Anmeldung an, gilt das nicht als falsches Passwort; Ihre Zugangsdaten bleiben, und das Protokoll nennt die Ray-ID für den Betreiber.
-- Programmcode in Seiten und Fragen: Die KI schreibt ihn im Format des Editors mit Syntaxhervorhebung, Lückenfragen mit Lücken im Code bleiben lösbar, und weist ein Schutzdienst HTML-Code im Text ab, lässt die KI betroffene Seiten und Fragen stehen und nennt sie Ihnen.
 - Neu angelegte Textfelder: Die Rückleseprobe prüft keinen Namen mehr, den ein Textfeld gar nicht hat.
 - Ändern: Wer unverändert neu speichert, bekommt „verified" nicht mehr ohne eine einzige Prüfung; eine Frage ohne neue Version wird als Abweichung gemeldet.
-- STACK: Varianten lassen sich wieder einsetzen, die Prüfung meldet jeden Testfall, und eine Frage mit Zufallswerten ohne Aufgabenhinweis wird nicht mehr angelegt.
-- Freigaben: Return, Leertaste und Enter geben nichts mehr frei; die Knöpfe nehmen einen Klick erst nach einer kurzen Wartezeit an, wenn der Dialog nach vorn kommt.
+
+## 0.9.32
+- Fragen: Muss eine Frage neu angelegt werden, etwa weil sich ihr Aufbau ändert, tauscht die KI sie in einem Schritt und mit einer Freigabe aus – die neue steht im Test an derselben Stelle mit denselben Punkten, und die alte wird auf Wunsch gelöscht.
+- Aufträge mit Quelle: Kann die KI eine genannte Seite nicht lesen, etwa über den Link auf eine einzelne Wikiseite, fragt sie nach, statt ohne die Quelle weiterzuarbeiten.
+
+## 0.9.30
+- Boards, Kanban-Boards, Fortschrittslisten und Tests: Die App bestätigt nach dem Ändern selbst, dass alles angekommen ist, und die KI liest nach dem Schreiben nicht mehr eigens nach – das spart Zeit und Kontext.
+
+## 0.9.28
+- Speichern: Weist ein Schutzdienst vor Moodle das Speichern gleich ab („Sorry, you have been blocked"), sagt die App es klar und übergibt es an Sie wie bei seiner Prüfung; das Protokoll nennt die Ray-ID für den Betreiber.
+- Programmcode in Seiten und Fragen: Weist ein Schutzdienst HTML-Code im Text ab, versucht die KI nicht mehr, betroffene Seiten und Fragen zu ändern, sondern lässt sie stehen und nennt sie Ihnen; neue Fragen mit solchem Code prüft sie vor dem Anlegen vollständig.
+
+## 0.9.26
+- Freigaben: Ein Return, eine Leertaste oder ein Klick, der beim Aufgehen des Dialogs noch einem anderen Fenster galt, gibt nichts mehr frei.
+- Speichern: Hält ein Schutzdienst vor Moodle das Speichern an, sagt die App es klar und übergibt es an Sie, damit Sie selbst im Browser speichern – beim Ändern, bei mehreren Seiten auf einmal, beim Setzen von Links und beim Anlegen, auch mit neuen Bildern und Dateien; die KI schreibt Programmbeispiele möglichst so, dass es gar nicht dazu kommt.
+- Speichern im Browser: Der Inhalt lässt sich in der gewöhnlichen Editoransicht einfügen, ohne Quelltextansicht und mit Kästen, Tabellen, Bildern und Code-Blöcken; die Schritte gehen der Reihe nach, und zeigt Moodle den neuen Stand noch nicht, lässt sich so oft neu prüfen, wie Sie wollen.
+- STACK: Varianten lassen sich wieder einsetzen, die Prüfung meldet jeden Testfall statt nur jeden zweiten, und eine Frage mit Zufallswerten ohne Aufgabenhinweis wird gar nicht erst angelegt.
+- Programmcode in Seiten und Fragen: Die KI schreibt ihn im Format des Editors mit Syntaxhervorhebung, und Lückenfragen mit Lücken im Code bleiben lösbar.
 
 ## 0.9.24
-- Freigaben: Claude Code und Codex bekommen für Werkzeugaufrufe ein Zeitlimit von 35 Minuten, damit eine offene Freigabe nicht vor ihrer 30-Minuten-Frist abbricht. Bei Codex ist das am Gerät noch nicht geprüft.
-- Einrichtung: Ein Werkzeug, dessen Eintrag ein altes oder fehlendes Zeitlimit hat, wird beim nächsten Einrichten ersetzt.
-
-## 0.9.23
-- Wiederherstellung: Bilder und Anhänge werden anhand der tatsächlichen Moodle-Dateiliste geprüft und nicht mehr fälschlich als fremd gemeldet.
-- Wiederherstellung: Fehlerseiten des Assistenten und Stillstand werden sichtbar; Statusmeldungen nennen Phase und letzten Fortschritt, laufende Prozesse bleiben vor Wiederholungen geschützt.
-- Formulare: Abschlussverfolgung und andere Optionsfelder lassen sich als eindeutige Auswahl lesen und setzen.
-- Unterrichtsverteilung: Wechselnde Entwurfsadressen im Kartenhintergrund lösen keinen falschen Änderungsabbruch mehr aus.
-- Wiederherstellung: Die Dateiprüfung berücksichtigt Inhaltsfelder statt Logos, Editorressourcen und Profilbildern der Seitenhülle.
-- Collabora: Gruppenmodus und Gruppierung bestehender Aktivitäten lassen sich begrenzt ändern und zurücklesen; die Gruppierungsübernahme bleibt ausdrücklich ungeprüft.
-- Formulare: Eine globale Moodle-Suche in der Kopfzeile stört das Lesen und Ändern von Aktivitäten nicht mehr.
-- Collabora: Ändert sich die Gruppierung während der Freigabe oder zwischen Planen und Schreiben, bricht die Änderung ab, bevor etwas gespeichert wird.
-- Wiederherstellung: Ein Dateibereich ohne Gegenstück im Formular wird als Lücke gemeldet statt unbemerkt übergangen.
-- Gruppenwahl: Gruppenmodus und Gruppierung bestehender Gruppenwahlen lassen sich wie bei Collabora ändern; stellt die App beim Zurücklesen fest, dass sich noch etwas anderes verändert hat, meldet sie es.
-- Neu: Gruppierungen eines Kurses lesen und mit ihren Gruppen anlegen. Fehlt eine Gruppierung beim Zuordnen, fragt die KI nach dem Anlegen, statt sie stillschweigend wegzulassen.
-- Wiederherstellung und Unterrichtsverteilung: Sichtbarkeit und Voraussetzungen bleiben standardmäßig wie in der Quelle; Verbergen ist ausdrücklich wählbar, die Freigabe nennt die Wahl.
-- Sicherung und Wiederherstellung: Die normale Antwortfrist wird als laufende Hintergrundarbeit erklärt, mit Statusabfragen bis zu 30 Minuten.
-- Wiederherstellung: Hält Moodle nach dem Prüfen mit der Seite „Rollenzuordnungen“ an, bestätigt die App die Vorgabe einmal; vorher blieb der Vorgang ohne Fehlermeldung auf „wartet“ stehen.
-- Wiederherstellung: Das Protokoll zeigt den Aufbau der Antwort auf den Start und die Rohwerte des Fortschritts (nur Zahlen und Feldnamen), damit eine nicht startende Wiederherstellung erkennbar wird.
-- Lernlandkarten: Eine Karte, deren Ortsziele Moodle als Text speichert, lässt sich wieder lesen (vorher Fehler beim Lesen, auch beim Verschieben in eine andere Instanz).
-- Mac: Die App startet per Doppelklick auf `moocp-starten.command` und baut sich bei Bedarf selbst.
-- Lernlandkarten: Eine Karte ohne Wege meldet beim Rücklesen kein falsches `verified: false` mehr.
-- Lernlandkarten: Vorhandene Zielaktivitäten lassen sich mit Inhaltsbelegen vorschlagen; fachliche Zuordnungen brauchen auch bei „keine“ eine Entscheidung und verfallen bei verändertem Inhalt.
-- Lernlandkarten: Ein Minutenwechsel bei ausgeschaltetem Abschlusstermin verhindert keine bestätigte Zielzuordnung mehr.
-- Debug-Testbetrieb: Vollständig geprüfte Kopien eigener ZZ-Proben lassen sich auch im gebundenen zweiten Profil automatisch nachbearbeiten und als Bild prüfen.
-- Unterrichtsverteilung: Lernlandkarten werden je Durchführungskurs auf die belegten Kopien neu verknüpft; offene Zuordnungen und Wiederholungen bleiben je Ziel erkennbar.
-- Wiederherstellung: Ein HTTP-Fehler beim Start bleibt unklar und löst keinen erneuten Start aus.
-- Lernlandkarten: Eine verborgene Karte lässt sich aus dem nativen Moodle-Formular anlegen; eine skriptfreie `lernlandkarte.json`-Vorlage kann Orte und Wege vorgeben, Ortsziele bleiben gezielt freigabegeschützt änderbar.
-- Lernlandkarten: Zieländerungen verfallen, wenn sich Karte, Kurs oder Ziel während der Freigabe ändern; die Rückleseprobe vergleicht SVG, Kartendaten, Einstellungen und übrige Inhalte.
-- Lernlandkarten: Nach dem Speichern meldet das Rücklesen `verified: true`, auch wenn Moodle die Ortsbeschriftung und die Hintergrunddatei neu ablegt; vorher stand dort fälschlich `false`.
-- Lernlandkarten: Das Rücklesen prüft Ortslabels gegen die Namen der neuen Ziele und freie SVG-Texte bleiben geschützt; eingebettete Bilder mit neuer Moodle-Entwurfs-ID verursachen keinen falschen Konflikt.
-- Debug-Testbetrieb: Eigene verborgene ZZ-Lernlandkarten lassen sich im gebundenen Testumfang ohne persönliche Freigabe ändern und als Bild prüfen.
-- Lernlandkarten: Anlegen, Ortsziele ändern, Rücklesen und Aufräumen sind auch auf der zweiten Testinstanz mit eigenen ZZ-Proben durchgespielt; das Bildschirmfoto zeigt dort die Karte nur abgeschnitten.
-- Debug-Testbetrieb: Gebundene Testprofile melden sich selbst an; automatische Freigaben einschließlich Inhaltsbildern bleiben auf erlaubte Testkurse und eigene verborgene ZZ-Textseiten begrenzt.
-- Änderungen speichern: Die Rückleseprobe wartet nicht mehr auf ihre eigene Ordnersperre.
-- Moodle-Profile: Ein nicht mehr benötigtes Profil lässt sich in den Einstellungen löschen; Anmeldung, gespeicherte Zugangsdaten und der Eintrag in Claude Code, Codex und LM Studio werden dabei entfernt, und bleibt einer stehen, sagt die App welcher.
-- Deinstallation: Die Einträge aller Moodle-Profile werden aus den KI-Werkzeugen entfernt, nicht nur der Eintrag „moodle“.
-- Übertragung: Prüfprobleme bleiben auch bei abgeschlossenen Zielen sichtbar; Zeitlimitantworten nennen den laufenden Vorgang und das passende Statuswerkzeug.
-- Wiederholungsschutz: Gescheiterte Wiederholungsversuche geben unklare Vorgänger nicht frei; parallele Übertragungen erhalten gegenseitig ihre Protokolleinträge.
-- Wiederherstellung: Geteilte Fragensammlungen werden vor dem Start mit ihren Risiken genannt; unbestätigte Herkunft wird auch ohne Freigabedialog erklärt.
-- Wiederherstellung: Die Freigabe nennt nur noch die Aktivitäten, die im Archiv wirklich stehen; leere Zeilen „„“ ()“ aus den Einstellungen des Archivs entfallen, und ein Quiz scheitert nicht mehr an einem angeblich unlesbaren Typ.
-- Wiederherstellung: Dateien, die nur im Dateimanager einer Aktivität liegen, meldet die App als nicht lesbar (Prüflücke) statt als „fehlend im Ziel".
-- Wiederherstellung: Enthält das Archiv mehrere Tests, vergleicht die App die Fragen je Test; ein Test, den sie nicht zuordnen kann, steht einzeln als Prüflücke. Liegen alle Fragen im Test selbst, gilt ihre Herkunft auch ohne angegebene Sammlung als eigen, auch bei späteren Statusabfragen.
-- Wiederherstellung: Meldet Moodle einen Fehler, urteilt die App nicht danach, sondern liest den Zielkurs zurück: vollständig und gleich gilt als verifiziert, Abweichungen werden genannt, und ist das Ende des Hintergrundauftrags nicht belegt, bleibt der Vorgang gesperrt und die Antwort enthält eine fertige Nachfrage an die Verwaltung; „fehlgeschlagen" steht nur noch mit Beleg.
-- Wiederherstellung: Fragenvergleiche bleiben nach Neustarts erhalten; unklare Versionen und eine nicht belegte Quellherkunft bleiben ausdrücklich Prüflücken.
-- Formulare lesen: Ein Aktivitätstyp, den die App nicht ändern kann, steht mit „Prüflücke" im Ergebnis; die Verweise darin sind geprüft oder ausdrücklich als nicht geprüft benannt.
-- Sicherung und Wiederherstellung: Bleibt der Fortschritt 15 Minuten stehen, meldet die App einen Stillstand mit der letzten Beobachtung, nicht einen Fehler und nicht einen Erfolg.
-- Fragen lesen: Dasselbe Lesen mehrfach oder gleichzeitig bricht nicht mehr mit einem Ordnerfehler ab; der Ordner einer Frage gehört jeweils nur einem Lesen.
-- Moodle-Profile: Mehrere Instanzen lassen sich in einem Fenster verwalten; Anmeldung, Freigabestufe und KI-Werkzeug-Einrichtung gelten je Profil.
-- Moodle-Profile: Freigaben bleiben dem richtigen Profil zugeordnet; eine aktive Moodle-Adresse lässt sich erst nach der Abmeldung ändern.
-- Testmodus: Automatische Freigaben gelten nur für ausdrücklich zugeordnete Testprofile und deren Moodle-Adresse.
-- Wiederherstellung: Bilder und Anhänge werden gegen die ursprüngliche Sicherung geprüft; ein zwischenzeitlich ausgetauschtes Archiv, fehlende Dateien oder Unterschiede bleiben ausdrücklich unverifiziert.
-- Wiederherstellung: Nur eindeutig zugeordnete Aktivitäten aus der Sicherung werden verborgen; parallele oder mehrdeutige Neuanlagen bleiben unberührt und werden zur Prüfung gemeldet.
-- Sicherung und Wiederherstellung: Vorgänge bleiben bei mehreren KI-Sitzungen erhalten und bleiben an Profil und tatsächliche Moodle-Adresse gebunden; Umbenennen umgeht keine Wiederholungssperre, und vor einer bewussten Wiederholung zeigt die Freigabe den aktuellen Stand und das Dublettenrisiko.
-- MCP-Aufrufe: Ungültige Antworten und Transportfehler melden einen Fehlerstatus statt Erfolg.
-- macOS: Bildschirmfotos finden Edge, Chrome oder Chromium im Programmordner; eine Richtlinie, die die Fernsteuerung abschaltet, nennt die App.
-- macOS: Die App darf Verbindungen aufbauen (Netzwerkrechte im Entwicklungsbau). Fehlt der Benutzerordner, bricht die App mit einem Fehler ab, statt einen falschen Ort zu nehmen.
-- macOS: Der Einstellungsdialog sagt ausdrücklich, dass sich die Version auf dem Mac nicht selbst aktualisiert und nichts bei GitHub prüft.
-- macOS: Die Einrichtung findet `python3`, wenn kein `python` da ist.
-- macOS: MCP-Aufrufe im Entwicklungsbau können ein Moodle-Profil gezielt wählen; ohne Auswahl gilt das erste.
-- Wiederherstellung: Eine Sicherungsdatei lässt sich in einen bestehenden Kurs einfügen, ohne etwas zu ersetzen; die Freigabe nennt Kurs, Datei und was neu angelegt wird, und die Datei wird vor dem Hochladen geprüft.
-- Wiederherstellung: Fünf Ziele statt einem – als neuer Kurs (verborgen angelegt), in den aktuellen oder einen anderen Kurs, jeweils einfügen oder vorhandene Inhalte ersetzen. Ersetzen braucht eine eigene Bestätigung, die den Kurs nennt. Bei unklarer Angabe fragt die KI nach.
-- Sicherung: Eine einzelne Aktivität lässt sich als Datei ohne Nutzerdaten in den Sicherungsordner der App sichern; nach der Freigabe läuft sie in Moodle und die Datei wird geprüft.
-- Sicherung: Mehrere Aktivitäten, ganze Abschnitte oder der ganze Kurs lassen sich in einer Datei ohne Nutzerdaten sichern; die Freigabe nennt die Inhalte, die dabei fehlen.
-- macOS: Die App startet als Entwicklerversion auf dem Mac; ein zweiter Start holt das laufende Fenster nach vorn, ohne den Arbeitsordner zu berühren.
-- Übertragung: Jedes Profil bekommt eine Rolle (Quelle, Ziel), der Projektkontext hält Quellkurs und Durchführungskurse fest; fehlt etwas, fragt die KI nach, statt zu raten.
-- Übertragung: Eine Auswahl lässt sich in einem Auftrag auf mehrere Zielkurse dieser Instanz übertragen; jedes Ziel hat sein eigenes Ergebnis, und fehlgeschlagene Ziele halten die übrigen nicht an. Dieselbe Datei für dasselbe Ziel wird nicht ohne Rückfrage ein zweites Mal eingespielt. Eine Einfüge-Wiederherstellung kann Inhalte doppelt anlegen.
+- Freigaben: In Claude Code und Codex verschwindet der Dialog nicht mehr nach einer Minute, und längere Vorgänge wie das Setzen vieler Links laufen zu Ende, statt für die KI scheinbar zu scheitern.
+- Lernsituationen: Infoblätter tragen keine Rückverweise auf die Arbeitsblätter mehr, und die Materialübersicht der Handreichung führt Zeichnungen nicht mehr als eigene Zeilen.
 
 ## 0.9.22
 - Freigaben: Warten weitere Anfragen hinter der offenen, zeigt der Dialog, wie viele, und das Protokoll nennt jede, die sich einreiht.

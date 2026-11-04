@@ -346,23 +346,17 @@ Future<Formular> formularHolen(
   final doc = html_parser.parse(r.text);
   final form = mitFeld == null
       ? hauptformular(doc)
-      : doc
-            .querySelectorAll('form')
-            .where((f) => f.querySelector('[name="$mitFeld"]') != null)
-            .firstOrNull;
+      : doc.querySelectorAll('form')
+          .where((f) => f.querySelector('[name="$mitFeld"]') != null)
+          .firstOrNull;
   if (form == null) {
     if (mitFeld != null) {
       // Nur Feldnamen, keine Inhalte oder Formularwerte (E11).
-      final namen = doc
-          .querySelectorAll('form [name]')
+      final namen = doc.querySelectorAll('form [name]')
           .map((e) => e.attributes['name']!)
-          .toSet()
-          .take(30)
-          .join(', ');
-      throw MoodleFehler(
-        'Moodle liefert kein Formular mit dem Feld $mitFeld '
-        '(Felder: $namen). Nichts geändert.',
-      );
+          .toSet().take(30).join(', ');
+      throw MoodleFehler('Moodle liefert kein Formular mit dem Feld $mitFeld '
+          '(Felder: $namen). Nichts geändert.');
     }
     throw MoodleFehler(
       'Moodle liefert kein Bearbeitungsformular (HTTP ${r.status}). Gibt es das '
@@ -720,15 +714,12 @@ Future<Probe> zuruecklesen(
     );
   }
   for (final s in einstellungen) {
-    final gelesen = g.einstellungen
-        .where((e) => e.schluessel == s.schluessel)
-        .firstOrNull;
+    final gelesen = g.einstellungen.where((e) => e.schluessel == s.schluessel).firstOrNull;
     final w = gelesen?.wert ?? '';
     probe.pruefe(
       s.auswahlwert != null
           ? gelesen?.auswahlwert == s.auswahlwert
-          : gelesen?.optionen != null
-          ? w == s.nachher
+          : gelesen?.optionen != null ? w == s.nachher
           : s.erwartet.every((t) => w.toLowerCase().contains(t.toLowerCase())),
       'Einstellung ${s.label} (erwartet ${s.nachher}, gelesen $w)',
     );
@@ -898,22 +889,16 @@ Future<String> aktivitaetAnlegen(
   Map<String, dynamic>? kartenVorlage;
   ({String svgcode, String placestore})? erwarteteKarte;
   if (typ == 'learningmap') {
-    final datei = quelle == null
-        ? null
-        : File(p.join(quelle, 'lernlandkarte.json'));
+    final datei = quelle == null ? null : File(p.join(quelle, 'lernlandkarte.json'));
     if (datei != null && datei.existsSync()) {
       final Object? json;
       try {
         json = jsonDecode(datei.readAsStringSync(encoding: utf8));
       } on FormatException {
-        throw MoodleFehler(
-          'lernlandkarte.json ist ungültiges JSON; nichts angelegt.',
-        );
+        throw MoodleFehler('lernlandkarte.json ist ungültiges JSON; nichts angelegt.');
       }
       if (json is! Map<String, dynamic>) {
-        throw MoodleFehler(
-          'lernlandkarte.json muss ein JSON-Objekt sein; nichts angelegt.',
-        );
+        throw MoodleFehler('lernlandkarte.json muss ein JSON-Objekt sein; nichts angelegt.');
       }
       kartenVorlage = json;
       // Die gleiche Validierung läuft vor der Freigabe mit einer neutralen
@@ -992,17 +977,14 @@ Future<String> aktivitaetAnlegen(
       '&section=${istSammlung ? 0 : abschnitt.nummer}&return=0&sr=0',
     );
     if (typ == 'learningmap' &&
-        (f.modul != typ ||
-            f.kurs != kurs ||
+        (f.modul != typ || f.kurs != kurs ||
             wertIn(f.felder, 'section') != '${abschnitt.nummer}' ||
             wertIn(f.felder, '_qf__mod_learningmap_mod_form') == null ||
             wertIn(f.felder, 'placestore') == null ||
             f.form.querySelector('textarea[name="svgcode"]') == null ||
             f.form.querySelector('[name="visible"]') == null ||
             (f.form.querySelector('select[name="visible"]') != null &&
-                f.form.querySelector(
-                      'select[name="visible"] option[value="0"]',
-                    ) ==
+                f.form.querySelector('select[name="visible"] option[value="0"]') ==
                     null) ||
             !f.bereiche.containsKey('backgroundfile'))) {
       throw MoodleFehler(
@@ -1109,7 +1091,9 @@ Future<String> aktivitaetAnlegen(
       );
       probe.pruefe(
         const JsonEncoder().convert(g.lernlandkarte?['placestore']) ==
-            const JsonEncoder().convert(jsonDecode(erwarteteKarte!.placestore)),
+            const JsonEncoder().convert(
+              jsonDecode(erwarteteKarte!.placestore),
+            ),
         'Orte und Wege zurückgelesen',
       );
     }
@@ -1198,27 +1182,20 @@ void _pruefeStand(
   bool nurGruppeneinstellungen = false,
 }) {
   final vorher = _gespeichertesFormular(stand);
-  final werte = vorher == null
-      ? <MapEntry<String, String>>[]
-      : formularFelder(vorher);
+  final werte = vorher == null ? <MapEntry<String, String>>[] : formularFelder(vorher);
   final vorherModul = wertIn(werte, 'modulename');
   final nurGruppen = MoodleZugang.nurGruppenModule;
-  final nurGruppenAenderung =
-      nurGruppen.contains(f.modul) &&
-      vorherModul == f.modul &&
-      nurGruppeneinstellungen &&
-      einstellungen.isNotEmpty &&
+  final nurGruppenAenderung = nurGruppen.contains(f.modul) && vorherModul == f.modul &&
+      nurGruppeneinstellungen && einstellungen.isNotEmpty &&
       einstellungen.every(MoodleZugang.gruppenFelder.contains);
-  if ((nurGruppen.contains(f.modul) || nurGruppen.contains(vorherModul)) &&
-      !nurGruppenAenderung) {
+  if ((nurGruppen.contains(f.modul) || nurGruppen.contains(vorherModul)) && !nurGruppenAenderung) {
     throw MoodleFehler(
       '${typName(nurGruppen.contains(f.modul) ? f.modul : vorherModul)}: Nur Gruppenmodus (groupmode) und Gruppierung (groupingid) bestehender Aktivitäten können geändert werden; keine Texte, Dateien oder anderen Einstellungen. Bei geänderter Aktivitätsart neu lesen.',
     );
   }
-  if (nurGruppenAenderung &&
-      (wertIn(werte, 'name') != f.name ||
-          wertIn(werte, 'course') != '${f.kurs}' ||
-          wertIn(f.felder, 'update') != '${ziel.id}')) {
+  if (nurGruppenAenderung && (wertIn(werte, 'name') != f.name ||
+      wertIn(werte, 'course') != '${f.kurs}' ||
+      wertIn(f.felder, 'update') != '${ziel.id}')) {
     throw MoodleFehler(
       '${typName(f.modul)}: Name, Kurs oder Aktivitätsart stimmen nicht mehr mit dem gelesenen Stand überein. Nichts geändert.',
     );
@@ -1490,20 +1467,14 @@ Future<_Aenderung?> _vorbereiten(
   );
   final gruppenStand = <String, String>{
     if (MoodleZugang.nurGruppenModule.contains(vorab.modul))
-      for (final k in MoodleZugang.gruppenFelder)
-        k: wertIn(vorab.felder, k) ?? '',
+      for (final k in MoodleZugang.gruppenFelder) k: wertIn(vorab.felder, k) ?? '',
   };
   gruppierungPruefen(vorab.form, einstellungen['groupingid'], vorab.kurs);
   final probeFelder = [...vorab.felder];
-  final probeSetzen = einstellungenSetzen(
-    vorab.form,
-    probeFelder,
-    einstellungen,
-  );
+  final probeSetzen = einstellungenSetzen(vorab.form, probeFelder, einstellungen);
   final gruppenWahl = <String, String>{
     if (MoodleZugang.nurGruppenModule.contains(vorab.modul))
-      for (final k in MoodleZugang.gruppenFelder)
-        k: wertIn(probeFelder, k) ?? '',
+      for (final k in MoodleZugang.gruppenFelder) k: wertIn(probeFelder, k) ?? '',
   };
   final kurs = vorab.kurs;
   final wo = kurs == null ? '' : ', ${await kursBezeichnung(moodle, kurs)}';
@@ -1635,16 +1606,12 @@ Future<(String, bool)> _schreibenOhneSperre(
     );
     // Vor der Mutation: Moodle zeigt noch den Stand von der Planung.
     if (a.gruppenStand.entries.any((e) => wertIn(f.felder, e.key) != e.value)) {
-      throw MoodleFehler(
-        '${typName(a.vorab.modul)}: Die Gruppeneinstellungen haben sich seit dem Planen geändert. Nichts gespeichert; neu lesen und planen.',
-      );
+      throw MoodleFehler('${typName(a.vorab.modul)}: Die Gruppeneinstellungen haben sich seit dem Planen geändert. Nichts gespeichert; neu lesen und planen.');
     }
     final gesetzt = einstellungenSetzen(f.form, f.felder, a.einstellungen);
     // Nach der Mutation: der Name ist jetzt auf eine ID aufgelöst; passt sie nicht zur geplanten, wird nichts gespeichert.
     if (a.gruppenWahl.entries.any((e) => wertIn(f.felder, e.key) != e.value)) {
-      throw MoodleFehler(
-        '${typName(a.vorab.modul)}: Die freigegebene Gruppenwahl hat sich seit der Freigabe geändert. Nichts gespeichert; neu lesen und planen.',
-      );
+      throw MoodleFehler('${typName(a.vorab.modul)}: Die freigegebene Gruppenwahl hat sich seit der Freigabe geändert. Nichts gespeichert; neu lesen und planen.');
     }
     final geschrieben = <String, String>{};
     for (final k in a.zuSchreiben) {
@@ -1697,27 +1664,16 @@ Future<(String, bool)> _schreibenOhneSperre(
   }
   if (a.gruppenWahl.isNotEmpty) {
     final rueckForm = _gespeichertesFormular(p.join(g.ordner, '.stand'));
-    final rueckWerte = rueckForm == null
-        ? <MapEntry<String, String>>[]
-        : formularFelder(rueckForm);
-    probe.pruefe(
-      g.modul == a.vorab.modul &&
-          g.kurs == a.vorab.kurs &&
-          g.name == a.vorab.name,
-      '${typName(a.vorab.modul)}: Aktivitätsart, Kurs und Name',
-    );
+    final rueckWerte = rueckForm == null ? <MapEntry<String, String>>[] : formularFelder(rueckForm);
+    probe.pruefe(g.modul == a.vorab.modul && g.kurs == a.vorab.kurs && g.name == a.vorab.name,
+        '${typName(a.vorab.modul)}: Aktivitätsart, Kurs und Name');
     for (final e in a.gruppenWahl.entries) {
-      probe.pruefe(
-        wertIn(rueckWerte, e.key) == e.value,
-        '${typName(a.vorab.modul)}: exakter Wert ${e.key}',
-      );
+      probe.pruefe(wertIn(rueckWerte, e.key) == e.value, '${typName(a.vorab.modul)}: exakter Wert ${e.key}');
     }
     // Alles andere muss unverändert sein: Der Typ ist nur für diese zwei Felder gemessen.
     final anders = uebrigeFelderAbweichung(a.vorab.felder, rueckWerte);
-    probe.pruefe(
-      anders.isEmpty,
-      '${typName(a.vorab.modul)}: übrige Felder unverändert${anders.isEmpty ? '' : ' (abweichend: ${anders.join(', ')})'}',
-    );
+    probe.pruefe(anders.isEmpty,
+        '${typName(a.vorab.modul)}: übrige Felder unverändert${anders.isEmpty ? '' : ' (abweichend: ${anders.join(', ')})'}');
   }
   final text = [
     'Gespeichert: ${_was(a.ziel, a.vorab)} „${g.name}" (${zurueck.bezeichnung}${a.wo}).',
