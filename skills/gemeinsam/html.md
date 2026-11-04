@@ -66,10 +66,28 @@ Soll ein Element leer bleiben und trotzdem wirken (ein Feld zum Ausfüllen), ist
 | Tabelle | `<table class="table table-bordered">`, Kopfzeile in `<thead>` mit `<th>` |
 | Bild, Foto | Datei in `dateien/`, `<img src="@@PLUGINFILE@@/<name>" alt="…" class="img-fluid">` |
 | Zeichnung | selbst gezeichnet als SVG-Datei, eingebunden wie ein Bild (`references/zeichnungen.md`) |
-| Befehl, Dateiname, Code im Text | `<code>`; mehrzeilig `<pre>` |
+| Befehl, Dateiname, Code im Text | `<code>`; mehrzeilig `<pre class="language-…"><code>…</code></pre>` (unten „Code") |
 | Link | Text sagt, wohin; Adresse ausgeschrieben, wo sie gedruckt zählt (unten „Links") |
 | Kopf- und Fußzeile, Logo, Seitenzahl, Feld für Name und Datum | entfällt — Moodle zeigt den Namen der Aktivität darüber, und beim Drucken setzt der Druck Kopf und Fuß |
 | Formel, auch ein einzelnes Formelzeichen im Text | LaTeX: `\( … \)` im Text, `\[ … \]` abgesetzt — nur wenn `kurs_filter` „Formeln: JA" meldet (unten „Formeln") |
+
+## Code
+
+Mehrzeiliger Code steht so, wie der Editor ihn mit seinem Code-Werkzeug einfügt, damit die Lehrkraft ihn dort später weiterbearbeiten kann:
+
+```html
+<pre class="language-javascript"><code>function summe(a, b) {
+  return a + b;
+}</code></pre>
+```
+
+- **Die Klasse nennt die Sprache:** `language-markup` für HTML und XML, sonst `language-javascript`, `language-python`, `language-java`, `language-sql`, `language-css` usw. Ist auf der Instanz ein Code-Highlighter an (`kurs_filter`), färbt er danach ein; ist keiner an, bleibt es ein gewöhnlicher Block in fester Breite – richtig ist die Form in beiden Fällen.
+- **`<`, `>` und `&` im Code als `&lt;`, `&gt;`, `&amp;`**, sonst hält Moodle sie für HTML.
+- **Keine Zeilen aus `<code>…</code><br>` in einem Absatz**, auch wenn der Kurs es schon so hat – das ist kein Block, und der Editor kann es nicht als Code bearbeiten. Was so schon in Moodle steht, wird als Befund gemeldet, nicht nebenbei umgebaut.
+- **Ausnahme Lücken in Fragen:** Steht eine Lücke im Code, gilt im Skill `moodle-fragen` `references/fragetypen.md`, „Lücken im Code".
+- **Beispielcode möglichst ohne Ereignis-Attribute:** `knopf.addEventListener("click", berechne)` statt `<button onclick="berechne()">`, außer das Attribut ist selbst der Lernstoff. Auch als Text in `<pre><code>` hält ein Schutzdienst vor manchen Instanzen ein Formular mit `onclick=` und ähnlichem für einen Angriff und das Speichern an.
+- **HTML-Code als Text** (`&lt;p id="…"&gt;`, `&lt;input …&gt;`) weist ein Schutzdienst vor manchen Instanzen in jedem Formular ab, in jeder Auszeichnung und auch aus dem Browser der Lehrkraft; reines JavaScript ohne Tag kam durch, ein Import auch mit HTML-Code (auf der Testinstanz gemessen, 29.10.2026). Abgewiesen wird der ganze Inhalt, nicht die Änderung: Steht solcher Code schon in einer Seite oder Frage, lässt sie sich über das Formular gar nicht mehr ändern, auch nicht an anderen Feldern. Hat ein Werkzeug das im Auftrag einmal gemeldet, gilt es für alle weiteren Formulare dieser Instanz: Objekte mit HTML-Code im Text nicht mehr zu ändern versuchen, sondern so lassen und der Lehrkraft am Ende auflisten; neue Fragen mit HTML-Code vor dem Import vollständig prüfen, denn danach lässt sich nichts mehr korrigieren; CodeRunner-Fragen mit HTML-Code im Text gehen dann gar nicht (sie müssen einmal über das Formular). Den Code nie tarnen, um durchzukommen (Ersatzzeichen, Umkodierung, Code als Bild): Er muss für Lernende richtig und kopierbar bleiben.
+- **Meldet ein Werkzeug, der Schutzdienst habe das Speichern angehalten oder abgewiesen, oder lehnt Moodle ein Formular mit HTTP 403 ab:** nicht noch einmal versuchen und keinen Umweg nehmen, etwa löschen und neu anlegen oder neu importieren – das zerreißt Versionen und Verwendung in Tests. Beim Schutzdienst bittet die App die Lehrkraft, selbst im Browser zu speichern; danach sagt die Antwort, was in Moodle steht. Hat er abgewiesen, gelingt das im Browser oft auch nicht; dann bleibt es, wie es ist. Beim HTTP 403 ohne diese Bitte anhalten und die Lehrkraft fragen, wie bei jeder Lücke: Sie ändert es selbst in Moodle, und du sagst genau, wo und was. Weiter geht es nur mit frisch Gelesenem.
 
 ## Tabellen
 

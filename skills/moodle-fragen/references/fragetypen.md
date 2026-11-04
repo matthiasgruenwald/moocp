@@ -392,7 +392,8 @@ ist nur die Elternfrage.
 Lücken im Text als `[[1]]`, `[[2]]`. Die `<selectoption>`-Elemente liefern in
 ihrer Reihenfolge die Antworten: Die erste gehört zu `[[1]]`, die zweite zu
 `[[2]]`. Weitere sind Distraktoren. `group` fasst Optionen zusammen, die
-gegeneinander austauschbar angeboten werden.
+gegeneinander austauschbar angeboten werden. Lücken in Programmcode: unten
+„Lücken im Code" – nie in `<code>`.
 
 ```xml
 <question type="gapselect">
@@ -694,7 +695,7 @@ anbieten, die Frage in Moodle anzulegen und den Text hinterher zuzuliefern.
 
 # HTML in Fragen
 
-Fragetext, Feedback, allgemeines Feedback und Erwartungshorizont sind HTML, und für sie gelten dieselben Regeln wie für alles in Moodle: **`references/html.md`**. Dazu kommen zwei Besonderheiten, die es nur bei Fragen gibt.
+Fragetext, Feedback, allgemeines Feedback und Erwartungshorizont sind HTML, und für sie gelten dieselben Regeln wie für alles in Moodle: **`references/html.md`**. Dazu kommen Besonderheiten, die es nur bei Fragen gibt.
 
 ## Wo HTML nicht hingehört
 
@@ -718,6 +719,24 @@ Ein `<strong>` darin zerlegt die Frage. HTML gehört ausschließlich in den Text
 
 Dasselbe gilt sinngemäß für die kurzen Antworttexte von `shortanswer`,
 `numerical` und `truefalse` — dort wird verglichen, nicht gerendert.
+
+## Lücken im Code
+
+Code ohne Lücken steht in Fragen wie überall als `<pre class="language-…"><code>…</code></pre>` (`references/html.md`, „Code"). **Steht eine Lücke von `gapselect` oder `ddwtos` im Code, kommt der Code in ein `<pre>` ohne `<code>` und ohne Klasse:**
+
+```html
+<pre>function summe(a, b) {
+  [[1]] a + b;
+}</pre>
+```
+
+Gemessen am 29.10.2026 in der Vorschau, mit Code-Highlighter an:
+
+- In einem `<code>` mit Sprachklasse, auch `language-none`, wird die Lücke zu Text („Leer 1 Frage 1 return…"). Die Frage ist dann nicht lösbar, und zwar bei `gapselect` wie bei `ddwtos`.
+- In einem `<code>` ohne Klasse und in `<code>`-Zeilen eines Absatzes bleibt die Lücke nur dann heil, wenn nirgends auf der Seite eine Sprachklasse steht. Steht eine in derselben Frage oder in einer anderen Frage auf derselben Testseite, geht die Lücke ebenfalls kaputt.
+- In `<pre>` ohne `<code>` blieb die Lücke in jedem Fall ein Auswahlfeld.
+
+Eine Frage, die in der Einzelvorschau heil aussieht, kann also im Test kaputt sein, sobald eine andere Frage Code mit Sprachklasse zeigt. Darum ist nur `<pre>` ohne `<code>` sicher. Lücken einer Cloze-Frage im Code sind nicht gemessen; dort dieselbe Form nehmen und in der Vorschau nachsehen.
 
 ## Was unkritisch ist
 

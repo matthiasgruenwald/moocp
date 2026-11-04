@@ -109,7 +109,7 @@ Teilen und die STACK-Version der Instanz.
 | `punkte` | Punkte der Frage | 1 |
 | `strafe` | Abzug je falschem Versuch | 0.1 |
 | `variablen` | Aufgabenvariablen (Maxima) | — |
-| `hinweis` | Aufgabenhinweis — unterscheidet die Varianten | — |
+| `hinweis` | Aufgabenhinweis — unterscheidet die Varianten; bei `rand()` Pflicht und mit allen gewürfelten Werten | — |
 | `beschreibung` | interne Beschreibung der Frage | — |
 | `allgemeinesFeedback`, `spezifischesFeedback` | Rückmeldungen | spezifisch: `[[feedback:…]]` je Baum |
 | `anzeige` | einzelne Anzeigeoptionen überschreiben (`decimals`, `multiplicationsign` …) | Komma, Malpunkt |
@@ -374,7 +374,10 @@ Später erneut laufen lassen: `stack_testen(sammlung, frage, seed?)`.
 
 Bei `rand()` in den Aufgabenvariablen prüft ein Testlauf nur **eine**
 Variante. Erst das Einsetzen rechnet weitere durch und lässt die Testfälle
-darauf laufen:
+darauf laufen. STACK unterscheidet Varianten am Aufgabenhinweis: Nennt er
+nicht jeden gewürfelten Wert, gelten verschiedene Würfe als dieselbe
+Variante, und es kommt keine neue dazu. Scheitert ein Testfall an einer
+Variante, hört das Einsetzen dort auf.
 
 ```
 stack_varianten(sammlung, frage, anzahl: 5)    -- nach Freigabe
