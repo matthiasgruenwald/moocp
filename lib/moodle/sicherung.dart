@@ -14,7 +14,19 @@
 // (E29). Dateinamen tragen Modul, cmid und Zeitpunkt, sonst nichts.
 //
 // Gemessen ist der Ablauf bis Schritt 2 (docs/plans/moodle-sicherung-formulare.md).
-// Die Stellen mit UNGEMESSEN stehen im Code und in TODO.md.
+// Die Stellen mit UNGEMESSEN stehen im Code. Für die Auswahl (`auswahlSichern`)
+// gilt: Gemessen sind die Feldnamen und die Reihenfolge der Schema-Seite
+// (`setting_section_section_<id>_included` steht vor den Aktivitäten darin) und
+// dass Moodle auf Schritt 4 die ganze Auswahl verwirft, wenn der Abschnitt einer
+// gewählten Aktivität aus ist (darum schaltet `schemaWahl` ihn als Rahmen ein,
+// ohne seine übrigen Aktivitäten). Ungemessen: ob Moodle den Rahmen so hält, was
+// Schritt 4 dann genau ausweist (`bestaetigungWahlFehler` bricht bei Abweichung
+// ab), ob der Kursweg ohne `cm` wie der Aktivitätsweg antwortet, die Stelle des
+// `_userinfo`-Felds je Abschnitt, ob versteckte oder gelöschte Aktivitäten auf
+// der Auswahlseite anders geführt werden als in `kursLesen`, der Dateiname einer
+// Kurssicherung, die Dauer (Zeitlimit der Anfrage eine Minute, danach zeigt
+// `sicherung_status` den Stand) und eine Änderung im Kurs zwischen Schritt 2 und 4.
+// Nutzerdaten-Optionen: nur `users` und `enrolments` sind gemessen.
 
 import 'dart:convert';
 import 'dart:io';

@@ -683,7 +683,7 @@ class LmStudio extends KiWerkzeug {
 
   @override
   Verbindung verbindung(int port, String schluessel, {String name = mcpName}) {
-    // Die Brücke kennt nur den Namen moodle (TODO.md, Instanzprofile).
+    // Die Brücke kennt nur den Namen moodle.
     if (name != mcpName) return Verbindung.fehlt;
     try {
       final e = [for (final x in _lesen()['servers'] as List) if (_unser(x)) x as Map];
@@ -700,7 +700,7 @@ class LmStudio extends KiWerkzeug {
   @override
   Future<String?> eintragen(int port, String schluessel, {String name = mcpName}) async {
     if (name != mcpName) {
-      return 'Die Brücke für Bionic kennt nur den Servernamen moodle; weitere Profile sind offen (TODO.md).';
+      return 'Die Brücke für Bionic kennt nur den Servernamen moodle; weitere Profile sind offen.';
     }
     if (!File(bruecke).existsSync()) return '$brueckeExe fehlt neben moocp.exe: moocp neu installieren.';
     try {
@@ -1021,7 +1021,7 @@ Future<bool> _eintragDa(KiWerkzeug w, [String name = mcpName]) async {
 /// einem Fehlercode und zählt deshalb richtig als „fehlt".
 Future<bool> pythonVorhanden() async {
   // Auf dem Mac heißt Python oft nur python3; der Skill ruft im Text `python`
-  // auf, das ist dort eine offene Lücke (TODO.md).
+  // auf, das ist dort eine offene Lücke.
   for (final name in Platform.isWindows ? const ['python'] : const ['python3', 'python']) {
     try {
       if (await _ausfuehren(name, ['--version']) == 0) return true;

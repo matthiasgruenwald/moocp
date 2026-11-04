@@ -18,9 +18,14 @@ import 'sicherung_regeln.dart' show nutzerdatenOptionen;
 import 'wiederherstellung_fragen.dart' show QuizFrage, quizFragenAusXml;
 
 /// Obergrenze für eine hochgeladene Sicherung. Fest 200 MB; der Wert aus dem
-/// Upload-Formular (maxbytes) wird nicht gelesen (TODO.md).
+/// Upload-Formular (maxbytes) wird nicht gelesen.
 const int archivGrenzeStandard = 200 * 1024 * 1024;
 
+/// Die Prüfung liest das Archiv ganz in den Speicher, der Upload (`readAsBytes`)
+/// ebenso; ob das auf schwachen Rechnern trägt, ist ungemessen (ein Strom wäre
+/// die Alternative). Unterstützt wird nur .tar.gz (.mbz), ZIP lehnt die Prüfung ab.
+/// Die drei folgenden Grenzen sind Schätzwerte, nicht gemessen.
+///
 /// Obergrenze für den entpackten Inhalt (Schutz vor Gzip-Bomben).
 const int entpacktGrenzeStandard = 1024 * 1024 * 1024;
 

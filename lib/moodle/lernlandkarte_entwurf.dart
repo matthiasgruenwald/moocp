@@ -17,6 +17,13 @@ String lernlandkarteSvgVergleichswert(String svg) => svg
 /// Eine kleine, skriptfreie Lernlandkarte aus den nativen Feldern des
 /// Moodle-Formulars. Eingaben enthalten nur Punkte und Verbindungen; IDs,
 /// SVG und placestore werden von der App erzeugt.
+///
+/// Anzeige (gemessen, Moodle-Eigenheit): Ein Ort erscheint in der Kartenansicht
+/// nur mit einem sichtbaren Ziel und trägt dessen Namen als Beschriftung; Orte
+/// ohne oder mit verborgenem Ziel fehlen, die Wege bleiben. Eine Karte braucht
+/// zum Speichern ein Hintergrundbild (Pflichtfeld `backgroundfile`, sonst „Sie
+/// müssen hier einen Wert eingeben"); die SVG dieser Vorlage zeichnet es nicht,
+/// sondern nur ein Rechteck.
 ({String svgcode, String placestore}) lernlandkarteEntwurfErzeugen(
   Map<String, dynamic> vorlage,
   String nativesPlacestore,

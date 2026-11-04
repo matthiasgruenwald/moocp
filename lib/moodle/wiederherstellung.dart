@@ -17,7 +17,7 @@
 // Platzhalterkurs an (siehe ADR/Plan „Bereits die Zielauswahl kann schreiben").
 //
 // Der Vorgang steht in vorgaenge.json unter wiederherstellung_status. UNGEMESSEN steht
-// im Code und in TODO.md.
+// im Code (Suche nach UNGEMESSEN).
 
 import 'dart:io';
 
@@ -668,7 +668,7 @@ Future<String> _warten(
     await vorgaenge.aktualisieren(vg, text: 'Phase: Moodle-Fortschritt abfragen.');
     while (true) {
       vorgaenge.pruefeBindung(vg);
-      // Operation „restore" und die Restore-ID als backupids: ungemessen, siehe TODO.md.
+      // Operation „restore" und die Restore-ID als backupids: ungemessen.
       final antwort = await moodle.dienst('core_backup_get_async_backup_progress', {
         'backupids': [restoreid],
         'contextid': kontext,
@@ -896,7 +896,7 @@ Future<String> _gegenlesen(
           : 'Neu im Kurs: $liste. Nicht alle sind verborgen; bitte prüfen.';
   // Verglichen wird hier nie Text mit Adressen: Aktivitäten nach Typ und Titel, Anhänge nach
   // Inhalt (SHA-1), Fragen nach Name. Instanzadressen (Quell- und Zieldomain) spielen keine
-  // Rolle. Ein Feldvergleich schreibbarer Typen müsste sie normalisieren (TODO.md).
+  // Rolle. Ein Feldvergleich schreibbarer Typen müsste sie normalisieren.
   // Fragenvergleich nach dem Wiederherstellen: je Quiz aus dem Archiv, zugeordnet
   // über den Titel (bei genau einem Quiz auf beiden Seiten auch ohne). Was sich nicht
   // eindeutig zuordnen lässt, ist je Quiz eine Prüflücke, nie Gleichheit.

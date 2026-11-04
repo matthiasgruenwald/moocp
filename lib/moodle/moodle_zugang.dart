@@ -429,7 +429,7 @@ class MoodleZugang {
         _nur(a, {'form', 'formdata'}) &&
         dynamischeFormulare.contains(a['form']),
     // Sicherung: Fortschritt lesen.
-    // Operation „restore" ist UNGEMESSEN (TODO.md); ohne Schlüssel gilt die Sicherung.
+    // Operation „restore" ist UNGEMESSEN; ohne Schlüssel gilt die Sicherung.
     'core_backup_get_async_backup_progress': (a) =>
         _nur(a, {'backupids', 'contextid', 'operation'}) &&
         a['backupids'] is List &&
@@ -1153,7 +1153,7 @@ class MoodleZugang {
       parameter: (q) => q.length == 1 && q['action'] == 'upload',
       formular: (f) =>
           _zahl(wertIn(f, 'itemid')) && _gesetzt(wertIn(f, 'sesskey')),
-      // UNGEMESSEN: der MIME-Typ, den Moodle für .mbz erwartet (TODO.md).
+      // UNGEMESSEN: der MIME-Typ, den Moodle für .mbz erwartet.
       anhang: (a) =>
           a.feld == 'repo_upload_file' &&
           RegExp(r'^[A-Za-z0-9_.-]{1,120}\.mbz$').hasMatch(a.dateiname) &&
@@ -1168,7 +1168,7 @@ class MoodleZugang {
       parameter: (q) => _nurSchluessel(q, {'id'}) && _zahl(q['id']),
     ),
     // Nur diese Felder: Marke, Sitzung, Draft-Itemid und ggf. der Absendeknopf und die Kurs-ID.
-    // Jedes andere Feld lehnt die Regel ab (UNGEMESSEN: Feldnamen, TODO.md).
+    // Jedes andere Feld lehnt die Regel ab (UNGEMESSEN: Feldnamen).
     Erlaubt(
       'POST',
       r'^/backup/restorefile\.php$',
