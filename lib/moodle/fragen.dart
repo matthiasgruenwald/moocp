@@ -147,6 +147,22 @@ Future<String> fragenLesen(MoodleZugang moodle, String arbeitsordner,
   return b.toString();
 }
 
+/// Die Nummern der Fragen namens [name] in der Sammlung, je Frage die der
+/// neuesten Version: So viel führt der Export einer Kategorie. Gebraucht,
+/// wenn nicht die App gespeichert hat, sondern die Lehrkraft im Browser
+/// (_uebergeben, formular_schreiben.dart) -- dann fehlt die Umleitung, die
+/// die neue Nummer nennt. Gefragt wird davor und danach: Speichern legt
+/// immer eine neue Nummer an, und genau die kommt hinzu, mit oder ohne
+/// Sachnummer, auch wenn es den Namen mehrfach gibt. Gesucht wird in allen
+/// Kategorien: Das Bearbeitungsformular nennt die Kategorie nicht immer
+/// (gemessen: gapselect ohne Feld category).
+Future<Set<int>> fragenNamens(MoodleZugang moodle, {required int sammlung, required String name}) async => {
+  for (final k in await kategorienLesen(moodle, sammlung))
+    if (k.anzahl > 0)
+      for (final f in fragenAusXml(await exportieren(moodle, sammlung, k)))
+        if (f.name == name && f.id != null) f.id!,
+};
+
 // ---------------------------------------------------------------------------
 // frage_lesen
 // ---------------------------------------------------------------------------

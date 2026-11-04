@@ -197,4 +197,53 @@ void main() {
       expect(alsText(utf8.encode('x' * (256 * 1024))), isNotNull);
     });
   });
+
+  test('Für die Zwischenablage der Übergabe werden eigene Dateien zu @@PLUGINFILE@@, fremde bleiben', () {
+    // Im Browser hat das Formular einen eigenen Entwurfsbereich; die Adresse
+    // aus dem der App gälte dort nicht (_uebergeben).
+    const html = '<p><img src="https://moodle.schule.example/draftfile.php/2996/user/draft/689622855/zz.png?time=1" '
+        'alt="Probe"> <a href="https://moodle.schule.example/pluginfile.php/7/mod_resource/content/1/plan.pdf">Plan</a> '
+        '<a href="https://moodle.schule.example/mod/page/view.php?id=12">Seite</a></p>';
+    expect(
+        fuerBrowser(html),
+        '<p><img src="@@PLUGINFILE@@/zz.png" alt="Probe"> '
+        '<a href="https://moodle.schule.example/pluginfile.php/7/mod_resource/content/1/plan.pdf">Plan</a> '
+        '<a href="https://moodle.schule.example/mod/page/view.php?id=12">Seite</a></p>');
+  });
+
+  test('Nach der Übergabe zählt, was der Editor im Browser gleichwertig schreibt, nicht wie', () {
+    // Gemessen am Abschnitt: TinyMCE sortiert Attribute um und setzt
+    // Zeilenumbrüche zwischen Absätze; der Entwurfsbereich hat eine andere Nummer.
+    const app = '<p>Probeabschnitt.</p><p><img src="https://moodle.schule.example/draftfile.php/2996/user/draft/1/zz.png" '
+        'alt="Probe" class="img-fluid"></p><pre class="language-html"><code>&lt;b&gt;\n  x\n</code></pre>';
+    const browser = '<p>Probeabschnitt.</p>\n<p><img class="img-fluid" '
+        'src="https://moodle.schule.example/draftfile.php/2996/user/draft/2/zz.png" alt="Probe"></p>\n'
+        '<pre class="language-html"><code>&lt;b&gt;\n  x\n</code></pre>';
+    expect(wieImEditor(browser), wieImEditor(app));
+    // Nach dem Anlegen mit Platzhalter steht im Ordner @@PLUGINFILE@@, zurück
+    // kommt die Entwurfsadresse.
+    expect(wieImEditor(browser), wieImEditor(app.replaceFirst(RegExp(r'https://[^"]*/zz\.png'), '@@PLUGINFILE@@/zz.png')));
+    expect(platzhalterFelder({'page': app, 'leer': ''}), {
+      'page': '<p>Inhalt folgt.</p><p><a href="@@PLUGINFILE@@/zz.png">zz.png</a></p>',
+      'leer': '',
+    });
+    expect(normalisiert(browser), isNot(normalisiert(app)), reason: 'Zeichen für Zeichen sind sie verschieden');
+    // Echte Unterschiede fallen weiter auf: Text, Leerraum im Code, ein Attributwert.
+    expect(wieImEditor(app.replaceFirst('Probeabschnitt', 'Probe')), isNot(wieImEditor(app)));
+    expect(wieImEditor(app.replaceFirst('\n  x', '\n x')), isNot(wieImEditor(app)));
+    expect(wieImEditor(app.replaceFirst('alt="Probe"', 'alt="Bild"')), isNot(wieImEditor(app)));
+  });
+
+  test('Gemessen am Buchkapitel: der übergebene Text und was Moodle danach zeigt, gelten als gleich', () {
+    const uebergeben = '<h3>ZZ Kapitel</h3><p><img src="@@PLUGINFILE@@/zz.png" alt="Probe" class="img-fluid"></p>'
+        '<pre class="language-html"><code>&lt;button onclick="berechne()"&gt;Berechnen&lt;/button&gt;\n'
+        '&lt;script&gt;\nfunction berechne() {\n  x = 2.5;\n}\n&lt;/script&gt;</code></pre>';
+    const moodle = '<h3>ZZ Kapitel</h3>\n<p><img class="img-fluid" '
+        'src="https://moodle.schule.example/draftfile.php/2996/user/draft/231118294/zz.png" alt="Probe"></p>\n'
+        '<pre class="language-html"><code>&lt;button onclick="berechne()"&gt;Berechnen&lt;/button&gt;\n'
+        '&lt;script&gt;\nfunction berechne() {\n  x = 2.5;\n}\n&lt;/script&gt;</code></pre>';
+    expect(wieImEditor(moodle), wieImEditor(uebergeben));
+    // Der Platzhalter ist etwas anderes.
+    expect(wieImEditor(platzhalterFelder({'f': uebergeben})['f']!), isNot(wieImEditor(uebergeben)));
+  });
 }

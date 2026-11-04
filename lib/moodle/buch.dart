@@ -157,10 +157,10 @@ Future<String> buchkapitelAnlegen(MoodleZugang moodle, Freigaben freigaben,
   ));
   if (!ja) return 'Nicht angelegt: in der App abgelehnt oder nicht rechtzeitig freigegeben.';
 
-  Future<(Map<String, String>, List<Gesetzt>)> versuch() async {
+  Future<(Map<String, String>, List<Gesetzt>)> versuch(Map<String, String> felder) async {
     final f = await formularHolen(moodle, '/mod/book/edit.php?cmid=$cmid&pagenum=$pagenum');
     final e = await formularFuellen(moodle, f,
-        quelle: quelle, felder: inhalt.felder, bereiche: inhalt.bereiche, name: titel, was: 'einem Buchkapitel');
+        quelle: quelle, felder: felder, bereiche: inhalt.bereiche, name: titel, was: 'einem Buchkapitel');
     // Ob Unterkapitel, entscheidet das Feld subchapter -- nicht die Adresse.
     f.felder
       ..removeWhere((x) => x.key == 'subchapter')
@@ -169,11 +169,23 @@ Future<String> buchkapitelAnlegen(MoodleZugang moodle, Freigaben freigaben,
     return e;
   }
 
+  Future<(Map<String, String>, List<Gesetzt>)> mitNeuanmeldung(Map<String, String> felder) async {
+    try {
+      return await versuch(felder);
+    } on SitzungAbgelaufen {
+      return await versuch(felder);
+    }
+  }
+
+  // Hält der Schutzdienst das Anlegen an, mit Platzhalter anlegen und den
+  // Inhalt danach übergeben (inhaltUebergeben, formular_schreiben.dart).
+  SchutzPruefung? angehalten;
   (Map<String, String>, List<Gesetzt>) e;
   try {
-    e = await versuch();
-  } on SitzungAbgelaufen {
-    e = await versuch();
+    e = await mitNeuanmeldung(inhalt.felder);
+  } on SchutzPruefung catch (x) {
+    angehalten = x;
+    e = await mitNeuanmeldung(platzhalterFelder(inhalt.felder));
   }
   final nachher = await kapitelLesen(moodle, cmid);
   final neu = nachher.where((k) => !vorher.any((v) => v.id == k.id)).toList();
@@ -188,6 +200,15 @@ Future<String> buchkapitelAnlegen(MoodleZugang moodle, Freigaben freigaben,
   final stelle = nachher.indexWhere((x) => x.id == k.id);
   probe.pruefe(stelle == pagenum, 'Position (erwartet ${pagenum + 1}, ist ${stelle + 1})');
   probe.pruefe(k.unterkapitel == unterkapitel, 'Ebene (${k.unterkapitel ? "Unterkapitel" : "Kapitel"})');
+  if (angehalten != null) {
+    return inhaltUebergeben(moodle, freigaben,
+        ziel: Formularziel.buchkapitel(cmid, k.id),
+        felder: inhalt.felder,
+        arbeitsordner: arbeitsordner,
+        fehler: angehalten,
+        angelegt: 'Angelegt: ${unterkapitel ? 'Unterkapitel' : 'Kapitel'} „${k.titel}" (id ${k.id}) im Buch '
+            'cmid $cmid, an Stelle ${stelle + 1}.\n${probe.text}');
+  }
   return [
     'Angelegt: ${unterkapitel ? 'Unterkapitel' : 'Kapitel'} „${k.titel}" (id ${k.id}) im Buch cmid $cmid, '
         'an Stelle ${stelle + 1}.',

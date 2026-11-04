@@ -1499,7 +1499,13 @@ class MoodleZugang {
     _angemeldet = false;
 
     // 1. Anmeldeseite: setzt das Sitzungs-Cookie und liefert den logintoken.
-    final seite = await _roh('GET', _adresse('/login/index.php'));
+    final Antwort seite;
+    try {
+      seite = await _roh('GET', _adresse('/login/index.php'));
+    } on SchutzPruefung {
+      // Das Passwort ist noch nicht gesendet: kein Fehlversuch (_neuAnmelden).
+      throw MoodleNichtErreichbar(_schutzBeiAnmeldung);
+    }
     final doc = html_parser.parse(seite.text);
     final token = doc
         .querySelector('input[name="logintoken"]')
@@ -1524,6 +1530,11 @@ class MoodleZugang {
     Antwort r;
     try {
       r = await _roh('POST', _adresse('/login/index.php'), formular: formular);
+    } on SchutzPruefung {
+      // Antwortet der Schutzdienst, kam die Anfrage nie bei Moodle an: Das
+      // Passwort wurde dort nicht geprüft, also auch nicht abgelehnt -- kein
+      // Fehlversuch, die Zugangsdaten bleiben (_neuAnmelden).
+      throw MoodleNichtErreichbar(_schutzBeiAnmeldung);
     } on MoodleNichtErreichbar catch (e) {
       // Ob das Passwort angekommen und abgelehnt worden ist, weiß hier niemand:
       // zählt wie ein Fehlversuch, nicht wie „nicht erreichbar" (_neuAnmelden).
@@ -1565,6 +1576,10 @@ class MoodleZugang {
     _druckaufbereitung = druck;
     _themeStylesheet = stylesheet;
   }
+
+  static const _schutzBeiAnmeldung =
+      'Der Schutzdienst vor Moodle lässt die App gerade nicht zur Anmeldung. '
+      'Das Passwort ist nicht geprüft worden. Später noch einmal versuchen.';
 
   /// Nur einmal je Stand ins Protokoll, nicht bei jeder Neuanmeldung.
   bool _druckGemeldet = false;
